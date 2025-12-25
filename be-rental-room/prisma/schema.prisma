@@ -1,0 +1,739 @@
+// PRISMA SCHEMA - ROOM RENTAL MANAGEMENT SYSTEM (PHASE 3 - WITH AI)
+// This file is the single source of truth for your database schema
+// Version: 3.0 - Production Ready with AI Features
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  TENANT
+  LANDLORD
+  ADMIN
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  STUDIO
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+}
+
+enum AmenityType {
+  AC
+  FRIDGE
+  WASHER
+  BED
+  WIFI
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ContractStatus {
+  ACTIVE
+  TERMINATED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum ItemType {
+  RENT
+  UTILITY
+  SERVICE
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOMO
+  ZALOPAY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum ServiceType {
+  ELECTRICITY
+  WATER
+  INTERNET
+  PARKING
+  CLEANING
+}
+
+enum BillingMethod {
+  FIXED
+  METERED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  APPLIANCE
+  OTHER
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  PAYMENT
+  CONTRACT
+  MAINTENANCE
+  APPLICATION
+  SYSTEM
+}
+
+enum FeedbackType {
+  BUG_REPORT
+  FEATURE_REQUEST
+  GENERAL_INQUIRY
+  OTHER
+}
+
+enum FeedbackStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum UserAiFeedback {
+  HELPFUL
+  NOT_HELPFUL
+  INACCURATE
+  OFFENSIVE
+}
+
+// ============================================================================
+// CORE MODELS
+// ============================================================================
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  fullName      String   @map("full_name") @db.VarChar(100)
+  email         String   @unique @db.VarChar(100)
+  passwordHash  String   @map("password_hash") @db.VarChar(255)
+  phoneNumber   String?  @map("phone_number") @db.VarChar(20)
+  role          UserRole
+  
+  // Email Verification
+  emailVerified         Boolean   @default(false) @map("email_verified")
+  verificationCode      String?   @map("verification_code") @db.VarChar(6)
+  verificationExpiry    DateTime? @map("verification_expiry")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant                  Tenant?
+  landlord                Landlord?
+  notifications           Notification[]
+  aiInteractionLogs       AiInteractionLog[]
+  assignedMaintenanceReqs MaintenanceRequest[] @relation("AssignedMaintenanceRequests")
+  terminatedContracts     Contract[]           @relation("ContractTerminatedBy")
+  systemFeedbacks         SystemFeedback[]
+
+  @@index([email])
+  @@map("user")
+}
+
+model Tenant {
+  userId              String    @id @map("user_id") @db.Uuid
+  dateOfBirth         DateTime? @map("date_of_birth") @db.Date
+  citizenId           String?   @map("citizen_id") @db.VarChar(20)
+  emergencyContact    String?   @map("emergency_contact") @db.VarChar(100)
+  budgetMin           Decimal?  @map("budget_min") @db.Decimal(10, 2)
+  budgetMax           Decimal?  @map("budget_max") @db.Decimal(10, 2)
+  preferredLocation   String?   @map("preferred_location") @db.VarChar(100)
+  employmentStatus    String?   @map("employment_status") @db.VarChar(50)
+  
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rentalApplications  RentalApplication[]
+  contracts           Contract[]
+  maintenanceRequests MaintenanceRequest[]
+  payments            Payment[]
+  invoices            Invoice[]
+  roomReviews         RoomReview[]
+  aiProfile           TenantAiProfile?
+
+  @@index([userId])
+  @@map("tenant")
+}
+
+model Landlord {
+  userId        String   @id @map("user_id") @db.Uuid
+  citizenId     String?  @map("citizen_id") @db.VarChar(20)
+  bankAccount   String?  @map("bank_account") @db.VarChar(50)
+  bankName      String?  @map("bank_name") @db.VarChar(100)
+  address       String?  @db.Text
+  propertyCount Int      @default(0) @map("property_count") // NOTE: Update via app logic or trigger
+  rating        Float?
+  verified      Boolean  @default(false)
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  properties        Property[]
+  rentalApplications RentalApplication[]
+  contracts         Contract[]
+
+  @@index([userId])
+  @@index([verified])
+  @@map("landlord")
+}
+
+model Property {
+  id           String       @id @default(uuid()) @db.Uuid
+  landlordId   String       @map("landlord_id") @db.Uuid
+  name         String       @db.VarChar(100)
+  address      String       @db.Text
+  city         String       @db.VarChar(50) // Province / City (e.g., TP. Hồ Chí Minh)
+  cityCode     String?      @map("city_code") @db.VarChar(20) // Optional administrative code
+  ward         String       @db.VarChar(50) // Ward / Commune / Township (e.g., Phường Võ Thị Sáu)
+  wardCode     String?      @map("ward_code") @db.VarChar(20) // Optional administrative code
+  propertyType PropertyType @map("property_type")
+  description  String?      @db.Text
+  
+  // Soft Delete
+  deletedAt    DateTime?    @map("deleted_at")
+  
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  landlord Landlord  @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  rooms    Room[]
+  services Service[]
+
+  @@unique([landlordId, name]) // Prevent duplicate property names per landlord
+  @@index([landlordId])
+  @@index([city, ward]) // Optimized index for Province -> Ward searches
+  @@index([deletedAt])
+  @@map("property")
+}
+
+model Room {
+  id             String     @id @default(uuid()) @db.Uuid
+  propertyId     String     @map("property_id") @db.Uuid
+  roomNumber     String     @map("room_number") @db.VarChar(20)
+  area           Float
+  pricePerMonth  Decimal    @map("price_per_month") @db.Decimal(10, 2)
+  deposit        Decimal    @db.Decimal(10, 2)
+  status         RoomStatus
+  description    String?    @db.Text
+  maxOccupants   Int?       @map("max_occupants")
+  
+  // Soft Delete
+  deletedAt      DateTime?  @map("deleted_at")
+  
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  property            Property              @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  images              RoomImage[]
+  amenities           RoomAmenity[]
+  rentalApplications  RentalApplication[]
+  contracts           Contract[]
+  maintenanceRequests MaintenanceRequest[]
+  reviews             RoomReview[]
+  embedding           RoomEmbedding?
+  aiInteractionLogs   AiInteractionLog[]    @relation("ClickedRoom")
+
+  @@index([propertyId, status]) // Frequent query: rooms by property + status
+  @@index([pricePerMonth])       // Frequent query: search by price
+  @@index([status])
+  @@index([deletedAt])
+  @@unique([propertyId, roomNumber])
+  @@map("room")
+}
+
+model RoomImage {
+  id           String @id @default(uuid()) @db.Uuid
+  roomId       String @map("room_id") @db.Uuid
+  imageUrl     String @map("image_url") @db.Text
+  displayOrder Int    @map("display_order")
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, displayOrder]) // Prevent duplicate order per room
+  @@index([roomId])
+  @@map("room_image")
+}
+
+model RoomAmenity {
+  id          String      @id @default(uuid()) @db.Uuid
+  roomId      String      @map("room_id") @db.Uuid
+  amenityType AmenityType @map("amenity_type")
+  quantity    Int
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_amenity")
+}
+
+model RentalApplication {
+  id                  String            @id @default(uuid()) @db.Uuid
+  roomId              String            @map("room_id") @db.Uuid
+  tenantId            String            @map("tenant_id") @db.Uuid
+  landlordId          String            @map("landlord_id") @db.Uuid
+  applicationDate     DateTime          @default(now()) @map("application_date") @db.Date
+  status              ApplicationStatus @default(PENDING)
+  requestedMoveInDate DateTime?         @map("requested_move_in_date") @db.Date
+  message             String?           @db.Text
+  
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  reviewedAt          DateTime?         @map("reviewed_at")
+
+  // Relations
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant   Tenant   @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  landlord Landlord @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  contract Contract?
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@index([landlordId])
+  @@index([status])
+  @@map("rental_application")
+}
+
+model Contract {
+  id              String         @id @default(uuid()) @db.Uuid
+  applicationId   String         @unique @map("application_id") @db.Uuid
+  roomId          String         @map("room_id") @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  landlordId      String         @map("landlord_id") @db.Uuid
+  contractNumber  String         @unique @map("contract_number") @db.VarChar(50)
+  startDate       DateTime       @map("start_date") @db.Date
+  endDate         DateTime       @map("end_date") @db.Date
+  monthlyRent     Decimal        @map("monthly_rent") @db.Decimal(10, 2)
+  depositAmount   Decimal        @map("deposit_amount") @db.Decimal(10, 2)
+  status          ContractStatus @default(ACTIVE)
+  eSignatureUrl   String?        @map("e_signature_url") @db.Text
+  
+  // Digital Signature Fields (Chữ ký số - PKI)
+  pdfUrl          String?        @map("pdf_url") @db.Text // Original PDF path
+  pdfHash         String?        @map("pdf_hash") @db.VarChar(64) // SHA-256 hash của PDF gốc
+  signedUrl       String?        @map("signed_url") @db.Text // Signed PDF path
+  signatureStatus String?        @map("signature_status") @db.VarChar(50) // PENDING_SIGNATURE, SIGNED, VERIFIED
+  
+  // Termination tracking
+  terminationReason           String?  @map("termination_reason") @db.Text
+  terminatedByUserId          String?  @map("terminated_by_user_id") @db.Uuid
+  earlyTerminationPenalty     Decimal? @map("early_termination_penalty") @db.Decimal(10, 2) @default(0)
+  noticeDays                  Int?     @map("notice_days") @default(0)
+  terminationApproved         Boolean  @map("termination_approved") @default(false)
+  
+  // Soft Delete (Important for legal/audit trail)
+  deletedAt       DateTime?      @map("deleted_at")
+  
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  signedAt        DateTime?      @map("signed_at")
+  terminatedAt    DateTime?      @map("terminated_at")
+
+  // Relations
+  application     RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  room            Room              @relation(fields: [roomId], references: [id])
+  tenant          Tenant            @relation(fields: [tenantId], references: [userId])
+  landlord        Landlord          @relation(fields: [landlordId], references: [userId])
+  terminatedBy    User?             @relation("ContractTerminatedBy", fields: [terminatedByUserId], references: [id], onDelete: SetNull)
+  invoices        Invoice[]
+  reviews         RoomReview[]
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@index([landlordId])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([terminatedByUserId])
+  @@map("contract")
+}
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  contractId    String        @map("contract_id") @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  invoiceNumber String        @unique @map("invoice_number") @db.VarChar(50) // Must be unique
+  issueDate     DateTime      @map("issue_date") @db.Date
+  dueDate       DateTime      @map("due_date") @db.Date
+  totalAmount   Decimal       @map("total_amount") @db.Decimal(10, 2)
+  status        InvoiceStatus @default(PENDING)
+  
+  // Soft Delete (Important for accounting)
+  deletedAt     DateTime?     @map("deleted_at")
+  
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  paidAt        DateTime?     @map("paid_at")
+
+  // Relations
+  contract  Contract           @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  tenant    Tenant             @relation(fields: [tenantId], references: [userId])
+  lineItems InvoiceLineItem[]
+  payments  Payment[]
+
+  @@index([contractId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([deletedAt])
+  @@map("invoice")
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  serviceId   String?  @map("service_id") @db.Uuid
+  itemType    ItemType @map("item_type")
+  description String?  @db.Text
+  quantity    Decimal  @db.Decimal(10, 2)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  amount      Decimal  @db.Decimal(10, 2)
+
+  // Relations
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([serviceId])
+  @@map("invoice_line_item")
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  invoiceId     String        @map("invoice_id") @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod @map("payment_method")
+  paymentDate   DateTime      @default(now()) @map("payment_date")
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique @map("transaction_id") @db.VarChar(100) // Must be unique
+  
+  // Soft Delete (Important for accounting)
+  deletedAt     DateTime?     @map("deleted_at")
+  
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  paidAt        DateTime?     @map("paid_at")
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [userId])
+
+  @@index([invoiceId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([deletedAt])
+  @@map("payment")
+}
+
+model Service {
+  id            String        @id @default(uuid()) @db.Uuid
+  propertyId    String        @map("property_id") @db.Uuid
+  serviceName   String        @map("service_name") @db.VarChar(50)
+  serviceType   ServiceType   @map("service_type")
+  billingMethod BillingMethod @map("billing_method")
+  unitPrice     Decimal       @map("unit_price") @db.Decimal(10, 2)
+  unit          String?       @db.VarChar(20)
+  description   String?       @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  invoiceLineItems InvoiceLineItem[]
+
+  @@index([propertyId])
+  @@map("service")
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(uuid()) @db.Uuid
+  roomId      String              @map("room_id") @db.Uuid
+  tenantId    String              @map("tenant_id") @db.Uuid
+  title       String              @db.VarChar(200)
+  description String              @db.Text
+  priority    MaintenancePriority @default(MEDIUM)
+  category    MaintenanceCategory
+  status      MaintenanceStatus   @default(PENDING)
+  requestDate DateTime            @default(now()) @map("request_date")
+  assignedTo  String?             @map("assigned_to") @db.Uuid
+  cost        Decimal?            @db.Decimal(10, 2)
+  
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+  completedAt DateTime?           @map("completed_at")
+  
+  // Feedback
+  rating      Int?                // Rating 1-5
+  feedback    String?             @db.Text
+  feedbackAt  DateTime?           @map("feedback_at")
+
+  // Relations
+  room         Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant       Tenant @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  assignedUser User?  @relation("AssignedMaintenanceRequests", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([priority])
+  @@map("maintenance_request")
+}
+
+model RoomReview {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  roomId            String   @map("room_id") @db.Uuid
+  contractId        String   @map("contract_id") @db.Uuid
+  rating            Int
+  cleanlinessRating Int      @map("cleanliness_rating")
+  locationRating    Int      @map("location_rating")
+  valueRating       Int      @map("value_rating")
+  comment           String?  @db.Text
+  
+  // Enhanced Review Features
+  reviewImages      String[] @default([]) @map("review_images")
+  landlordReply     String?  @map("landlord_reply") @db.Text
+  repliedAt         DateTime? @map("replied_at")
+  isVisible         Boolean  @default(true) @map("is_visible")
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant   Tenant   @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@map("room_review")
+}
+
+model Notification {
+  id              String           @id @default(uuid()) @db.Uuid
+  userId          String           @map("user_id") @db.Uuid
+  title           String           @db.VarChar(100)
+  content         String           @db.Text
+  notificationType NotificationType @map("notification_type")
+  relatedEntityId String?          @map("related_entity_id") @db.Uuid
+  isRead          Boolean          @default(false) @map("is_read")
+  sentAt          DateTime         @default(now()) @map("sent_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  readAt          DateTime?        @map("read_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([notificationType])
+  @@map("notification")
+}
+
+model SystemFeedback {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  type        FeedbackType
+  title       String         @db.VarChar(200)
+  description String         @db.Text
+  rating      Int?           // Optional 1-5 rating
+  status      FeedbackStatus @default(PENDING)
+  images      String[]       @default([]) // URLs of attached images
+  
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  resolvedAt  DateTime?      @map("resolved_at")
+
+  // Relations
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@map("system_feedback")
+}
+
+// ============================================================================
+// AI MODULE - SEMANTIC SEARCH & RECOMMENDATIONS
+// ============================================================================
+
+// 1. Vector Embeddings for Rooms (Semantic Search)
+model RoomEmbedding {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @unique @map("room_id") @db.Uuid
+  
+  // Text used to generate vector (auto-generated from Room data)
+  rawText   String   @map("raw_text") @db.Text
+  
+  // Vector 768 dimensions (Gemini text-embedding-004)
+  // NOTE: Requires pgvector extension: CREATE EXTENSION IF NOT EXISTS vector;
+  embedding Unsupported("vector(768)")? 
+  
+  // Metadata for tracking
+  embeddingModel String   @default("gemini-text-embedding-004") @map("embedding_model") @db.VarChar(50)
+  lastUpdated    DateTime @updatedAt @map("last_updated")
+  
+  // Relations
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_embedding")
+}
+
+// 2. Tenant AI Profile (Personalized Recommendations)
+model TenantAiProfile {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @unique @map("tenant_id") @db.Uuid
+  
+  // Search history (limit to 50 most recent queries)
+  // NOTE: Consider moving to separate table if grows large
+  searchHistory  String[] @default([]) @map("search_history")
+  
+  // Preference vector (average of search queries)
+  preferenceVector Unsupported("vector(768)")? @map("preference_vector")
+  
+  // Metadata
+  searchCount    Int      @default(0) @map("search_count")
+  lastSearched   DateTime @default(now()) @map("last_searched")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  tenant         Tenant   @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([lastSearched])
+  @@map("tenant_ai_profile")
+}
+
+// 3. Search Cache (PostgreSQL cache for vector queries)
+// NOTE: Use Redis for hot cache, PostgreSQL for persistence
+model SearchCache {
+  id          String   @id @default(uuid()) @db.Uuid
+  
+  // Original query (lowercase, trimmed for normalization)
+  query       String   @unique @db.VarChar(500)
+  
+  // Query vector
+  queryVector Unsupported("vector(768)")? @map("query_vector")
+  
+  // Metadata
+  hitCount    Int      @default(1) @map("hit_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  lastUsed    DateTime @default(now()) @map("last_used")
+  
+  // Auto-expire after 7 days (handled by DB or cron job)
+  expiresAt   DateTime @map("expires_at") @default(dbgenerated("now() + INTERVAL '7 DAYS'"))
+
+  @@index([query])
+  @@index([lastUsed])
+  @@index([hitCount(sort: Desc)])
+  @@map("search_cache")
+}
+
+// 4. AI Interaction Log (Analytics & Improvement)
+model AiInteractionLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  
+  // Action type
+  action          String   @db.VarChar(50)
+  // VIEW_ROOM, LIKE_ROOM, SEARCH, BOOK_ROOM, SEMANTIC_SEARCH, HYBRID_SEARCH
+  
+  // Input data (JSON)
+  inputData       Json?    @map("input_data")
+  
+  // AI response (JSON)
+  aiResponse      Json?    @map("ai_response")
+  
+  // Metadata
+  searchType      String?  @map("search_type") @db.VarChar(20) // SEMANTIC, HYBRID, KEYWORD
+  resultCount     Int?     @map("result_count")
+  responseTimeMs  Int?     @map("response_time_ms")
+  clickedRoomId   String?  @map("clicked_room_id") @db.Uuid
+  
+  // AI Feedback
+  userFeedback    UserAiFeedback? @map("user_feedback")
+  feedbackReason  String?         @map("feedback_reason") @db.Text
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clickedRoom     Room?    @relation("ClickedRoom", fields: [clickedRoomId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([searchType])
+  @@index([createdAt])
+  @@index([clickedRoomId])
+  @@map("ai_interaction_log")
+}
+
+// 5. Popular Searches (Analytics Dashboard)
+model PopularSearch {
+  id           String   @id @default(uuid()) @db.Uuid
+  query        String   @unique @db.VarChar(500)
+  searchCount  Int      @default(1) @map("search_count")
+  lastSearched DateTime @default(now()) @map("last_searched")
+  
+  // Cache results for popular queries (Optional - use Redis instead)
+  cachedResults Json?   @map("cached_results")
+  cacheExpiry   DateTime? @map("cache_expiry")
+
+  @@index([searchCount(sort: Desc)])
+  @@index([lastSearched(sort: Desc)])
+  @@map("popular_search")
+}

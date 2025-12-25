@@ -1,0 +1,84 @@
+apiVersion: 2021-09-01
+location: southeastasia
+name: rental-room-api
+properties:
+  containers:
+  - name: api
+    properties:
+      image: rentalroomacr.azurecr.io/rental-room-api:latest
+      resources:
+        requests:
+          cpu: 1.0
+          memoryInGb: 1.5
+      ports:
+      - port: 3000
+        protocol: TCP
+      environmentVariables:
+      # Application
+      - name: NODE_ENV
+        value: production
+      - name: PORT
+        value: '3000'
+      - name: CORS_ORIGIN
+        value: https://yourdomain.com
+      
+      # Database (use secureValue for sensitive data)
+      - name: DATABASE_URL
+        secureValue: postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres
+      
+      # Redis
+      - name: REDIS_HOST
+        value: your-redis.upstash.io
+      - name: REDIS_PORT
+        value: '6379'
+      - name: REDIS_PASSWORD
+        secureValue: your-redis-password
+      - name: REDIS_TTL
+        value: '3600'
+      
+      # JWT
+      - name: JWT_SECRET
+        secureValue: your-jwt-secret
+      - name: JWT_EXPIRES_IN
+        value: 15m
+      - name: JWT_REFRESH_SECRET
+        secureValue: your-refresh-secret
+      - name: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      
+      # Email
+      - name: MAIL_HOST
+        value: smtp.gmail.com
+      - name: MAIL_PORT
+        value: '587'
+      - name: MAIL_USER
+        value: your-email@gmail.com
+      - name: MAIL_PASSWORD
+        secureValue: your-app-password
+      - name: MAIL_FROM
+        value: noreply@yourdomain.com
+      - name: MAIL_FROM_NAME
+        value: Rental Room
+      
+      # AI
+      - name: GEMINI_API_KEY
+        secureValue: your-gemini-key
+  
+  osType: Linux
+  ipAddress:
+    type: Public
+    ports:
+    - protocol: TCP
+      port: 3000
+    dnsNameLabel: rental-room-api
+  
+  imageRegistryCredentials:
+  - server: rentalroomacr.azurecr.io
+    username: rentalroomacr
+    password: <get-from-azure-portal>
+
+tags:
+  environment: production
+  project: rental-room
+
+type: Microsoft.ContainerInstance/containerGroups

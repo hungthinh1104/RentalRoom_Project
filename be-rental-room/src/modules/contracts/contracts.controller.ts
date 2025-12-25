@@ -1,0 +1,255 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  BadRequestException,
+  Res,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { ContractsService } from './contracts.service';
+import { ContractSigningService } from './services/contract-signing.service';
+import { PdfQueueService } from './services/pdf-queue.service';
+import {
+  CreateRentalApplicationDto,
+  CreateContractDto,
+  UpdateContractDto,
+  FilterRentalApplicationsDto,
+  FilterContractsDto,
+} from './dto';
+import { UserRole } from '../users/entities';
+import { Auth } from 'src/common/decorators/auth.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+
+@Controller('contracts')
+export class ContractsController {
+  constructor(
+    private readonly contractsService: ContractsService,
+    private readonly contractSigningService: ContractSigningService,
+    private readonly pdfQueueService: PdfQueueService,
+  ) {}
+
+  // ===== RENTAL APPLICATIONS ENDPOINTS =====
+
+  @Post('applications')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  createApplication(@Body() createDto: CreateRentalApplicationDto) {
+    return this.contractsService.createApplication(createDto);
+  }
+
+  @Get('applications')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  findAllApplications(@Query() filterDto: FilterRentalApplicationsDto) {
+    return this.contractsService.findAllApplications(filterDto);
+  }
+
+  @Get('applications/:id')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  findOneApplication(@Param('id') id: string) {
+    return this.contractsService.findOneApplication(id);
+  }
+
+  @Patch('applications/:id/approve')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  approveApplication(@Param('id') id: string) {
+    return this.contractsService.approveApplication(id);
+  }
+
+  @Patch('applications/:id/reject')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  rejectApplication(@Param('id') id: string) {
+    return this.contractsService.rejectApplication(id);
+  }
+
+  @Patch('applications/:id/withdraw')
+  @Auth(UserRole.TENANT)
+  withdrawApplication(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.contractsService.withdrawApplication(id, user.id);
+  }
+
+  // ===== CONTRACT MANAGEMENT ENDPOINTS =====
+
+  /**
+   * GET /contracts/jobs/:jobId (MUST be before :id routes)
+   * - Check PDF generation job status
+   */
+  @Get('jobs/:jobId')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async checkJobStatus(@Param('jobId') jobId: string) {
+    const job = await this.pdfQueueService.getJob(jobId);
+    if (!job) {
+      throw new NotFoundException(`Job ${jobId} not found`);
+    }
+    return job;
+  }
+
+  @Post()
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  create(@Body() createContractDto: CreateContractDto) {
+    return this.contractsService.create(createContractDto);
+  }
+
+  @Get()
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  findAll(@Query() filterDto: FilterContractsDto) {
+    return this.contractsService.findAll(filterDto);
+  }
+
+  @Get(':id')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  findOne(@Param('id') id: string) {
+    return this.contractsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  update(
+    @Param('id') id: string,
+    @Body() updateContractDto: UpdateContractDto,
+  ) {
+    return this.contractsService.update(id, updateContractDto);
+  }
+
+  @Patch(':id/terminate')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  terminate(
+    @Param('id') id: string,
+    @Body() terminateDto: { reason: string; noticeDays?: number },
+    @CurrentUser() user: any,
+  ) {
+    return this.contractsService.terminate(id, user.id, terminateDto);
+  }
+
+  @Delete(':id')
+  @Auth(UserRole.ADMIN)
+  remove(@Param('id') id: string) {
+    return this.contractsService.remove(id);
+  }
+
+  // ===== DIGITAL SIGNATURE ENDPOINTS (Chữ ký số) =====
+
+  /**
+   * POST /contracts/:id/generate-pdf-async (NON-BLOCKING)
+   * - Tạo job và trả về jobId ngay lập tức
+   * - PDF generation chạy background (không block event loop)
+   */
+  @Post(':id/generate-pdf-async')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async generatePDFAsync(
+    @Param('id') id: string,
+    @Body('templateName') templateName: string = 'rental-agreement',
+  ) {
+    // Create job và trả về ngay
+    const jobId = await this.pdfQueueService.createJob(id, templateName);
+
+    // Process PDF in background (non-blocking)
+    setImmediate(() => {
+      void (async () => {
+        try {
+          await this.pdfQueueService.markProcessing(jobId);
+          const result = await this.contractSigningService.generateContractPDF(
+            id,
+            templateName,
+          );
+          await this.pdfQueueService.markCompleted(jobId, result);
+        } catch (error: unknown) {
+          const msg = (error as Error)?.message ?? String(error);
+          await this.pdfQueueService.markFailed(jobId, msg);
+        }
+      })();
+    });
+
+    return {
+      jobId,
+      status: 'pending',
+      message:
+        'PDF generation started. Check /contracts/jobs/:jobId for status',
+    };
+  }
+
+  /**
+   * POST /contracts/:id/generate-pdf (SYNCHRONOUS - giữ lại cho compatibility)
+   * - Tạo PDF từ contract data
+   * - Hash file PDF
+   * - Lưu file gốc để ký sau
+   */
+  @Post(':id/generate-pdf')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async generateContractPDF(
+    @Param('id') id: string,
+    @Body('templateName') templateName: string = 'rental-agreement',
+  ) {
+    return this.contractSigningService.generateContractPDF(id, templateName);
+  }
+
+  /**
+   * POST /contracts/:id/sign
+   * - Ký file PDF bằng Private Key của hệ thống
+   * - Embed chữ ký vào file
+   * - Tạo audit log (ai ký, khi nào, từ đâu)
+   */
+  @Post(':id/sign')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async signContract(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { reason: string },
+  ) {
+    if (!user) {
+      throw new BadRequestException('User information is required');
+    }
+
+    return this.contractSigningService.signContract(
+      id,
+      {
+        name: user.fullName,
+        email: user.email,
+        userId: user.id,
+        reason: body.reason || 'Contract signature',
+      },
+      {
+        ipAddress: 'N/A', // Nên parse từ request headers: req.ip
+        userAgent: 'N/A', // Nên parse từ request headers
+        deviceInfo: 'Web Browser',
+      },
+    );
+  }
+
+  /**
+   * GET /contracts/:id/verify
+   * - Kiểm tra chữ ký có hợp lệ không
+   * - Xác nhận file chưa bị sửa đổi
+   */
+  @Get(':id/verify')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async verifyContract(@Param('id') id: string) {
+    return this.contractSigningService.verifyContract(id);
+  }
+
+  /**
+   * GET /contracts/:id/download-signed
+   * - Download file PDF đã ký
+   */
+  @Get(':id/download-signed')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async downloadSignedPDF(@Param('id') id: string, @Res() res: Response) {
+    try {
+      const { buffer, fileName } =
+        await this.contractSigningService.downloadSignedPDF(id);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${fileName}"`,
+      );
+      res.send(buffer);
+    } catch (error) {
+      const msg = (error as Error)?.message ?? String(error);
+      throw new BadRequestException(msg);
+    }
+  }
+}

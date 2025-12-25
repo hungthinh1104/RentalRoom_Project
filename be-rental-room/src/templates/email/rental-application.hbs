@@ -1,0 +1,53 @@
+<html>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
+      <!-- Header -->
+      <div style="background-color: #0066cc; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+        <h1 style="margin: 0;">Đơn Đăng Ký Thuê Phòng Mới</h1>
+      </div>
+
+      <!-- Content -->
+      <div style="padding: 20px;">
+        <p>Xin chào <strong>{{landlordName}}</strong>,</p>
+
+        <p>Bạn có một đơn đăng ký thuê phòng mới từ một khách hàng tiềm năng:</p>
+
+        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
+          <p><strong>Thông tin phòng:</strong></p>
+          <ul style="margin: 5px 0;">
+            <li><strong>Tên phòng:</strong> {{roomName}}</li>
+            <li><strong>Địa chỉ:</strong> {{roomAddress}}</li>
+            <li><strong>Giá thuê:</strong> {{roomPrice}} VNĐ/tháng</li>
+          </ul>
+
+          <p style="margin-top: 15px;"><strong>Thông tin người đăng ký:</strong></p>
+          <ul style="margin: 5px 0;">
+            <li><strong>Tên:</strong> {{tenantName}}</li>
+            <li><strong>Email:</strong> {{tenantEmail}}</li>
+            <li><strong>Điện thoại:</strong> {{tenantPhone}}</li>
+          </ul>
+
+          {{#if requestedMoveInDate}}
+          <p style="margin-top: 10px;"><strong>Ngày dự kiến nhận phòng:</strong> {{requestedMoveInDate}}</p>
+          {{/if}}
+
+          {{#if message}}
+          <p style="margin-top: 10px;"><strong>Tin nhắn từ khách hàng:</strong></p>
+          <p style="font-style: italic; margin-top: 5px;">{{message}}</p>
+          {{/if}}
+        </div>
+
+        <p>Vui lòng đăng nhập vào hệ thống để xem chi tiết và phản hồi lại đơn đăng ký.</p>
+
+        <a href="{{dashboardUrl}}" style="display: inline-block; background-color: #0066cc; color: white; padding: 12px 24px; border-radius: 5px; text-decoration: none; margin: 15px 0;">Xem Đơn Đăng Ký</a>
+
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+
+        <p style="font-size: 12px; color: #666;">
+          Đây là thư tự động từ hệ thống. Vui lòng không trả lời email này.<br>
+          © 2024 Rental Room. Tất cả quyền được bảo lưu.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
