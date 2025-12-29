@@ -1,6 +1,5 @@
 import api from '@/lib/api/client';
 import type { LoginDto, RegisterDto, AuthResponse } from '@/types';
-import { setAccessToken, clearTokens } from '@/lib/api/client';
 
 export const authApi = {
 	async register(dto: RegisterDto) {
@@ -22,19 +21,21 @@ export const authApi = {
 
 	async login(dto: LoginDto) {
 		const { data } = await api.post<AuthResponse>('/auth/login', dto);
-		// Store access token only; refresh token is set as HttpOnly cookie by the server
-		setAccessToken(data.access_token);
+		// Note: Authentication is now handled via NextAuth and HttpOnly cookies
+		// This endpoint is kept for backwards compatibility but shouldn't be used directly
 		return data;
 	},
 
 	async refreshToken(refreshToken?: string) {
 		const body = refreshToken ? { refresh_token: refreshToken } : undefined;
 		const { data } = await api.post<{ access_token: string }>('/auth/refresh', body);
-		setAccessToken(data.access_token);
+		// Token refresh is now handled automatically by browser cookies
 		return data;
 	},
 
-	logout() {
-		clearTokens();
+	async logout() {
+		// Logout is now handled by NextAuth signOut
+		// This function is kept for backwards compatibility
+		await api.post('/auth/logout');
 	},
 };
