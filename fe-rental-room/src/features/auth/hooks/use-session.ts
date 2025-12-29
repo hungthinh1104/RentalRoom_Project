@@ -1,41 +1,25 @@
-import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSession as useNextAuthSession } from 'next-auth/react';
-import { authApi } from '../api/auth-api';
-import { setAccessToken, clearTokens } from '@/lib/api/client';
+import { useSession as useNextAuthSession, signOut } from 'next-auth/react';
 
 /**
  * Hook for accessing current user session
  * Wraps NextAuth useSession with type safety
+ * All authentication is handled via HttpOnly cookies
  * 
  * @example
  * const { data: session, status } = useSession()
  * 
  * if (status === "authenticated") {
- *   console.log(session.user.role) // TENANT | LANDLORD
+ *   console.log(session.user.role) // TENANT | LANDLORD | ADMIN
  * }
  */
 export function useSession() {
-	const sessionResult = useNextAuthSession();
-
-	// Sync tokens from NextAuth session to API client helpers (client-side)
-	useEffect(() => {
-		if (typeof window === 'undefined') return;
-		const { accessToken } = sessionResult.data ?? {};
-		if (accessToken) setAccessToken(accessToken);
-		// We no longer persist refresh tokens client-side (cookie-only refresh)
-		// If session lost, clear client tokens
-		if (!accessToken && sessionResult.status === 'unauthenticated') {
-			clearTokens();
-		}
-	}, [sessionResult.data, sessionResult.status]);
-
-	return sessionResult;
+	return useNextAuthSession();
 }
 
 /**
  * Hook for user logout
- * Clears tokens and query cache
+ * Uses NextAuth signOut to clear session cookies
  * 
  * @example
  * const { mutate: logout, isPending } = useLogout()
@@ -48,13 +32,12 @@ export function useLogout() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: () => {
-			// Clear localStorage tokens
-			authApi.logout();
-			return Promise.resolve();
+		mutationFn: async () => {
+			// Use NextAuth signOut to clear session properly
+			await signOut({ redirect: false });
 		},
 		onSuccess: () => {
-			// Clear all cached data
+			// Clear all cached query data
 			queryClient.clear();
 		},
 	});
