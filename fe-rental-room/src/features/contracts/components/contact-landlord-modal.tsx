@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,6 +34,7 @@ export function ContactLandlordModal({
 }: ContactLandlordModalProps) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     message: '',
@@ -75,6 +77,9 @@ export function ContactLandlordModal({
 
       console.log('[ContactLandlordModal] API success:', result);
       toast.success(`Đơn đăng ký của bạn đã được gửi cho ${landlordName}. Chúng tôi sẽ thông báo cho bạn khi có phản hồi.`);
+
+      // Invalidate and refetch applications to show the new one
+      await queryClient.invalidateQueries({ queryKey: ['applications'] });
 
       // Reset form
       setFormData({ message: '', requestedMoveInDate: '' });
