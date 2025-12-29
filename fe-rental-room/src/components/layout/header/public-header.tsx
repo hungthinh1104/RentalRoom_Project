@@ -7,7 +7,6 @@ import { Building2, Menu, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useSession, signOut } from 'next-auth/react';
-import { clearTokens } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 
 export function PublicHeader() {
@@ -30,7 +29,7 @@ export function PublicHeader() {
     if (typeof window !== 'undefined') {
       try {
         clearTokens();
-      } catch {}
+      } catch { }
     }
     await signOut({ redirect: false });
     router.push('/');
@@ -38,7 +37,7 @@ export function PublicHeader() {
   };
 
   return (
-        <header style={{ height: 'var(--height-header)' }} className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header style={{ height: 'var(--height-header)' }} className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-3 items-center gap-4 h-full">
         {/* Logo */}
         <Link href="/" className="flex items-center space-x-2 flex-shrink-0 py-2 pl-2">
@@ -97,7 +96,7 @@ export function PublicHeader() {
             <>
               <div className="flex items-center gap-2 shrink-0">
                 <Button variant="outline" size="sm" asChild>
-                   <Link href="/login" onClick={() => saveCallbackUrl(pathname)}>Đăng nhập</Link>
+                  <Link href="/login" onClick={() => saveCallbackUrl(pathname)}>Đăng nhập</Link>
                 </Button>
                 <Button size="sm" asChild>
                   <Link href="/register">Đăng ký</Link>
@@ -143,7 +142,7 @@ export function PublicHeader() {
                         variant="outline"
                         asChild
                       >
-                          <Link href={`/dashboard/${session.user.role?.toLowerCase()}`}>
+                        <Link href={`/dashboard/${session.user.role?.toLowerCase()}`}>
                           Bảng điều khiển
                         </Link>
                       </Button>
