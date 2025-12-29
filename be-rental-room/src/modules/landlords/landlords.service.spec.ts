@@ -52,6 +52,9 @@ describe('LandlordsService', () => {
     it('should create a new landlord', async () => {
       const createDto = {
         userId: mockLandlord.userId,
+        fullName: 'Test Landlord',
+        email: 'landlord@example.com',
+        phoneNumber: '0987654321',
         citizenId: mockLandlord.citizenId,
         dateOfBirth: '1985-05-15',
         address: mockLandlord.address,

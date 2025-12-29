@@ -1,4 +1,10 @@
-import { Controller, Get, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -30,7 +36,6 @@ import {
   AdminOverviewResponseDto,
   AdminMarketInsightsQueryDto,
   AdminMarketInsightsResponseDto,
-  LandlordRatingResponseDto,
   LandlordRatingQueryDto,
   PaginatedLandlordRatingResponseDto,
 } from './dto/admin-report.dto';
@@ -48,7 +53,7 @@ export class ReportsController {
     private readonly adminService: AdminReportService,
     private readonly landlordService: LandlordReportService,
     private readonly tenantService: TenantReportService,
-  ) { }
+  ) {}
 
   /**
    * GET /reports/landlord/revenue
@@ -235,7 +240,6 @@ export class ReportsController {
    * Get landlord ratings for admin
    */
   @Get('admin/ratings')
-  @Roles(UserRole.ADMIN)
   @Roles(UserRole.ADMIN)
   @ApiOperation({
     summary: 'Get landlord ratings',

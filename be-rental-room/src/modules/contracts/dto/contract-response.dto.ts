@@ -1,4 +1,4 @@
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Transform, Type } from 'class-transformer';
 
 @Exclude()
 export class ContractResponseDto {
@@ -24,9 +24,21 @@ export class ContractResponseDto {
   endDate: Date;
 
   @Expose()
+  @Transform(({ value }) => {
+    if (value && typeof value === 'object' && 'toNumber' in value) {
+      return value.toNumber();
+    }
+    return value ? Number(value) : null;
+  })
   monthlyRent: number;
 
   @Expose()
+  @Transform(({ value }) => {
+    if (value && typeof value === 'object' && 'toNumber' in value) {
+      return value.toNumber();
+    }
+    return value ? Number(value) : null;
+  })
   depositAmount: number;
 
   @Expose()
@@ -43,4 +55,35 @@ export class ContractResponseDto {
 
   @Expose()
   terminatedAt?: Date;
+
+  @Expose()
+  paymentDay?: number;
+
+  @Expose()
+  terms?: string;
+
+  @Expose()
+  maxOccupants?: number;
+
+  @Expose()
+  @Type(() => ContractResidentResponseDto)
+  residents?: ContractResidentResponseDto[];
+}
+
+@Exclude()
+export class ContractResidentResponseDto {
+  @Expose()
+  id: string;
+
+  @Expose()
+  fullName: string;
+
+  @Expose()
+  phoneNumber?: string;
+
+  @Expose()
+  citizenId?: string;
+
+  @Expose()
+  relationship?: string;
 }

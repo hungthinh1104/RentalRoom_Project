@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Room } from "@/types";
 import { RoomCard } from "./room-card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RoomListProps {
   rooms: Room[];
@@ -14,9 +15,18 @@ export const RoomList = memo(function RoomList({ rooms, isLoading }: RoomListPro
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
-            className="h-[560px] rounded-[20px] bg-muted animate-pulse"
-            aria-label={`Loading room ${i + 1}`}
-          />
+            className="rounded-[28px] bg-card/80 backdrop-blur-xl shadow-xl overflow-hidden"
+            aria-label={`Đang tải phòng ${i + 1}`}
+          >
+            <div className="h-72 w-full">
+              <Skeleton className="h-72 w-full" />
+            </div>
+            <div className="p-5">
+              <Skeleton className="h-5 w-3/4 mb-3" />
+              <Skeleton className="h-4 w-1/2 mb-2" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          </div>
         ))}
       </div>
     );

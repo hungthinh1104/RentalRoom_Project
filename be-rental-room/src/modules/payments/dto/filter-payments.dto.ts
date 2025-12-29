@@ -30,6 +30,7 @@ export class FilterPaymentsDto extends PaginationDto {
   @IsOptional()
   @IsUUID()
   landlordId?: string;
+  @IsOptional()
   @IsString()
   search?: string; // Search in transactionId
 }

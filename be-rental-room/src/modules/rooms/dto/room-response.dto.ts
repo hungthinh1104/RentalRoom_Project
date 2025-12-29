@@ -1,4 +1,4 @@
-import { Exclude, Expose, Type } from 'class-transformer';
+import { Exclude, Expose, Transform, Type } from 'class-transformer';
 import { RoomStatus } from '../entities';
 
 @Exclude()
@@ -34,9 +34,21 @@ export class RoomResponseDto {
   area: number;
 
   @Expose()
+  @Transform(({ value }) => {
+    if (value && typeof value === 'object' && 'toNumber' in value) {
+      return value.toNumber();
+    }
+    return value ? Number(value) : 0;
+  })
   pricePerMonth: number;
 
   @Expose()
+  @Transform(({ value }) => {
+    if (value && typeof value === 'object' && 'toNumber' in value) {
+      return value.toNumber();
+    }
+    return value ? Number(value) : 0;
+  })
   deposit: number;
 
   @Expose()
@@ -54,8 +66,28 @@ export class RoomResponseDto {
   @Expose()
   updatedAt?: Date;
 
+  // Review statistics
+  @Expose()
+  averageRating?: number;
+
+  @Expose()
+  reviewCount?: number;
+
   // Optional: Include related property info
   @Expose()
   @Type(() => PropertyBasicDto)
   property?: PropertyBasicDto;
+
+  @Expose()
+  @Transform(({ value }) => value?.map((img: any) => img.imageUrl) || [])
+  images: string[];
+
+  @Expose()
+  @Transform(
+    ({ value }) => value?.map((amenity: any) => amenity.amenityType) || [],
+  )
+  amenities: string[];
+
+  @Expose()
+  isFavorited?: boolean;
 }

@@ -7,7 +7,7 @@ import { X, MessageCircle, Sparkles, Loader2, Trash2 } from "lucide-react";
 import { useAIChat, CHAT_SUGGESTIONS } from "../hooks/use-ai-chat";
 import { AIChatInput } from "./ai-chat-input";
 import { AIChatMessages } from "./ai-chat-messages";
-import { cn } from "@/lib/utils";
+
 import { useEffect, useRef } from "react";
 
 export function AIChatWidget() {

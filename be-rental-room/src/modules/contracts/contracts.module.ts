@@ -9,8 +9,10 @@ import { PdfQueueService } from './services/pdf-queue.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from 'src/common/common.module';
 
+import { PaymentsModule } from '../payments/payments.module';
+
 @Module({
-  imports: [ScheduleModule.forRoot(), NotificationsModule, CommonModule],
+  imports: [ScheduleModule.forRoot(), NotificationsModule, CommonModule, PaymentsModule],
   controllers: [ContractsController],
   providers: [
     ContractsService,
@@ -21,4 +23,4 @@ import { CommonModule } from 'src/common/common.module';
   ],
   exports: [ContractsService, ContractSigningService],
 })
-export class ContractsModule {}
+export class ContractsModule { }

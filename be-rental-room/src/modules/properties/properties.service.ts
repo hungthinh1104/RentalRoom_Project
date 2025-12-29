@@ -8,10 +8,14 @@ import {
 } from './dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
+import { CacheService } from 'src/common/services/cache.service';
 
 @Injectable()
 export class PropertiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async create(createPropertyDto: CreatePropertyDto) {
     const property = await this.prisma.property.create({
@@ -60,6 +64,7 @@ export class PropertiesService {
         take: limit,
         orderBy: { [sortBy]: sortOrder },
         include: {
+          rooms: true,
           _count: {
             select: { rooms: true },
           },
@@ -71,7 +76,15 @@ export class PropertiesService {
     const transformedProperties = properties.map((property) =>
       plainToClass(
         PropertyResponseDto,
-        { ...property, roomCount: property._count.rooms },
+        {
+          ...property,
+          totalRooms: property._count.rooms,
+          rooms: property.rooms?.map((r) => ({
+            ...r,
+            pricePerMonth: r.pricePerMonth ? Number(r.pricePerMonth) : 0,
+            deposit: r.deposit ? Number(r.deposit) : 0,
+          })),
+        },
         { excludeExtraneousValues: true },
       ),
     );
@@ -83,6 +96,7 @@ export class PropertiesService {
     const property = await this.prisma.property.findUnique({
       where: { id },
       include: {
+        rooms: true,
         _count: {
           select: { rooms: true },
         },
@@ -95,7 +109,15 @@ export class PropertiesService {
 
     return plainToClass(
       PropertyResponseDto,
-      { ...property, roomCount: property._count.rooms },
+      {
+        ...property,
+        totalRooms: property._count.rooms,
+        rooms: property.rooms?.map((r) => ({
+          ...r,
+          pricePerMonth: r.pricePerMonth ? Number(r.pricePerMonth) : 0,
+          deposit: r.deposit ? Number(r.deposit) : 0,
+        })),
+      },
       { excludeExtraneousValues: true },
     );
   }
@@ -108,6 +130,10 @@ export class PropertiesService {
       data: updatePropertyDto,
     });
 
+    // Invalidate cache
+    await this.cacheService.invalidatePropertyCache(id);
+    await this.cacheService.invalidateRoomCache(); // Some property info is in room list
+
     return plainToClass(PropertyResponseDto, property, {
       excludeExtraneousValues: true,
     });
@@ -119,6 +145,10 @@ export class PropertiesService {
     await this.prisma.property.delete({
       where: { id },
     });
+
+    // Invalidate cache
+    await this.cacheService.invalidatePropertyCache(id);
+    await this.cacheService.invalidateRoomCache();
 
     return { message: 'Property deleted successfully' };
   }

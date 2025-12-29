@@ -121,7 +121,7 @@ describe('RoomsController', () => {
 
       mockRoomsService.findAll.mockResolvedValue(mockRooms);
 
-      const result = await controller.findAll(filterDto);
+      const result = await controller.findAll(filterDto, null);
 
       expect(result).toEqual(mockRooms);
       expect(service.findAll).toHaveBeenCalledWith(filterDto);
@@ -135,7 +135,7 @@ describe('RoomsController', () => {
 
       mockRoomsService.findAll.mockResolvedValue([]);
 
-      await controller.findAll(filterDto);
+      await controller.findAll(filterDto, null);
 
       expect(service.findAll).toHaveBeenCalledWith(filterDto);
     });
@@ -148,7 +148,7 @@ describe('RoomsController', () => {
 
       mockRoomsService.findAll.mockResolvedValue([]);
 
-      const result = await controller.findAll(filterDto);
+      const result = await controller.findAll(filterDto, null);
 
       expect(result).toEqual([]);
     });
@@ -167,7 +167,7 @@ describe('RoomsController', () => {
 
       mockRoomsService.findOne.mockResolvedValue(mockRoom);
 
-      const result = await controller.findOne(roomId);
+      const result = await controller.findOne(roomId, null);
 
       expect(result).toEqual(mockRoom);
       expect(service.findOne).toHaveBeenCalledWith(roomId);
@@ -179,7 +179,7 @@ describe('RoomsController', () => {
 
       mockRoomsService.findOne.mockResolvedValue(null);
 
-      await controller.findOne(roomId);
+      await controller.findOne(roomId, null);
 
       expect(service.findOne).toHaveBeenCalledWith(roomId);
     });

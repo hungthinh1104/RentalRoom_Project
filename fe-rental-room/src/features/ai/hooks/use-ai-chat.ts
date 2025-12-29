@@ -1,7 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { aiApi } from '../api/ai-api';
-import { useDebounce } from '@/hooks/use-debounce';
+import type { AIChatRoom } from '@/types';
 
 export interface ChatMessage {
   id: string;
@@ -9,30 +9,27 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   isTyping?: boolean;
+  rooms?: AIChatRoom[];
 }
 
 const STORAGE_KEY = 'ai-chat-history';
 const MAX_HISTORY = 50;
 
 export function useAIChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Load chat history from localStorage
-  useEffect(() => {
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window === 'undefined') return [];
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setMessages(parsed.map((m: any) => ({
-          ...m,
-          timestamp: new Date(m.timestamp),
-        })));
-      }
-    } catch (error) {
-      console.error('Failed to load chat history:', error);
+      if (!stored) return [];
+      const parsed = JSON.parse(stored) as Array<ChatMessage & { timestamp: string }>;
+      return parsed.map((m) => ({ ...m, timestamp: new Date(m.timestamp) }));
+    } catch {
+      return [];
     }
-  }, []);
+  });
+  const [isOpen, setIsOpen] = useState(false);
+
+  // Initial load handled in state initializer
 
   // Save to localStorage whenever messages change
   const saveToStorage = useCallback((msgs: ChatMessage[]) => {
@@ -102,12 +99,13 @@ export function useAIChat() {
           role: 'assistant',
           content: response.response,
           timestamp: new Date(response.timestamp),
+          rooms: response.rooms,
         };
         const updated = [...withoutTyping, assistantMessage];
         saveToStorage(updated);
         return updated;
       });
-    } catch (error) {
+    } catch {
       // Remove typing indicator and show error
       setMessages((prev) => {
         const withoutTyping = prev.filter((m) => !m.isTyping);

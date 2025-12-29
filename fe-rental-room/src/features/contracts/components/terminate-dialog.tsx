@@ -12,17 +12,17 @@ interface TerminateDialogProps {
   onOpenChange: (o: boolean) => void;
   onConfirm: (data: { reason: string; noticeDays: number }) => void;
   loading?: boolean;
-  depositAmount?: number;
+  deposit?: number;
   daysRemaining?: number;
   isTenant?: boolean;
 }
 
-export function TerminateDialog({ 
-  open, 
-  onOpenChange, 
-  onConfirm, 
-  loading, 
-  depositAmount = 0,
+export function TerminateDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+  loading,
+  deposit = 0,
   daysRemaining = 0,
   isTenant = true,
 }: TerminateDialogProps) {
@@ -45,10 +45,10 @@ export function TerminateDialog({
 
   if (daysRemaining > 0) {
     if (isTenant) {
-      penaltyAmount = depositAmount;
+      penaltyAmount = deposit;
       penaltyWarning = `⚠️ Chấm dứt trước hạn (còn ${daysRemaining} ngày): BẠN SẼ MẤT 100% TIỀN CỌC (${penaltyAmount.toLocaleString('vi-VN')} VNĐ). Mặc dù báo trước ${noticeDays} ngày, do vi phạm cam kết thời gian thuê, tiền cọc sẽ bị giữ lại.`;
     } else {
-      penaltyAmount = depositAmount * 2;
+      penaltyAmount = deposit * 2;
       penaltyWarning = `⚠️ Chấm dứt trước hạn (còn ${daysRemaining} ngày): BẠN PHẢI TRẢ LẠI 100% TIỀN CỌC + ĐỀN BÙ THÊM 100% TIỀN CỌC = ${penaltyAmount.toLocaleString('vi-VN')} VNĐ cho người thuê.`;
       if (noticeDays < 30) {
         penaltyWarning += ` Bạn chỉ báo trước ${noticeDays} ngày (yêu cầu tối thiểu 30 ngày).`;
@@ -138,9 +138,9 @@ export function TerminateDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Hủy bỏ
             </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleConfirm} 
+            <Button
+              variant="destructive"
+              onClick={handleConfirm}
               disabled={loading || !reason.trim()}
             >
               {loading ? 'Đang xử lý...' : 'Xác nhận chấm dứt'}

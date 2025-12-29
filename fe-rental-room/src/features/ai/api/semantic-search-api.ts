@@ -18,15 +18,50 @@ export const semanticSearchApi = {
    * API calls: 1 (semantic search)
    */
   async semanticSearch(query: string, limit: number = 12) {
+    const trimmed = (query || '').toString().trim();
+    if (!trimmed) {
+      console.warn('[semanticSearch] Empty query provided; returning empty result');
+      return {
+        query: trimmed,
+        method: 'STANDARD' as const,
+        count: 0,
+        results: [],
+      };
+    }
+
     try {
       const { data } = await api.get<SemanticSearchResponse>('/ai/search/semantic', {
-        params: { q: query, limit: Math.min(limit, 50) },
+        params: { q: trimmed, limit: Math.min(limit, 50) },
       });
       return data;
     } catch (error) {
-      console.error('[semanticSearch] Error:', error);
+      // Log detailed error information for easier debugging
+      const err = error as { status?: number; statusCode?: number; message?: string } | undefined;
+      const status = err?.statusCode ?? err?.status ?? undefined;
+      console.error('[semanticSearch] Error (status):', status, error);
+      console.error('[semanticSearch] Query was:', trimmed);
+      console.error('[semanticSearch] Falling back to standard search');
+
       // Fallback to standard search on error
-      return this.standardSearch({ search: query }, 1, limit);
+      try {
+        const standardData = await this.standardSearch({ search: trimmed }, 1, limit);
+        // Convert PaginatedResponse to SemanticSearchResponse format
+        return {
+          query: trimmed,
+          method: 'STANDARD' as const,
+          count: standardData.data?.length ?? 0,
+          results: standardData.data ?? [],
+        };
+      } catch (fallbackError) {
+        console.error('[semanticSearch] Fallback also failed:', fallbackError);
+        // Return empty results if both fail
+        return {
+          query: trimmed,
+          method: 'STANDARD' as const,
+          count: 0,
+          results: [],
+        };
+      }
     }
   },
 
@@ -62,7 +97,28 @@ export const semanticSearchApi = {
     } catch (error) {
       console.error('[hybridSearch] Error:', error);
       // Fallback to standard search with filters
-      return this.standardSearch(filters, 1, limit);
+      try {
+        const standardData = await this.standardSearch(
+          { ...filters, search: query },
+          1,
+          limit
+        );
+        // Convert PaginatedResponse to SemanticSearchResponse format
+        return {
+          query,
+          method: 'STANDARD' as const,
+          count: standardData.data?.length ?? 0,
+          results: standardData.data ?? [],
+        };
+      } catch (fallbackError) {
+        console.error('[hybridSearch] Fallback also failed:', fallbackError);
+        return {
+          query,
+          method: 'STANDARD' as const,
+          count: 0,
+          results: [],
+        };
+      }
     }
   },
 

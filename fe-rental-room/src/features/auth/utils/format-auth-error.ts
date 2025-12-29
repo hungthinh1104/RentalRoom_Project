@@ -8,8 +8,8 @@ export function formatAuthError(err: unknown): string {
   } else if (err instanceof Error) {
     msg = err.message || String(err);
   } else if (typeof err === "object" && err !== null && "message" in err) {
-    // @ts-ignore
-    msg = typeof err.message === "string" ? err.message : String(err);
+    const e = err as { message?: unknown };
+    msg = typeof e.message === "string" ? e.message : String(e.message ?? String(err));
   } else {
     msg = String(err);
   }

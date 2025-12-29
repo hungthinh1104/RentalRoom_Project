@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import vietnamMapPaths, { mapConfig, cities } from './vietnam-map-data';
 import CityCard from './city-card';
@@ -12,7 +12,6 @@ interface VietnamMap3DProps {
 export default function VietnamMap3D({ isDark = true }: VietnamMap3DProps) {
   const [hoveredCity, setHoveredCity] = useState<string | null>(null);
   const [hoveredProvince, setHoveredProvince] = useState<string | null>(null);
-  const [svgSize, setSvgSize] = useState({ width: 900, height: 900 });
   const svgRef = useRef<SVGSVGElement | null>(null);
   const router = useRouter();
 
@@ -20,46 +19,15 @@ export default function VietnamMap3D({ isDark = true }: VietnamMap3DProps) {
   const bgStyle = useMemo(() => {
     return {
       bg: `linear-gradient(to bottom right, var(--color-page-gradient-from), var(--color-page-gradient-to))`,
-      gridColor: 'var(--color-muted-foreground)',
-      bgFill: 'var(--color-background)',
+      gridColor: isDark ? 'var(--color-muted-foreground)' : 'rgba(0,0,0,0.06)',
+      bgFill: isDark ? 'var(--color-background)' : 'var(--color-background)',
     };
   }, [isDark]);
 
-  // Measure SVG size and respond to resizes without causing update loops
-  useLayoutEffect(() => {
-    if (!svgRef.current) return;
-    const node = svgRef.current;
-    const updateSize = () => {
-      const r = node.getBoundingClientRect();
-      const nextSize = { width: Math.round(r.width), height: Math.round(r.height) };
-      setSvgSize((prev) => (prev.width !== nextSize.width || prev.height !== nextSize.height ? nextSize : prev));
-    };
-
-    updateSize();
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => updateSize());
-      ro.observe(node);
-    }
-    window.addEventListener('resize', updateSize);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener('resize', updateSize);
-    };
-  }, []);
+  // Tooltip will be positioned using percentages relative to the SVG viewBox
 
   const mapWidth = 900;
   const mapHeight = 1000;
-
-  const getCityPosition = (city: { x: number; y: number }) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return { left: 0, top: 0 };
-    const left = rect.left + (city.x / mapWidth) * rect.width;
-    const top = rect.top + (city.y / mapHeight) * rect.height;
-    const clampedLeft = Math.max(8, Math.min((typeof window !== 'undefined' ? window.innerWidth : rect.width) - 8, left));
-    const clampedTop = Math.max(8, Math.min((typeof window !== 'undefined' ? window.innerHeight : rect.height) - 8, top));
-    return { left: clampedLeft, top: clampedTop };
-  };
 
   return (
     <div 
@@ -168,34 +136,34 @@ export default function VietnamMap3D({ isDark = true }: VietnamMap3DProps) {
 
       {/* City info tooltip - floats on map */}
       {/* Hover card showing city highlights */}
-      {hoveredCity && (
-        <div className="fixed pointer-events-none z-50">
-          {cities.map((city) => (
-            hoveredCity === city.name && (
-              <div
-                key={city.name}
-                style={{
-                  position: 'fixed',
-                  ...(() => {
-                    const { left, top } = getCityPosition(city);
-                    return { left: left + 4, top: top - 4 };
-                  })(),
-                  transform: 'translate(-50%, -100%)',
-                }}
-              >
-                <div className="pointer-events-none">
-                  <CityCard
-                    name={city.name}
-                    rooms={city.rooms}
-                    searchQuery={city.searchQuery}
-                    region={city.region as 'north' | 'central' | 'south'}
-                  />
-                </div>
+      {hoveredCity && (() => {
+        const city = cities.find((c) => c.name === hoveredCity);
+        if (!city) return null;
+        const leftPercent = (city.x / mapWidth) * 100;
+        const topPercent = (city.y / mapHeight) * 100;
+        return (
+          <div className="absolute pointer-events-none z-50 inset-0">
+            <div
+              key={city.name}
+              style={{
+                position: 'absolute',
+                left: `${leftPercent}%`,
+                top: `${topPercent}%`,
+                transform: 'translate(-50%, -100%)',
+              }}
+            >
+              <div className="pointer-events-none">
+                <CityCard
+                  name={city.name}
+                  rooms={city.rooms}
+                  searchQuery={city.searchQuery}
+                  region={city.region as 'north' | 'central' | 'south'}
+                />
               </div>
-            )
-          ))}
-        </div>
-      )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Province name tooltip */}
       {hoveredProvince && (

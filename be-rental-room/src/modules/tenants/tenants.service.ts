@@ -51,14 +51,24 @@ export class TenantsService {
         skip: filterDto.skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
+        include: { user: true },
       }),
       this.prisma.tenant.count({ where }),
     ]);
 
     const transformedTenants = tenants.map((tenant) =>
-      plainToClass(TenantResponseDto, tenant, {
-        excludeExtraneousValues: true,
-      }),
+      plainToClass(
+        TenantResponseDto,
+        {
+          ...tenant,
+          fullName: tenant.user?.fullName,
+          email: tenant.user?.email,
+          phoneNumber: tenant.user?.phoneNumber,
+        },
+        {
+          excludeExtraneousValues: true,
+        },
+      ),
     );
 
     return new PaginatedResponse(transformedTenants, total, page, limit);
@@ -67,15 +77,25 @@ export class TenantsService {
   async findOne(id: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { userId: id },
+      include: { user: true },
     });
 
     if (!tenant) {
       throw new NotFoundException(`Tenant with ID ${id} not found`);
     }
 
-    return plainToClass(TenantResponseDto, tenant, {
-      excludeExtraneousValues: true,
-    });
+    return plainToClass(
+      TenantResponseDto,
+      {
+        ...tenant,
+        fullName: tenant.user?.fullName,
+        email: tenant.user?.email,
+        phoneNumber: tenant.user?.phoneNumber,
+      },
+      {
+        excludeExtraneousValues: true,
+      },
+    );
   }
 
   async update(id: string, updateTenantDto: UpdateTenantDto) {

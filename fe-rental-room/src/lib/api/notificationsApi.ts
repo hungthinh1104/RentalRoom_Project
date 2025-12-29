@@ -68,19 +68,19 @@ export const notificationsApi = {
 
   // Mark all notifications as read
   async markAllAsRead(userId: string): Promise<void> {
-    const { data } = await api.patch(`/notifications/user/${userId}/mark-all-as-read`, {});
-    return data;
+    await api.patch(`/notifications/user/${userId}/mark-all-as-read`, {});
+    return;
   },
 
   // Delete notification
   async delete(id: string): Promise<void> {
-    const { data } = await api.delete(`/notifications/${id}`);
-    return data;
+    await api.delete(`/notifications/${id}`);
+    return;
   },
 
   // Delete all notifications for user
   async deleteAll(userId: string): Promise<void> {
-    const { data } = await api.delete(`/notifications/user/${userId}`);
-    return data;
+    await api.delete(`/notifications/user/${userId}`);
+    return;
   },
 };

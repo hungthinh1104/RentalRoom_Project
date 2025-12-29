@@ -3,7 +3,7 @@ import type { Room, CreateRoomDto, PaginatedResponse, PaginationParams } from '@
 
 export const roomsApi = {
   getAll: async (params?: PaginationParams & { propertyId?: string; status?: string }) => {
-    const { data } = await api.get<PaginatedResponse<Room>>('/rooms', { params });
+    const { data } = await api.get<PaginatedResponse<Room>>('/rooms', { params: params as Record<string, unknown> });
     return data;
   },
 

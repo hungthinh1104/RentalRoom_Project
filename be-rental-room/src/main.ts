@@ -25,7 +25,13 @@ async function bootstrap() {
             defaultSrc: ["'self'"],
             scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Next.js dev uses eval
             styleSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", 'data:', 'blob:', 'http://localhost:3000', 'http://localhost:3001'],
+            imgSrc: [
+              "'self'",
+              'data:',
+              'blob:',
+              'http://localhost:3000',
+              'http://localhost:3001',
+            ],
             connectSrc: [
               "'self'",
               'http://localhost:3000',

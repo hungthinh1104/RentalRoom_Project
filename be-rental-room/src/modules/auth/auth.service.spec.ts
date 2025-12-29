@@ -15,7 +15,7 @@ jest.mock('bcrypt');
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prismaService: jest.Mocked<PrismaService>;
+  let prismaService: any;
   let jwtService: jest.Mocked<JwtService>;
   let emailService: jest.Mocked<EmailService>;
   let configService: jest.Mocked<ConfigService>;
@@ -105,6 +105,8 @@ describe('AuthService', () => {
       fullName: 'New User',
       phone: '+1234567890',
       role: 'TENANT' as const,
+      address: 'Test Address',
+      citizenId: '123456789012',
     };
 
     it('should successfully register a new user and send verification email', async () => {

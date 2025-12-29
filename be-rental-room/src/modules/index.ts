@@ -12,3 +12,5 @@ export { PaymentsModule } from './payments/payments.module';
 export { MaintenanceModule } from './maintenance/maintenance.module';
 export { NotificationsModule } from './notifications/notifications.module';
 export { RecommendationModule } from './recommendation/recommendation.module';
+export { UploadModule } from './upload/upload.module';
+export { FavoritesModule } from './favorites/favorites.module';

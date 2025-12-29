@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { signIn } from "next-auth/react"
+import { setAccessToken } from '@/lib/api/client';
 import { motion, AnimatePresence } from "framer-motion"
 import { Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle } from "lucide-react"
 import { formatAuthError } from "../utils/format-auth-error"
@@ -17,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useLogin } from "../hooks/use-auth"
 import { loginSchema, type LoginInput } from "../schemas"
 import type { AuthResponse } from '@/types';
-import { getAndClearCallbackUrl, getCallbackUrl, normalizeRedirectTarget } from "@/lib/redirect-after-login";
+import { getCallbackUrl, normalizeRedirectTarget } from "@/lib/redirect-after-login";
 
 export function LoginForm() {
   const router = useRouter()
@@ -42,30 +43,36 @@ export function LoginForm() {
     const callbackUrlGuess = getCallbackUrl(searchParams, undefined);
 
     // Try NextAuth signIn (credentials provider) so NextAuth session is created
-    const signInResult = await signIn('credentials', { redirect: false, email: data.email, password: data.password, callbackUrl: callbackUrlGuess });
-    if (signInResult && (signInResult as any).ok) {
+    const absoluteCallback = (typeof window !== 'undefined' && typeof callbackUrlGuess === 'string' && callbackUrlGuess.startsWith('/'))
+      ? window.location.origin + callbackUrlGuess
+      : callbackUrlGuess;
+    const signInResult = await signIn('credentials', { redirect: false, email: data.email, password: data.password, callbackUrl: absoluteCallback });
+    if (signInResult?.ok) {
+      // Fetch session to sync tokens to localStorage
       try {
         const sessionRes = await fetch('/api/auth/session');
-        const sessionData = await sessionRes.json();
-        const role = (sessionData?.user?.role as string)?.toLowerCase();
+        const sessionData = (await sessionRes.json()) as { user?: { role?: string }; accessToken?: string; refreshToken?: string };
+        // Persist access token via API client helper (refresh token is cookie-only)
+        const { accessToken } = sessionData ?? {};
+        if (accessToken) setAccessToken(accessToken);
+        const role = sessionData?.user?.role?.toLowerCase();
         const callbackRole = getCallbackUrl(searchParams, role);
-        let targetRaw = (signInResult as any).url ?? callbackRole;
-        // sanitize target: ensure it's a valid absolute/relative URL and normalize
+        const targetRaw = signInResult.url ?? callbackRole;
         const target = normalizeRedirectTarget(targetRaw, role);
-        console.debug('[Login] signIn ok -> redirect to', target, signInResult, 'role from session=', role);
+        console.debug('[Login] signIn ok -> redirect to', target, 'role=', role);
         await router.push(target);
         router.refresh();
         return;
       } catch (e) {
-        const target = normalizeRedirectTarget((signInResult as any).url ?? callbackUrlGuess, undefined);
-        console.debug('[Login] signIn ok but session fetch failed, fallback ->', target, e);
+        const target = normalizeRedirectTarget(signInResult.url ?? callbackUrlGuess, undefined);
+        console.debug('[Login] session fetch failed, fallback ->', target, e);
         await router.push(target);
         router.refresh();
         return;
       }
     }
-    if (signInResult && (signInResult as any).error) {
-      setSignInErrorState((signInResult as any).error as string);
+    if (signInResult?.error) {
+      setSignInErrorState(signInResult.error);
       return;
     }
 

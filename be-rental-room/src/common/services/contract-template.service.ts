@@ -20,12 +20,16 @@ export class ContractTemplateService {
   private browser: puppeteer.Browser;
 
   async onModuleInit() {
-    this.browser = await puppeteer.launch({
-      headless: true,
-      executablePath:
-        process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    try {
+      this.browser = await puppeteer.launch({
+        headless: true,
+        executablePath:
+          process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+    } catch (e) {
+      this.logger.warn('Puppeteer launch failed (PDF generation will not work): ' + e.message);
+    }
   }
 
   async onModuleDestroy() {

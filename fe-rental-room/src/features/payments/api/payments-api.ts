@@ -10,7 +10,7 @@ import type {
 export const paymentsApi = {
 	async getAll(params?: PaginationParams & { tenantId?: string; status?: string }) {
 		const { data } = await api.get<PaginatedResponse<Payment>>('/payments', {
-			params,
+			params: params as Record<string, unknown>,
 		});
 		return data;
 	},
@@ -62,7 +62,7 @@ export const billingApi = {
 
 	async getInvoices(params?: PaginationParams & { status?: string }) {
 		const { data } = await api.get<PaginatedResponse<Invoice>>('/billing/invoices', {
-			params,
+			params: params as Record<string, unknown>,
 		});
 		return data;
 	},

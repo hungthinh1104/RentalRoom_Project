@@ -38,13 +38,15 @@ export function useRoomAnalysis() {
         error: null,
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
+      const msg = error instanceof Error ? error.message : String(error);
       setState({
         isAnalyzing: false,
         result: null,
-        error: error?.message || 'Phân tích thất bại. Vui lòng thử lại.',
+        error: msg || 'Phân tích thất bại. Vui lòng thử lại.',
       });
     },
+
   });
 
   const analyze = useCallback((description: string) => {

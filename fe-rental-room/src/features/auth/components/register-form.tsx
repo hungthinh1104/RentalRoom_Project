@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -32,13 +32,13 @@ import { UserRole } from "@/types";
 
 type AuthRole = UserRole.TENANT | UserRole.LANDLORD;
 
-type RoleFeature = { icon: any; text: string };
+type RoleFeature = { icon: React.ComponentType; text: string };
 
 type RoleInfo = {
   title: string;
   badge: string;
   description: string;
-  icon: any;
+  icon: React.ComponentType;
   color: string;
   features: RoleFeature[];
 };
@@ -84,7 +84,7 @@ export function RegisterForm() {
     handleSubmit,
     formState: { errors },
     setValue,
-    watch,
+    control,
   } = useForm<RegisterInput>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
@@ -99,7 +99,7 @@ export function RegisterForm() {
 
   const onSubmit = (data: RegisterInput) => {
     // Remove confirmPassword from payload and map `phone` -> `phoneNumber` for API
-    const { confirmPassword, phone, ...rest } = data as any;
+    const { phone, ...rest } = data;
     // Send 'phone' property (not phoneNumber) and exclude confirmPassword
     const payload = {
       ...rest,
@@ -119,9 +119,9 @@ export function RegisterForm() {
   const currentRole = roleInfo[selectedRole];
   const RoleIcon = currentRole.icon;
 
-  // Live check for password mismatch on frontend
-  const password = watch("password");
-  const confirmPassword = watch("confirmPassword");
+  // Live check for password mismatch on frontend using useWatch (called unconditionally)
+  const password = useWatch({ control, name: "password" }) as string | undefined;
+  const confirmPassword = useWatch({ control, name: "confirmPassword" }) as string | undefined;
   const passwordsMismatch = Boolean(confirmPassword && password !== confirmPassword);
 
   return (
@@ -438,10 +438,7 @@ export function RegisterForm() {
             {/* Footer */}
             <div className="text-center text-sm text-muted-foreground pt-2">
               Đã có tài khoản?{" "}
-              <Link
-                href="/login"
-                className="text-primary hover:underline font-medium"
-              >
+              <Link href="/login" className="text-primary hover:underline font-medium">
                 Đăng nhập ngay
               </Link>
             </div>
@@ -462,7 +459,9 @@ export function RegisterForm() {
           >
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/70 text-white grid place-items-center shadow-lg">
-                <RoleIcon className="w-7 h-7" />
+                <span className="w-7 h-7">
+                  <RoleIcon />
+                </span>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Vai trò đang chọn</p>
@@ -493,7 +492,9 @@ export function RegisterForm() {
                     className="flex items-center gap-3 p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm hover:bg-card/80 transition-all duration-200"
                   >
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-primary/20 text-primary grid place-items-center flex-shrink-0">
-                      <FeatureIcon className="w-5 h-5" />
+                      <span className="w-5 h-5">
+                        <FeatureIcon />
+                      </span>
                     </div>
                     <p className="text-sm font-medium text-foreground">
                       {feature.text}

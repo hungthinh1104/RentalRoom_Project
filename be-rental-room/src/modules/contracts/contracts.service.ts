@@ -21,6 +21,8 @@ import { ApplicationStatus, ContractStatus } from './entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from 'src/common/services/email.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import { SepayService } from '../payments/sepay.service';
+import { RoomStatus } from '@prisma/client';
 
 @Injectable()
 export class ContractsService {
@@ -30,12 +32,98 @@ export class ContractsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
-  ) {}
+    private readonly sepayService: SepayService,
+  ) { }
+
+  /**
+   * Validate contract status transitions to prevent invalid state changes
+   * @throws BadRequestException if transition is invalid
+   */
+  private validateStatusTransition(
+    oldStatus: ContractStatus,
+    newStatus: ContractStatus,
+  ): void {
+    const VALID_TRANSITIONS: Record<ContractStatus, ContractStatus[]> = {
+      [ContractStatus.DRAFT]: [ContractStatus.PENDING_SIGNATURE, ContractStatus.CANCELLED],
+      [ContractStatus.PENDING_SIGNATURE]: [ContractStatus.DEPOSIT_PENDING, ContractStatus.CANCELLED],
+      [ContractStatus.DEPOSIT_PENDING]: [ContractStatus.ACTIVE, ContractStatus.CANCELLED, ContractStatus.EXPIRED],
+      [ContractStatus.ACTIVE]: [ContractStatus.TERMINATED, ContractStatus.EXPIRED],
+      [ContractStatus.TERMINATED]: [], // Terminal state
+      [ContractStatus.EXPIRED]: [], // Terminal state
+      [ContractStatus.CANCELLED]: [], // Terminal state
+    };
+
+    const allowedTransitions = VALID_TRANSITIONS[oldStatus];
+
+    if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
+      throw new BadRequestException(
+        `Invalid status transition: ${oldStatus} → ${newStatus}. ` +
+        `Allowed transitions from ${oldStatus}: ${allowedTransitions?.join(', ') || 'none'}`,
+      );
+    }
+  }
+
+  /**
+   * Auto-generate unique contract number with transaction safety
+   * Format: HD-{landlordPrefix}-{YYYYMM}-{XXXX}
+   * @param landlordId Landlord ID
+   * @returns Unique contract number
+   */
+  private async generateContractNumber(landlordId: string): Promise<string> {
+    const landlordPrefix = landlordId.slice(0, 4).toUpperCase();
+    const date = new Date();
+    const yearMonth = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    // Use transaction to ensure atomicity and prevent race conditions
+    return await this.prisma.$transaction(
+      async (tx) => {
+        const count = await tx.contract.count({
+          where: {
+            landlordId,
+            contractNumber: { startsWith: `HD-${landlordPrefix}-${yearMonth}` },
+          },
+        });
+
+        const sequence = String(count + 1).padStart(4, '0');
+        return `HD-${landlordPrefix}-${yearMonth}-${sequence}`;
+      },
+      {
+        maxWait: 5000, // Wait up to 5s for transaction lock
+        timeout: 10000, // Transaction timeout 10s
+      },
+    );
+  }
 
   // Rental Applications
   async createApplication(createDto: CreateRentalApplicationDto) {
+    // Workaround: If landlordId not provided, fetch from room's property
+    let landlordId = createDto.landlordId;
+
+    if (!landlordId) {
+      const room = await this.prisma.room.findUnique({
+        where: { id: createDto.roomId },
+        include: { property: { select: { landlordId: true } } },
+      });
+
+      if (!room) {
+        throw new NotFoundException(`Room with ID ${createDto.roomId} not found`);
+      }
+
+      if (!room.property?.landlordId) {
+        throw new BadRequestException(
+          'Property does not have a landlord assigned. Please contact support.',
+        );
+      }
+
+      landlordId = room.property.landlordId;
+      this.logger.log(`Auto-fetched landlordId ${landlordId} for room ${createDto.roomId}`);
+    }
+
     const application = await this.prisma.rentalApplication.create({
-      data: createDto,
+      data: {
+        ...createDto,
+        landlordId, // Use fetched or provided landlordId
+      },
     });
 
     // Trigger notification + email to landlord (best effort)
@@ -87,8 +175,8 @@ export class ContractsService {
         tenantUser.phoneNumber || 'N/A',
         application.requestedMoveInDate
           ? new Date(application.requestedMoveInDate).toLocaleDateString(
-              'vi-VN',
-            )
+            'vi-VN',
+          )
           : undefined,
         application.message || undefined,
       );
@@ -196,46 +284,82 @@ export class ContractsService {
   }
 
   async approveApplication(id: string) {
-    await this.findOneApplication(id);
+    const application = await this.findOneApplication(id);
 
-    const updated = await this.prisma.rentalApplication.update({
-      where: { id },
-      data: {
-        status: ApplicationStatus.APPROVED,
-        reviewedAt: new Date(),
-      },
-      include: {
-        tenant: { include: { user: true } },
-        room: {
-          include: {
-            property: {
-              include: { landlord: { include: { user: true } } },
+    // Update application status and create contract in transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Approve application
+      const app = await tx.rentalApplication.update({
+        where: { id },
+        data: {
+          status: ApplicationStatus.APPROVED,
+          reviewedAt: new Date(),
+        },
+        include: {
+          tenant: { include: { user: true } },
+          room: {
+            include: {
+              property: {
+                include: { landlord: { include: { user: true } } },
+              },
             },
           },
         },
-      },
+      });
+
+      // 2. Set room to RESERVED (prevent new applications)
+      await tx.room.update({
+        where: { id: application.roomId },
+        data: { status: RoomStatus.RESERVED },
+      });
+
+      // 3. ✅ AUTO-CREATE CONTRACT (DRAFT status)
+      const contractNumber = await this.generateContractNumber(application.landlordId);
+      const startDate = app.requestedMoveInDate
+        ? new Date(app.requestedMoveInDate)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const endDate = new Date(startDate);
+      endDate.setFullYear(endDate.getFullYear() + 1); // 1 year lease
+
+      const contract = await tx.contract.create({
+        data: {
+          applicationId: app.id,
+          roomId: application.roomId,
+          tenantId: application.tenantId,
+          landlordId: application.landlordId,
+          contractNumber,
+          startDate,
+          endDate,
+          monthlyRent: app.room.pricePerMonth,
+          deposit: app.room.deposit,
+          status: ContractStatus.DRAFT, // ✅ DRAFT - waiting for tenant approval
+          signedAt: new Date(), // Landlord signed by approving
+        },
+      });
+
+      return { app, contract };
     });
 
-    const tenantUser = updated.tenant.user;
-    const landlordUser = updated.room.property.landlord.user;
+    const tenantUser = result.app.tenant.user;
+    const landlordUser = result.app.room.property.landlord.user;
 
     try {
-      // Notify tenant
+      // Notify tenant about CONTRACT (not just approval)
       await this.notificationsService.create({
         userId: tenantUser.id,
-        title: `Đơn thuê đã được duyệt - Phòng ${updated.room.roomNumber}`,
-        content: `Chủ nhà ${landlordUser.fullName} đã duyệt đơn của bạn. Liên hệ: ${landlordUser.email}${landlordUser.phoneNumber ? ` / ${landlordUser.phoneNumber}` : ''}`,
-        notificationType: NotificationType.APPLICATION,
-        relatedEntityId: updated.id,
+        title: `Hợp đồng đã được tạo - ${result.contract.contractNumber}`,
+        content: `Chủ nhà ${landlordUser.fullName} đã tạo hợp đồng cho phòng ${result.app.room.roomNumber}. Vui lòng xem xét và phê duyệt hợp đồng.`,
+        notificationType: NotificationType.CONTRACT,
+        relatedEntityId: result.contract.id,
         isRead: false,
       });
 
-      // Email tenant
+      // Email tenant about contract
       await this.emailService.sendRentalApplicationStatusEmail(
         tenantUser.email,
         tenantUser.fullName,
-        `Phòng ${updated.room.roomNumber}`,
-        'ĐƯỢC DUYỆT',
+        `Phòng ${result.app.room.roomNumber}`,
+        'HỢP ĐỒNG ĐÃ ĐƯỢC TẠO',
         true,
         landlordUser.fullName,
         landlordUser.email,
@@ -244,13 +368,16 @@ export class ContractsService {
     } catch (error) {
       const msg = (error as Error)?.message ?? String(error);
       this.logger.warn(
-        `Failed to notify tenant for approved application ${id}: ${msg}`,
+        `Failed to notify tenant for contract ${result.contract.id}: ${msg}`,
       );
     }
 
-    return plainToClass(RentalApplicationResponseDto, updated, {
-      excludeExtraneousValues: true,
-    });
+    return {
+      application: plainToClass(RentalApplicationResponseDto, result.app, {
+        excludeExtraneousValues: true,
+      }),
+      contract: result.contract,
+    };
   }
 
   async rejectApplication(id: string) {
@@ -307,6 +434,55 @@ export class ContractsService {
     return plainToClass(RentalApplicationResponseDto, updated, {
       excludeExtraneousValues: true,
     });
+  }
+
+  /**
+   * Tenant approves contract - Two-party agreement flow
+   */
+  async tenantApproveContract(contractId: string, tenantId: string) {
+    const contract = await this.findOne(contractId);
+
+    // Verify tenant owns this contract
+    if (contract.tenantId !== tenantId) {
+      throw new UnauthorizedException('You are not authorized to approve this contract');
+    }
+
+    // Verify contract status
+    if (contract.status !== ContractStatus.DRAFT) {
+      throw new BadRequestException(
+        `Contract must be in DRAFT status to approve. Current status: ${contract.status}`,
+      );
+    }
+
+    // Update contract to PENDING_SIGNATURE
+    const updated = await this.prisma.contract.update({
+      where: { id: contractId },
+      data: {
+        status: ContractStatus.PENDING_SIGNATURE,
+        // tenantSignedAt: new Date(), // Will be enabled after migration
+      },
+      include: {
+        tenant: { include: { user: true } },
+        landlord: { include: { user: true } },
+        room: true,
+      },
+    });
+
+    // Notify landlord
+    try {
+      await this.notificationsService.create({
+        userId: contract.landlordId,
+        title: `Hợp đồng đã được phê duyệt - ${contract.contractNumber}`,
+        content: `${updated.tenant.user.fullName} đã phê duyệt hợp đồng. Chờ thanh toán tiền cọc.`,
+        notificationType: NotificationType.CONTRACT,
+        relatedEntityId: contractId,
+        isRead: false,
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to notify landlord for contract approval ${contractId}`, error);
+    }
+
+    return updated;
   }
 
   async withdrawApplication(id: string, tenantUserId: string) {
@@ -388,22 +564,220 @@ export class ContractsService {
 
   // Contracts
   async create(createContractDto: CreateContractDto) {
-    const contract = await this.prisma.contract.create({
-      data: createContractDto,
+    // 1. Check Payment Config (Strict Mode)
+    // @ts-ignore
+    const paymentConfig = await this.prisma.paymentConfig.findUnique({
+      where: { landlordId: createContractDto.landlordId },
     });
+
+    if (!paymentConfig || !paymentConfig.isActive || !paymentConfig.apiToken) {
+      throw new BadRequestException(
+        'Vui lòng cấu hình tài khoản nhận tiền (SePay) trước khi tạo hợp đồng.',
+      );
+    }
+
+    const { residents, ...contractData } = createContractDto;
+
+    // 2. Auto-generate contract number if not provided
+    const contractNumber = contractData.contractNumber ||
+      await this.generateContractNumber(createContractDto.landlordId);
+
+    const paymentRef = `HD${contractNumber}`.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); // Sanitize
+    const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    // 3. Create Contract + Soft Lock Room (Transaction)
+    // Note: Room is currently AVAILABLE. We change to RESERVED.
+    const contract = await this.prisma.$transaction(async (tx) => {
+      // Check room availability again in transaction
+      const room = await tx.room.findUnique({ where: { id: contractData.roomId } });
+      if (room?.status !== RoomStatus.AVAILABLE) {
+        throw new BadRequestException('Phòng không còn trống.');
+      }
+
+      // Create Contract
+      const newContract = await tx.contract.create({
+        data: {
+          ...contractData,
+          applicationId: contractData.applicationId!, // Ensure not undefined
+          contractNumber, // Use auto-generated or provided number
+          // @ts-ignore
+          status: ContractStatus.DEPOSIT_PENDING as any,
+          // @ts-ignore
+          paymentRef,
+          // @ts-ignore
+          depositDeadline,
+          residents:
+            residents && residents.length > 0
+              ? { create: residents }
+              : undefined,
+        },
+        include: {
+          residents: true,
+        },
+      });
+
+      // Soft Lock Room
+      await tx.room.update({
+        where: { id: contractData.roomId },
+        data: { status: RoomStatus.RESERVED },
+      });
+
+      return newContract;
+    });
+
+    // 4. Send email with payment instructions
+    try {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { userId: createContractDto.tenantId },
+        include: { user: true },
+      });
+
+      if (tenant) {
+        await this.emailService.sendEmail(
+          tenant.user.email,
+          `Hợp đồng ${contractNumber} - Hướng dẫn thanh toán`,
+          `
+            <h2>Hợp đồng thuê phòng đã được tạo</h2>
+            <p>Xin chào ${tenant.user.fullName},</p>
+            <p>Hợp đồng <strong>${contractNumber}</strong> đã được tạo thành công.</p>
+            <h3>Thông tin thanh toán:</h3>
+            <ul>
+              <li><strong>Số tiền cọc:</strong> ${Number(contract.deposit).toLocaleString('vi-VN')} VNĐ</li>
+              <li><strong>Mã thanh toán:</strong> ${paymentRef}</li>
+              <li><strong>Hạn thanh toán:</strong> ${depositDeadline.toLocaleString('vi-VN')}</li>
+            </ul>
+            <p>Vui lòng chuyển khoản với nội dung: <strong>${paymentRef}</strong></p>
+            <p>Sau khi thanh toán, hợp đồng sẽ tự động được kích hoạt.</p>
+          `,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to send payment email for contract ${contract.id}`, error);
+    }
 
     // Convert Decimal to Number
     const cleaned = {
       ...contract,
-      depositAmount: contract.depositAmount
-        ? Number(contract.depositAmount)
-        : 0,
+      deposit: contract.deposit ? Number(contract.deposit) : 0,
       monthlyRent: contract.monthlyRent ? Number(contract.monthlyRent) : 0,
+      residents: contract.residents || [],
     };
 
     return plainToClass(ContractResponseDto, cleaned, {
       excludeExtraneousValues: true,
     });
+  }
+
+  /**
+   * Check payment status (Polling endpoint)
+   */
+  async verifyPaymentStatus(id: string) {
+    const contract = await this.prisma.contract.findUnique({
+      where: { id },
+      include: {
+        room: true,
+        landlord: true, // Needed for SePay config
+      }
+    });
+
+    if (!contract) throw new NotFoundException('Contract not found');
+
+    // If already active, return success
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+    if (contract.status === ContractStatus.ACTIVE) {
+      return { success: true, status: ContractStatus.ACTIVE };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+    if (contract.status !== 'DEPOSIT_PENDING' as ContractStatus) {
+      return { success: false, status: contract.status };
+    }
+
+    // Call SePay Service
+    const expectedAmount = Number(contract.deposit);
+    const isPaid = await this.sepayService.verifyPayment(contract, expectedAmount);
+
+    if (isPaid) {
+      // Activate contract and sync application status
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Activate contract
+        await tx.contract.update({
+          where: { id },
+          data: { status: ContractStatus.ACTIVE, depositDeadline: null },
+        });
+
+        // 2. Set room to OCCUPIED
+        await tx.room.update({
+          where: { id: contract.roomId },
+          data: { status: RoomStatus.OCCUPIED },
+        });
+
+        // 3. Sync application status to COMPLETED (if from application)
+        if (contract.applicationId) {
+          await tx.rentalApplication.update({
+            where: { id: contract.applicationId },
+            data: {
+              status: ApplicationStatus.COMPLETED,
+              contractId: contract.id,
+            },
+          });
+
+          // 4. Auto-reject other PENDING applications for same room
+          await tx.rentalApplication.updateMany({
+            where: {
+              roomId: contract.roomId,
+              status: ApplicationStatus.PENDING,
+              id: { not: contract.applicationId },
+            },
+            data: {
+              status: ApplicationStatus.REJECTED,
+              rejectionReason: 'Phòng đã được thuê bởi người khác',
+              reviewedAt: new Date(),
+            },
+          });
+        }
+
+        // 5. Record payment
+        await tx.payment.create({
+          data: {
+            amount: contract.deposit,
+            paymentMethod: 'BANK_TRANSFER',
+            paymentDate: new Date(),
+            status: 'COMPLETED',
+            invoiceId: contract.id, // Payment links to invoice, not contract directly
+            tenantId: contract.tenantId,
+          },
+        });
+      });
+
+      // 6. Send activation email to tenant
+      try {
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { userId: contract.tenantId },
+          include: { user: true },
+        });
+
+        if (tenant) {
+          await this.emailService.sendEmail(
+            tenant.user.email,
+            `Hợp đồng ${contract.contractNumber} đã được kích hoạt`,
+            `
+              <h2>Thanh toán thành công!</h2>
+              <p>Xin chào ${tenant.user.fullName},</p>
+              <p>Hợp đồng <strong>${contract.contractNumber}</strong> đã được kích hoạt.</p>
+              <p>Cảm ơn bạn đã thanh toán tiền cọc. Hợp đồng của bạn hiện đang có hiệu lực.</p>
+              <p>Chúc bạn có trải nghiệm thuê phòng tốt đẹp!</p>
+            `,
+          );
+        }
+      } catch (error) {
+        this.logger.warn(`Failed to send activation email for contract ${id}`, error);
+      }
+
+      return { success: true, status: ContractStatus.ACTIVE };
+    }
+
+    return { success: false, status: ContractStatus.DEPOSIT_PENDING };
   }
 
   async findAll(filterDto: FilterContractsDto) {
@@ -435,6 +809,12 @@ export class ContractsService {
         skip: filterDto.skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
+        include: {
+          tenant: { include: { user: true } },
+          landlord: { include: { user: true } },
+          room: { include: { property: true } },
+          residents: true,
+        },
       }),
       this.prisma.contract.count({ where }),
     ]);
@@ -442,8 +822,9 @@ export class ContractsService {
     // Convert Decimal to Number
     const cleaned = contracts.map((c) => ({
       ...c,
-      depositAmount: c.depositAmount ? Number(c.depositAmount) : 0,
+      deposit: c.deposit ? Number(c.deposit) : 0,
       monthlyRent: c.monthlyRent ? Number(c.monthlyRent) : 0,
+      residents: c.residents || [],
     }));
 
     const transformed = cleaned.map((contract) =>
@@ -458,6 +839,12 @@ export class ContractsService {
   async findOne(id: string) {
     const contract = await this.prisma.contract.findUnique({
       where: { id },
+      include: {
+        tenant: { include: { user: true } },
+        landlord: { include: { user: true } },
+        room: { include: { property: true } },
+        residents: true,
+      },
     });
 
     if (!contract) {
@@ -467,10 +854,9 @@ export class ContractsService {
     // Convert Decimal to Number
     const cleaned = {
       ...contract,
-      depositAmount: contract.depositAmount
-        ? Number(contract.depositAmount)
-        : 0,
+      deposit: contract.deposit ? Number(contract.deposit) : 0,
       monthlyRent: contract.monthlyRent ? Number(contract.monthlyRent) : 0,
+      residents: contract.residents || [],
     };
 
     return plainToClass(ContractResponseDto, cleaned, {
@@ -479,18 +865,20 @@ export class ContractsService {
   }
 
   async update(id: string, updateContractDto: UpdateContractDto) {
-    await this.findOne(id);
+    // Exclude immutable fields and relations that need special handling
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { tenantId, landlordId, roomId, applicationId, residents, ...updateData } = updateContractDto;
 
     const contract = await this.prisma.contract.update({
       where: { id },
-      data: updateContractDto,
+      data: updateData,
     });
 
     // Convert Decimal to Number
     const cleaned = {
       ...contract,
-      depositAmount: contract.depositAmount
-        ? Number(contract.depositAmount)
+      deposit: contract.deposit
+        ? Number(contract.deposit)
         : 0,
       monthlyRent: contract.monthlyRent ? Number(contract.monthlyRent) : 0,
     };
@@ -549,7 +937,7 @@ export class ContractsService {
     if (daysRemaining > 0) {
       if (isTenant) {
         // TENANT terminates early: Loses 100% deposit
-        penalty = Number(contract.depositAmount);
+        penalty = Number(contract.deposit);
         penaltyReason = `Rút khỏi hợp đồng trước thời hạn (còn ${daysRemaining} ngày). Mất 100% tiền cọc theo điều khoản hợp đồng.`;
 
         // Even with 30 days notice, if contract not fulfilled, deposit is lost
@@ -558,7 +946,7 @@ export class ContractsService {
         }
       } else if (isLandlord) {
         // LANDLORD terminates early: Penalty is refund 100% deposit + 100% deposit as compensation
-        penalty = Number(contract.depositAmount) * 2;
+        penalty = Number(contract.deposit) * 2;
         penaltyReason = `Chủ nhà chấm dứt hợp đồng trước thời hạn (còn ${daysRemaining} ngày). Phải hoàn trả 100% tiền cọc + đền bù thêm 100% tiền cọc cho người thuê.`;
 
         if (noticeDays < requiredNoticeDays) {
@@ -679,7 +1067,7 @@ export class ContractsService {
     // Convert Decimal to Number
     const cleaned = {
       ...updated,
-      depositAmount: updated.depositAmount ? Number(updated.depositAmount) : 0,
+      deposit: updated.deposit ? Number(updated.deposit) : 0,
       monthlyRent: updated.monthlyRent ? Number(updated.monthlyRent) : 0,
       earlyTerminationPenalty: updated.earlyTerminationPenalty
         ? Number(updated.earlyTerminationPenalty)

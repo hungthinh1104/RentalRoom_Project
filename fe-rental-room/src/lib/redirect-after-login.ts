@@ -1,3 +1,5 @@
+import type { ReadonlyURLSearchParams } from 'next/navigation';
+
 /**
  * Utility to manage redirect URL after login
  * Lưu URL mà user muốn truy cập trước khi redirect sang login
@@ -38,10 +40,10 @@ export function getAndClearCallbackUrl(): string | null {
  * @param searchParams - URL search params
  * @returns callbackUrl hoặc default path
  */
-export function getCallbackUrl(searchParams: any | undefined, role?: string): string {
+export function getCallbackUrl(searchParams: ReadonlyURLSearchParams | undefined, role?: string): string {
   // Nếu có callbackUrl trong URL params (từ NextAuth)
-  // Next.js useSearchParams returns ReadonlyURLSearchParams; accept both types
-  const paramCallback = (searchParams as any)?.get?.('callbackUrl');
+  // Next.js useSearchParams returns ReadonlyURLSearchParams
+  const paramCallback = searchParams?.get('callbackUrl');
   if (paramCallback && !paramCallback.includes('/login')) {
     return paramCallback;
   }

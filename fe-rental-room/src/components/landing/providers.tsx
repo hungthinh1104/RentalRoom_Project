@@ -3,6 +3,7 @@
 import React from 'react';
 import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TokenSync } from '@/components/auth/token-sync';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -13,10 +14,11 @@ const queryClient = new QueryClient({
   },
 });
 
-export function Providers({ children }:{ children: React.ReactNode }) {
+export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
+        <TokenSync />
         {children}
       </SessionProvider>
     </QueryClientProvider>
@@ -24,3 +26,4 @@ export function Providers({ children }:{ children: React.ReactNode }) {
 }
 
 export default Providers;
+

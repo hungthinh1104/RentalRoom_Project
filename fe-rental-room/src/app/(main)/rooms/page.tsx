@@ -113,7 +113,7 @@ export default function RoomsPage() {
       {/* Hero Header - Clean & Minimal */}
       <div className="relative w-full bg-background border-b border-border">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-50" />
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        <div className="relative mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 mb-4">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
@@ -134,7 +134,7 @@ export default function RoomsPage() {
 
       {/* Search Section - Floating Card Style */}
       <div className="sticky top-[4rem] z-20 bg-background/80 backdrop-blur-xl border-b border-border shadow-lg">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+        <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-6">
           <Tabs value={searchTab} onValueChange={(v) => setSearchTab(v as "ai" | "filters")} className="w-full">
             {/* Tab Switcher */}
             <div className="flex items-center justify-center mb-6">
@@ -235,7 +235,7 @@ export default function RoomsPage() {
       </div>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
         {/* Results Header */}
         {results.length > 0 && (
           <div className="flex items-center justify-between py-4 px-6 bg-card rounded-xl border border-border shadow-sm">

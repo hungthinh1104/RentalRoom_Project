@@ -81,9 +81,15 @@ describe('RoomsService', () => {
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('roomNumber', 'R101');
       expect(mockPrismaService.room.create).toHaveBeenCalledWith({
-        data: createDto,
+        data: {
+          ...createDto,
+          images: { create: undefined },
+          amenities: { create: undefined },
+        },
         include: {
           property: true,
+          images: true,
+          amenities: true,
         },
       });
     });
@@ -364,6 +370,9 @@ describe('RoomsService', () => {
               ward: true,
             },
           },
+          images: true,
+          amenities: true,
+          reviews: true,
         },
       });
     });

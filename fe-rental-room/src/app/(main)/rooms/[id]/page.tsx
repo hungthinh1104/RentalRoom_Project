@@ -3,7 +3,6 @@
 import { use } from "react";
 import { notFound } from "next/navigation";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -25,7 +24,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RoomAmenities } from "@/features/rooms/components/room-amenities";
 import { RoomStatus } from "@/types/enums";
+import type { RoomReview } from '@/types';
 import { useRequireAuth } from "@/features/auth/hooks/use-require-auth";
+import { ContactLandlordModal } from "@/features/contracts/components/contact-landlord-modal";
 
 interface RoomDetailPageProps {
   params: {
@@ -35,22 +36,28 @@ interface RoomDetailPageProps {
 
 export default function RoomDetailPage({ params }: RoomDetailPageProps) {
   const { id } = use(params as unknown as Promise<{ id: string }>);
-  const router = useRouter();
   const { requireLogin } = useRequireAuth();
   const { data: room, isLoading, error } = useRoom(id);
   const [mainImage, setMainImage] = useState<string>("");
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarked] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
 
   const handleBookmark = () => {
-    requireLogin(`/rooms/${id}`);
+    if (requireLogin(`/rooms/${id}`)) {
+      // TODO: Implement bookmark functionality
+    }
   };
 
   const handleApply = () => {
-    requireLogin(`/rooms/${id}`);
+    if (requireLogin(`/rooms/${id}`)) {
+      setIsContactModalOpen(true);
+    }
   };
 
   const handleContact = () => {
-    requireLogin(`/rooms/${id}`);
+    if (requireLogin(`/rooms/${id}`)) {
+      setIsContactModalOpen(true);
+    }
   };
 
   if (isLoading) {
@@ -69,9 +76,8 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
   }
 
   const displayImage = mainImage ||
-    room.images?.find((img: any) => img.isPrimary)?.imageUrl ||
-    room.images?.[0]?.imageUrl ||
-    "/placeholder-room.jpg";
+    room.images?.[0] ||
+    "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop";
 
   const isAvailable = room.status === RoomStatus.AVAILABLE;
 
@@ -104,12 +110,12 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
             {room.status === RoomStatus.AVAILABLE
               ? "Có sẵn"
               : room.status === RoomStatus.OCCUPIED
-              ? "Đã cho thuê"
-              : room.status === RoomStatus.MAINTENANCE
-              ? "Bảo trì"
-              : room.status === RoomStatus.RESERVED
-              ? "Đã đặt cọc"
-              : String(room.status)}
+                ? "Đã cho thuê"
+                : room.status === RoomStatus.MAINTENANCE
+                  ? "Bảo trì"
+                  : room.status === RoomStatus.RESERVED
+                    ? "Đã đặt cọc"
+                    : String(room.status)}
           </Badge>
         </div>
 
@@ -135,18 +141,17 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
         <div className="space-y-3">
           <h3 className="font-semibold">Thư viện ảnh</h3>
           <div className="grid grid-cols-4 gap-3">
-            {room.images.map((image: any) => (
+            {room.images.map((imageUrl: string) => (
               <button
-                key={image.id}
-                onClick={() => setMainImage(image.imageUrl)}
-                className={`relative h-24 rounded-lg overflow-hidden border-2 transition-all ${
-                  mainImage === image.imageUrl
-                    ? "border-primary"
-                    : "border-muted hover:border-muted-foreground"
-                }`}
+                key={imageUrl}
+                onClick={() => setMainImage(imageUrl)}
+                className={`relative h-24 rounded-lg overflow-hidden border-2 transition-all ${mainImage === imageUrl
+                  ? "border-primary"
+                  : "border-muted hover:border-muted-foreground"
+                  }`}
               >
                 <Image
-                  src={image.imageUrl}
+                  src={imageUrl}
                   alt="Phòng - thư viện ảnh"
                   fill
                   className="object-cover"
@@ -223,7 +228,7 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
                 <div>
                   <h4 className="font-semibold mb-4">Đánh giá</h4>
                   <div className="space-y-3">
-                    {room.reviews.slice(0, 3).map((review: any) => (
+                    {room.reviews.slice(0, 3).map((review: RoomReview) => (
                       <div key={review.id} className="p-4 border rounded-lg">
                         <div className="flex items-start justify-between mb-2">
                           <div>
@@ -238,11 +243,10 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
                             {[...Array(5)].map((_, i) => (
                               <Star
                                 key={i}
-                                className={`size-4 ${
-                                  i < review.rating
-                                    ? "fill-yellow-400 text-yellow-400"
-                                    : "text-muted-foreground"
-                                }`}
+                                className={`size-4 ${i < review.rating
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-muted-foreground"
+                                  }`}
                               />
                             ))}
                           </div>
@@ -347,6 +351,16 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
           )}
         </div>
       </div>
+
+      {/* Contact Landlord Modal */}
+      <ContactLandlordModal
+        open={isContactModalOpen}
+        onOpenChange={setIsContactModalOpen}
+        roomId={id}
+        roomName={`Phòng ${room?.roomNumber}`}
+        landlordId={room?.property?.landlord?.user?.id}
+        landlordName={room?.property?.landlord?.user?.fullName || "Chủ nhà"}
+      />
     </div>
   );
 }

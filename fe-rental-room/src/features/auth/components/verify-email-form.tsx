@@ -40,8 +40,10 @@ export function VerifyEmailForm() {
   }, [countdown])
 
   // Auto-send verification code when arriving with email from register
+  const hasAutoSent = React.useRef(false)
   React.useEffect(() => {
-    if (targetEmail && countdown === 60) {
+    if (targetEmail && !hasAutoSent.current && countdown === 60) {
+      hasAutoSent.current = true
       resend(targetEmail, {
         onSuccess: () => {
           setShowResendSuccess(true)

@@ -4,6 +4,7 @@ import { CacheService } from './services/cache.service';
 import { CertificateService } from './services/certificate.service';
 import { DigitalSignatureService } from './services/digital-signature.service';
 import { ContractTemplateService } from './services/contract-template.service';
+import { EncryptionService } from './services/encryption.service';
 
 @Module({
   providers: [
@@ -12,6 +13,7 @@ import { ContractTemplateService } from './services/contract-template.service';
     CertificateService,
     DigitalSignatureService,
     ContractTemplateService,
+    EncryptionService,
   ],
   exports: [
     EmailService,
@@ -21,4 +23,4 @@ import { ContractTemplateService } from './services/contract-template.service';
     ContractTemplateService,
   ],
 })
-export class CommonModule {}
+export class CommonModule { }

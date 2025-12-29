@@ -6,14 +6,16 @@ export const propertySchema = z.object({
   name: z.string().min(2, "Property name must be at least 2 characters"),
   address: z.string().min(5, "Address must be at least 5 characters"),
   city: z.string().min(2, "City is required"),
-  district: z.string().min(2, "District is required"),
+  ward: z.string().min(2, "Ward is required"),
+  cityCode: z.string().optional(),
+  wardCode: z.string().optional(),
   propertyType: z.nativeEnum(PropertyType),
   description: z.string().optional(),
 });
 
 export const propertyFilterSchema = z.object({
   city: z.string().optional(),
-  district: z.string().optional(),
+  ward: z.string().optional(),
   propertyType: z.nativeEnum(PropertyType).optional(),
   search: z.string().optional(),
 });

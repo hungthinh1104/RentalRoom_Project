@@ -226,11 +226,12 @@ export class AIController {
     }
 
     const startTime = Date.now();
-    const response = await this.aiService.chatWithAI(dto.message, dto.context);
+    const result = await this.aiService.chatWithAI(dto.message, dto.context);
     const processingTime = Date.now() - startTime;
 
     return {
-      response,
+      response: result.response,
+      rooms: result.rooms,
       processingTime,
       timestamp: new Date(),
     };

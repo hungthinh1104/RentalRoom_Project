@@ -4,29 +4,30 @@
 
 "use client"
 
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useCallback } from 'react'
-import { saveCallbackUrl } from '@/lib/redirect-after-login'
+import { saveCallbackUrl as saveRedirectUrl } from '@/lib/redirect-after-login'
 
 export function useRequireAuth() {
   const router = useRouter()
+  const pathname = usePathname()
   const { data: session } = useSession()
 
   /**
    * Redirect sang login nếu chưa đăng nhập, lưu URL callback
    * @param redirectUrl - URL để redirect sau khi login thành công
    */
-  const requireLogin = useCallback((redirectUrl?: string) => {
+  const requireLogin = useCallback((redirectUrl?: string): boolean => {
     if (!session?.user) {
-      // Lưu URL callback
-      const toSave = redirectUrl || (typeof window !== 'undefined' ? window.location.pathname : undefined);
+      const toSave = redirectUrl || pathname;
       console.debug('[auth] requireLogin -> saving callback:', toSave);
-      saveCallbackUrl(toSave)
-      // Redirect sang login
-      router.push('/login')
+      saveRedirectUrl(toSave);
+      router.push('/auth/login');
+      return false;
     }
-  }, [session, router])
+    return true;
+  }, [session, pathname, router]);
 
   return { requireLogin, isLoggedIn: !!session?.user }
 }

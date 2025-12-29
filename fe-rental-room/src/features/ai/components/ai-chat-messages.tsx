@@ -2,11 +2,10 @@
 
 import { cn } from "@/lib/utils";
 import { ChatMessage } from "../hooks/use-ai-chat";
-import { Loader2, User, Sparkles } from "lucide-react";
+import { User, Sparkles, MapPin, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import { useRouter } from "next/navigation";
-import { roomsApi } from "@/features/rooms/api/rooms-api";
+import Link from "next/link";
 
 interface AIChatMessagesProps {
   messages: ChatMessage[];
@@ -34,70 +33,7 @@ function sanitizeMarkdown(text: string): string {
     .trim();
 }
 
-// Parse and format message with room links
-function formatMessage(text: string, onRoomClick: (roomNumber: string) => void) {
-  const lines = text.split('\n');
-  const parts: (string | React.ReactNode)[] = [];
-  let inRoomList = false;
-  let roomIndex = 0; // Counter for unique keys
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.includes('Phòng phù hợp:')) {
-      inRoomList = true;
-      parts.push(line);
-      parts.push('\n');
-    } else if (line.startsWith('• ') && inRoomList) {
-      // Format room item with link
-      const roomMatch = line.match(/• (.*?) -/);
-      if (roomMatch) {
-        const roomNumber = roomMatch[1].trim();
-        parts.push('• ');
-        parts.push(
-          <button
-            key={`room-${roomNumber}-${roomIndex++}`}
-            onClick={() => onRoomClick(roomNumber)}
-            className="text-primary hover:underline font-medium"
-            aria-label={`Xem phòng ${roomNumber}`}
-          >
-            {roomNumber}
-          </button>
-        );
-        parts.push(line.substring(roomMatch[0].length));
-      } else {
-        parts.push(line);
-      }
-      parts.push('\n');
-    } else if (line.includes('Bạn có thể xem chi tiết tại /rooms')) {
-      inRoomList = false;
-      parts.push(
-        <div key="rooms-link" className="mt-2 pt-2 border-t border-border/30">
-          <a
-            href="/rooms"
-            className="text-primary hover:underline text-xs font-medium"
-          >
-            → Xem tất cả phòng
-          </a>
-        </div>
-      );
-    } else {
-      parts.push(line);
-      if (i < lines.length - 1) parts.push('\n');
-    }
-  }
-
-  return parts;
-}
-
 export function AIChatMessages({ messages }: AIChatMessagesProps) {
-  const router = useRouter();
-
-  async function handleRoomClick(roomNumber: string) {
-    // Navigate to rooms search with room number as filter
-    // Backend would handle the search/filter
-    router.push(`/rooms?search=${encodeURIComponent(roomNumber)}`);
-  }
   return (
     <div className="space-y-3">
       {messages.map((message) => (
@@ -136,7 +72,7 @@ export function AIChatMessages({ messages }: AIChatMessagesProps) {
                 "rounded-2xl px-3 py-2 text-sm shadow-sm",
                 message.role === "user"
                   ? "bg-primary text-primary-foreground rounded-tr-sm"
-                  : "bg-white border border-border rounded-tl-sm"
+                  : "bg-white dark:bg-card border border-border rounded-tl-sm"
               )}
             >
               {message.isTyping ? (
@@ -147,14 +83,62 @@ export function AIChatMessages({ messages }: AIChatMessagesProps) {
                 </div>
               ) : (
                 <div className="whitespace-pre-wrap break-words leading-relaxed text-sm">
-                  {Array.isArray(formatMessage(sanitizeMarkdown(message.content), handleRoomClick)) ? (
-                    formatMessage(sanitizeMarkdown(message.content), handleRoomClick)
-                  ) : (
-                    sanitizeMarkdown(message.content)
-                  )}
+                  {sanitizeMarkdown(message.content)}
                 </div>
               )}
             </div>
+
+            {/* Room Cards - Render when rooms exist */}
+            {message.rooms && message.rooms.length > 0 && (
+              <div className="w-full mt-2 space-y-2">
+                {message.rooms.map((room) => (
+                  <Link
+                    key={room.id}
+                    href={`/rooms/${room.id}`}
+                    className="block group"
+                  >
+                    <div className="flex items-center justify-between p-3 rounded-xl border bg-white dark:bg-card hover:bg-muted/50 hover:border-primary/30 transition-all duration-200 shadow-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                            Phòng {room.roomNumber}
+                          </span>
+                          {room.status === 'AVAILABLE' && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
+                              Còn trống
+                            </span>
+                          )}
+                        </div>
+                        {room.propertyName && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                            <MapPin className="h-3 w-3" />
+                            <span className="truncate">{room.propertyName}</span>
+                          </div>
+                        )}
+                        {room.area && (
+                          <span className="text-xs text-muted-foreground">
+                            {room.area}m²
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-primary text-sm">
+                          {room.price?.toLocaleString('vi-VN')}đ
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                <Link
+                  href="/rooms"
+                  className="block text-center py-2 text-xs text-primary hover:underline font-medium"
+                >
+                  Xem tất cả phòng →
+                </Link>
+              </div>
+            )}
+
             {!message.isTyping && (
               <span className="text-xs text-muted-foreground px-2">
                 {format(message.timestamp, "HH:mm", { locale: vi })}
@@ -166,3 +150,4 @@ export function AIChatMessages({ messages }: AIChatMessagesProps) {
     </div>
   );
 }
+

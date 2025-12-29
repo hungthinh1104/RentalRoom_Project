@@ -7,7 +7,7 @@ export interface Contract {
   monthlyRent?: number;
   startDate?: string;
   endDate?: string;
-  property?: { name?: string; city?: string; district?: string };
+  property?: { name?: string; city?: string; ward?: string };
 }
 
 export interface Payment {
@@ -23,7 +23,7 @@ export interface RoomSummary {
   name?: string;
   pricePerMonth?: number;
   city?: string;
-  district?: string;
+  ward?: string;
 }
 
 interface PaginatedResponse<T> {
@@ -56,8 +56,11 @@ export const tenantDashboardApi = {
   },
 
   async getFavorites() {
-    // Fallback: not documented, keep empty list to avoid breaking UI
-    return { items: [] as RoomSummary[], total: 0 };
+    const { data } = await api.get<any>('/favorites');
+    return {
+      items: data?.items ?? [],
+      total: data?.total ?? 0,
+    };
   },
 
   async getRecommendations() {

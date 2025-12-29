@@ -3,7 +3,8 @@
 // Version: 3.0 - Production Ready with AI Features
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -47,12 +48,17 @@ enum ApplicationStatus {
   APPROVED
   REJECTED
   WITHDRAWN
+  COMPLETED // Contract created and activated
 }
 
 enum ContractStatus {
+  DRAFT
+  PENDING_SIGNATURE
+  DEPOSIT_PENDING
   ACTIVE
   TERMINATED
   EXPIRED
+  CANCELLED
 }
 
 enum InvoiceStatus {
@@ -199,6 +205,7 @@ model Tenant {
   invoices            Invoice[]
   roomReviews         RoomReview[]
   aiProfile           TenantAiProfile?
+  favoriteRooms       FavoriteRoom[]
 
   @@index([userId])
   @@map("tenant")
@@ -214,6 +221,7 @@ model Landlord {
   rating        Float?
   verified      Boolean  @default(false)
   
+  paymentConfig PaymentConfig?
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -284,6 +292,7 @@ model Room {
   reviews             RoomReview[]
   embedding           RoomEmbedding?
   aiInteractionLogs   AiInteractionLog[]    @relation("ClickedRoom")
+  favoritedBy         FavoriteRoom[]
 
   @@index([propertyId, status]) // Frequent query: rooms by property + status
   @@index([pricePerMonth])       // Frequent query: search by price
@@ -294,16 +303,18 @@ model Room {
 }
 
 model RoomImage {
-  id           String @id @default(uuid()) @db.Uuid
-  roomId       String @map("room_id") @db.Uuid
-  imageUrl     String @map("image_url") @db.Text
-  displayOrder Int    @map("display_order")
+  id           String  @id @default(uuid()) @db.Uuid
+  roomId       String  @map("room_id") @db.Uuid
+  imageUrl     String  @map("image_url") @db.Text
+  fileId       String? @map("file_id") @db.VarChar(255) // ImageKit fileId for deletion
+  displayOrder Int     @map("display_order")
 
   // Relations
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@unique([roomId, displayOrder]) // Prevent duplicate order per room
   @@index([roomId])
+  @@index([fileId]) // Index for faster deletion lookups
   @@map("room_image")
 }
 
@@ -325,19 +336,21 @@ model RentalApplication {
   roomId              String            @map("room_id") @db.Uuid
   tenantId            String            @map("tenant_id") @db.Uuid
   landlordId          String            @map("landlord_id") @db.Uuid
+  contractId          String?           @map("contract_id") @db.Uuid // Link to created contract
   applicationDate     DateTime          @default(now()) @map("application_date") @db.Date
   status              ApplicationStatus @default(PENDING)
   requestedMoveInDate DateTime?         @map("requested_move_in_date") @db.Date
   message             String?           @db.Text
+  rejectionReason     String?           @map("rejection_reason") @db.Text // Why rejected
   
   createdAt           DateTime          @default(now()) @map("created_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
   reviewedAt          DateTime?         @map("reviewed_at")
 
   // Relations
-  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  tenant   Tenant   @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
-  landlord Landlord @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant   Tenant    @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  landlord Landlord  @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
   contract Contract?
 
   @@index([roomId])
@@ -357,7 +370,7 @@ model Contract {
   startDate       DateTime       @map("start_date") @db.Date
   endDate         DateTime       @map("end_date") @db.Date
   monthlyRent     Decimal        @map("monthly_rent") @db.Decimal(10, 2)
-  depositAmount   Decimal        @map("deposit_amount") @db.Decimal(10, 2)
+  deposit         Decimal        @map("deposit_amount") @db.Decimal(10, 2)
   status          ContractStatus @default(ACTIVE)
   eSignatureUrl   String?        @map("e_signature_url") @db.Text
   
@@ -367,6 +380,10 @@ model Contract {
   signedUrl       String?        @map("signed_url") @db.Text // Signed PDF path
   signatureStatus String?        @map("signature_status") @db.VarChar(50) // PENDING_SIGNATURE, SIGNED, VERIFIED
   
+  // Payment & Deposit (Strict Flow)
+  depositDeadline DateTime?      @map("deposit_deadline")
+  paymentRef      String?        @map("payment_ref") @db.VarChar(50)
+
   // Termination tracking
   terminationReason           String?  @map("termination_reason") @db.Text
   terminatedByUserId          String?  @map("terminated_by_user_id") @db.Uuid
@@ -379,9 +396,16 @@ model Contract {
   
   createdAt       DateTime       @default(now()) @map("created_at")
   updatedAt       DateTime       @updatedAt @map("updated_at")
-  signedAt        DateTime?      @map("signed_at")
+  signedAt        DateTime?      @map("signed_at") // Landlord signature
+  tenantSignedAt  DateTime?      @map("tenant_signed_at") // Tenant signature
   terminatedAt    DateTime?      @map("terminated_at")
 
+  // Terms and Residents
+  paymentDay      Int            @default(5) @map("payment_day")
+  terms           String?        @db.Text
+  maxOccupants    Int?           @map("max_occupants")
+  residents       ContractResident[]
+  
   // Relations
   application     RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   room            Room              @relation(fields: [roomId], references: [id])
@@ -398,6 +422,23 @@ model Contract {
   @@index([deletedAt])
   @@index([terminatedByUserId])
   @@map("contract")
+}
+
+model ContractResident {
+  id            String   @id @default(uuid()) @db.Uuid
+  contractId    String   @map("contract_id") @db.Uuid
+  fullName      String   @map("full_name") @db.VarChar(100)
+  phoneNumber   String?  @map("phone_number") @db.VarChar(20)
+  citizenId     String?  @map("citizen_id") @db.VarChar(20)
+  relationship  String?  @db.VarChar(50) // SPOUSE, CHILD, FRIEND, OTHER
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_resident")
 }
 
 model Invoice {
@@ -562,6 +603,22 @@ model RoomReview {
   @@map("room_review")
 }
 
+model FavoriteRoom {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, roomId])
+  @@index([tenantId])
+  @@index([roomId])
+  @@map("favorite_room")
+}
+
 model Notification {
   id              String           @id @default(uuid()) @db.Uuid
   userId          String           @map("user_id") @db.Uuid
@@ -603,6 +660,27 @@ model SystemFeedback {
   @@index([type])
   @@index([status])
   @@map("system_feedback")
+}
+
+model PaymentConfig {
+  id            String   @id @default(uuid()) @db.Uuid
+  landlordId    String   @unique @map("landlord_id") @db.Uuid
+  provider      String   @default("SEPAY") @db.VarChar(20)
+  isActive      Boolean  @default(true) @map("is_active")
+  
+  // SePay Credentials
+  apiToken      String   @map("api_token") @db.Text
+  accountNumber String   @map("account_number") @db.VarChar(50)
+  bankName      String   @map("bank_name") @db.VarChar(100)
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  landlord      Landlord @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+
+  @@index([landlordId])
+  @@map("payment_config")
 }
 
 // ============================================================================

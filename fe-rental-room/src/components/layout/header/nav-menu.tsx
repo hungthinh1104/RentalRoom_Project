@@ -11,6 +11,7 @@ import {
   Users,
   BarChart3,
   Heart,
+  Star,
 } from 'lucide-react';
 import {
   NavigationMenu,
@@ -21,6 +22,7 @@ import {
   NavigationMenuTrigger,
 } from '@/components/ui/navigation-menu';
 import { cn } from '@/lib/utils';
+
 
 interface NavMenuProps {
   role?: string;
@@ -33,7 +35,6 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
 
   // Navigation items based on role
   const getNavItems = () => {
-    const baseUrl = `/dashboard/${role?.toLowerCase()}`;
 
     switch (role) {
       case 'ADMIN':
@@ -58,6 +59,11 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
             href: '/dashboard/admin/analytics',
             icon: BarChart3,
           },
+          {
+            title: 'Báo cáo',
+            href: '/dashboard/admin/reports',
+            icon: BarChart3,
+          },
         ];
 
       case 'LANDLORD':
@@ -75,6 +81,11 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
               { title: 'Tất cả bất động sản', href: '/dashboard/landlord/properties' },
               { title: 'Thêm mới', href: '/dashboard/landlord/properties/new' },
             ],
+          },
+          {
+            title: 'Đánh giá',
+            href: '/dashboard/landlord/reviews',
+            icon: Star,
           },
           {
             title: 'Hợp đồng',
@@ -194,7 +205,12 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
           if (item.children) {
             return (
               <NavigationMenuItem key={item.title}>
-                <NavigationMenuTrigger className={cn(isActive && 'bg-accent')}>
+                <NavigationMenuTrigger
+                  className={cn(
+                    'group inline-flex h-10 items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50',
+                    isActive && 'bg-accent text-accent-foreground'
+                  )}
+                >
                   <Icon className="mr-2 h-4 w-4" />
                   {item.title}
                 </NavigationMenuTrigger>
@@ -223,8 +239,8 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
 
           return (
             <NavigationMenuItem key={item.href}>
-                <NavigationMenuLink asChild>
-                  <Link href={item.href}
+              <NavigationMenuLink asChild>
+                <Link href={item.href}
                   className={cn(
                     'group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50',
                     isActive && 'bg-accent text-accent-foreground'
@@ -232,8 +248,8 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
                 >
                   <Icon className="mr-2 h-4 w-4" />
                   {item.title}
-                  </Link>
-                </NavigationMenuLink>
+                </Link>
+              </NavigationMenuLink>
             </NavigationMenuItem>
           );
         })}

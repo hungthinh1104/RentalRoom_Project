@@ -1,5 +1,6 @@
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Type } from 'class-transformer';
 import { PropertyType } from '../entities';
+import { RoomResponseDto } from '../../rooms/dto/room-response.dto';
 
 @Exclude()
 export class PropertyResponseDto {
@@ -37,5 +38,9 @@ export class PropertyResponseDto {
   createdAt: Date;
 
   @Expose()
-  roomCount?: number; // Optional aggregated count
+  totalRooms?: number; // Optional aggregated count
+
+  @Expose()
+  @Type(() => RoomResponseDto)
+  rooms?: RoomResponseDto[];
 }

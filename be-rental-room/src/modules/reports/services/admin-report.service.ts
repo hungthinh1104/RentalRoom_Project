@@ -1,83 +1,81 @@
 import {
-    Injectable,
-    InternalServerErrorException,
-    Logger,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import {
-    AdminOverviewQueryDto,
-    AdminOverviewResponseDto,
-    AdminMarketInsightsQueryDto,
-    AdminMarketInsightsResponseDto,
-    MarketPriceDto,
-    PopularSearchDto,
-    LandlordRatingResponseDto,
-    LandlordRatingQueryDto,
-    PaginatedLandlordRatingResponseDto,
+  AdminOverviewQueryDto,
+  AdminOverviewResponseDto,
+  AdminMarketInsightsQueryDto,
+  AdminMarketInsightsResponseDto,
+  MarketPriceDto,
+  PopularSearchDto,
+  PaginatedLandlordRatingResponseDto,
 } from '../dto/admin-report.dto';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AdminReportService {
-    private readonly logger = new Logger(AdminReportService.name);
+  private readonly logger = new Logger(AdminReportService.name);
 
-    constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
-    /**
-     * Get platform overview for admins
-     */
-    async getAdminOverview(
-        query: AdminOverviewQueryDto,
-    ): Promise<AdminOverviewResponseDto> {
-        const { period: _period = 'monthly', periods: _periods = 6 } = query;
-        void _period;
-        void _periods;
+  /**
+   * Get platform overview for admins
+   */
+  async getAdminOverview(
+    query: AdminOverviewQueryDto,
+  ): Promise<AdminOverviewResponseDto> {
+    const { period: _period = 'monthly', periods: _periods = 6 } = query;
+    void _period;
+    void _periods;
 
-        // Get current summary statistics
-        const [
-            totalUsers,
-            totalTenants,
-            totalLandlords,
-            totalProperties,
-            totalRooms,
-            activeContracts,
-        ] = await Promise.all([
-            this.prisma.user.count(),
-            this.prisma.tenant.count(),
-            this.prisma.landlord.count(),
-            this.prisma.property.count(),
-            this.prisma.room.count(),
-            this.prisma.contract.count({ where: { status: 'ACTIVE' } }),
-        ]);
+    // Get current summary statistics
+    const [
+      totalUsers,
+      totalTenants,
+      totalLandlords,
+      totalProperties,
+      totalRooms,
+      activeContracts,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.tenant.count(),
+      this.prisma.landlord.count(),
+      this.prisma.property.count(),
+      this.prisma.room.count(),
+      this.prisma.contract.count({ where: { status: 'ACTIVE' } }),
+    ]);
 
-        // Calculate platform revenue and occupancy
-        const [revenueData, occupancyData] = await Promise.all([
-            this.prisma.payment.aggregate({
-                where: { status: 'COMPLETED' },
-                _sum: { amount: true },
-            }),
-            this.prisma.room.groupBy({
-                by: ['status'],
-                _count: true,
-            }),
-        ]);
+    // Calculate platform revenue and occupancy
+    const [revenueData, occupancyData] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: { status: 'COMPLETED' },
+        _sum: { amount: true },
+      }),
+      this.prisma.room.groupBy({
+        by: ['status'],
+        _count: true,
+      }),
+    ]);
 
-        const platformRevenue = Number(revenueData._sum.amount || 0);
-        const occupiedRooms =
-            occupancyData.find((g) => g.status === 'OCCUPIED')?._count || 0;
-        const averageOccupancy =
-            totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
+    const platformRevenue = Number(revenueData._sum.amount || 0);
+    const occupiedRooms =
+      occupancyData.find((g) => g.status === 'OCCUPIED')?._count || 0;
+    const averageOccupancy =
+      totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
 
-        // Get top performers
-        const topLandlords = await this.prisma.$queryRaw<
-            Array<{
-                landlordId: string;
-                name: string;
-                properties: number;
-                revenue: number;
-                occupancyRate: number;
-            }>
-        >`
+    // Get top performers
+    const topLandlords = await this.prisma.$queryRaw<
+      Array<{
+        landlordId: string;
+        name: string;
+        properties: number;
+        revenue: number;
+        occupancyRate: number;
+      }>
+    >`
       SELECT 
         l.user_id as "landlordId",
         u.full_name as "name",
@@ -98,15 +96,15 @@ export class AdminReportService {
       LIMIT 5
     `;
 
-        const topProperties = await this.prisma.$queryRaw<
-            Array<{
-                propertyId: string;
-                name: string;
-                landlord: string;
-                occupancyRate: number;
-                revenue: number;
-            }>
-        >`
+    const topProperties = await this.prisma.$queryRaw<
+      Array<{
+        propertyId: string;
+        name: string;
+        landlord: string;
+        occupancyRate: number;
+        revenue: number;
+      }>
+    >`
       SELECT 
         p.id as "propertyId",
         p.name,
@@ -129,45 +127,45 @@ export class AdminReportService {
       LIMIT 5
     `;
 
-        return {
-            summary: {
-                totalUsers,
-                totalTenants,
-                totalLandlords,
-                totalProperties,
-                totalRooms,
-                activeContracts,
-                platformRevenue,
-                averageOccupancy,
-            },
-            trends: [], // TODO: Implement time-series trends based on period
-            topPerformers: {
-                landlords: topLandlords.map((l) => ({
-                    ...l,
-                    revenue: Number(l.revenue),
-                    occupancyRate: Number(l.occupancyRate),
-                })),
-                properties: topProperties.map((p) => ({
-                    ...p,
-                    occupancyRate: Number(p.occupancyRate),
-                    revenue: Number(p.revenue),
-                })),
-            },
-        };
-    }
+    return {
+      summary: {
+        totalUsers,
+        totalTenants,
+        totalLandlords,
+        totalProperties,
+        totalRooms,
+        activeContracts,
+        platformRevenue,
+        averageOccupancy,
+      },
+      trends: [], // TODO: Implement time-series trends based on period
+      topPerformers: {
+        landlords: topLandlords.map((l) => ({
+          ...l,
+          revenue: Number(l.revenue),
+          occupancyRate: Number(l.occupancyRate),
+        })),
+        properties: topProperties.map((p) => ({
+          ...p,
+          occupancyRate: Number(p.occupancyRate),
+          revenue: Number(p.revenue),
+        })),
+      },
+    };
+  }
 
-    /**
-     * Get market insights for admins
-     * Uses materialized view: popular_searches_mv
-     */
-    async getAdminMarketInsights(
-        query: AdminMarketInsightsQueryDto,
-    ): Promise<AdminMarketInsightsResponseDto> {
-        const { city, ward } = query;
+  /**
+   * Get market insights for admins
+   * Uses materialized view: popular_searches_mv
+   */
+  async getAdminMarketInsights(
+    query: AdminMarketInsightsQueryDto,
+  ): Promise<AdminMarketInsightsResponseDto> {
+    const { city, ward } = query;
 
-        try {
-            // Price analysis by location and property type
-            const priceAnalysis = await this.prisma.$queryRaw<MarketPriceDto[]>`
+    try {
+      // Price analysis by location and property type
+      const priceAnalysis = await this.prisma.$queryRaw<MarketPriceDto[]>`
         SELECT 
           p.property_type as "propertyType",
           p.city,
@@ -190,25 +188,38 @@ ${ward ? Prisma.sql`AND p.ward = ${ward}` : Prisma.empty}
         ORDER BY "averagePrice" DESC
       `;
 
-            // Get popular searches from materialized view
-            const popularSearches = await this.prisma.$queryRaw<PopularSearchDto[]>`
-        SELECT 
-          query,
-          search_count as "searchCount",
-          last_searched::text as "lastSearched"
-        FROM popular_searches_mv
-        ORDER BY search_count DESC, last_searched DESC
-        LIMIT 10
-      `;
+      // Get popular searches - use direct table query instead of materialized view
+      // This avoids dependency on materialized view which may not exist yet
+      const popularSearches = await this.prisma.popularSearch.findMany({
+        select: {
+          query: true,
+          searchCount: true,
+          lastSearched: true,
+        },
+        where: {
+          searchCount: { gt: 0 },
+        },
+        orderBy: [{ searchCount: 'desc' }, { lastSearched: 'desc' }],
+        take: 10,
+      });
 
-            // Calculate demand metrics
-            const [totalSearches, totalApplications, avgTimeToBook] =
-                await Promise.all([
-                    this.prisma.popularSearch.aggregate({
-                        _sum: { searchCount: true },
-                    }),
-                    this.prisma.rentalApplication.count(),
-                    this.prisma.$queryRaw<[{ avgDays: number }]>`
+      // Transform to match expected DTO format
+      const popularSearchesDto: PopularSearchDto[] = popularSearches.map(
+        (ps) => ({
+          query: ps.query,
+          searchCount: ps.searchCount,
+          lastSearched: ps.lastSearched.toISOString(),
+        }),
+      );
+
+      // Calculate demand metrics
+      const [totalSearches, totalApplications, avgTimeToBook] =
+        await Promise.all([
+          this.prisma.popularSearch.aggregate({
+            _sum: { searchCount: true },
+          }),
+          this.prisma.rentalApplication.count(),
+          this.prisma.$queryRaw<[{ avgDays: number }]>`
           SELECT AVG(
             EXTRACT(DAY FROM (c.signed_at - ra.created_at))
           )::decimal as "avgDays"
@@ -216,66 +227,66 @@ ${ward ? Prisma.sql`AND p.ward = ${ward}` : Prisma.empty}
           JOIN contract c ON ra.id = c.application_id
           WHERE c.signed_at IS NOT NULL
         `,
-                ]);
+        ]);
 
-            const demandMetrics = {
-                totalSearches: Number(totalSearches._sum.searchCount || 0),
-                totalApplications,
-                conversionRate:
-                    totalApplications > 0
-                        ? (totalApplications /
-                            Number(totalSearches._sum.searchCount || 1)) *
-                        100
-                        : 0,
-                averageTimeToBook: Number(avgTimeToBook[0]?.avgDays || 0),
-            };
+      const demandMetrics = {
+        totalSearches: Number(totalSearches._sum.searchCount || 0),
+        totalApplications,
+        conversionRate:
+          totalApplications > 0
+            ? (totalApplications /
+                Number(totalSearches._sum.searchCount || 1)) *
+              100
+            : 0,
+        averageTimeToBook: Number(avgTimeToBook[0]?.avgDays || 0),
+      };
 
-            // Generate recommendations
-            const recommendations: string[] = [];
-            if (demandMetrics.conversionRate < 10) {
-                recommendations.push(
-                    'Low conversion rate detected. Consider improving property listings quality.',
-                );
-            }
-            if (demandMetrics.averageTimeToBook > 14) {
-                recommendations.push(
-                    'Long booking time. Streamline application approval process.',
-                );
-            }
+      // Generate recommendations
+      const recommendations: string[] = [];
+      if (demandMetrics.conversionRate < 10) {
+        recommendations.push(
+          'Low conversion rate detected. Consider improving property listings quality.',
+        );
+      }
+      if (demandMetrics.averageTimeToBook > 14) {
+        recommendations.push(
+          'Long booking time. Streamline application approval process.',
+        );
+      }
 
-            return {
-                priceAnalysis: priceAnalysis.map((p) => ({
-                    ...p,
-                    averagePrice: Number(p.averagePrice),
-                    minPrice: Number(p.minPrice),
-                    maxPrice: Number(p.maxPrice),
-                    occupancyRate: Number(p.occupancyRate),
-                })),
-                popularSearches,
-                demandMetrics,
-                recommendations,
-            };
-        } catch (err) {
-            this.logger.error('Failed to compute market insights', err as Error);
-            throw new InternalServerErrorException(
-                'Failed to compute market insights',
-            );
-        }
+      return {
+        priceAnalysis: priceAnalysis.map((p) => ({
+          ...p,
+          averagePrice: Number(p.averagePrice),
+          minPrice: Number(p.minPrice),
+          maxPrice: Number(p.maxPrice),
+          occupancyRate: Number(p.occupancyRate),
+        })),
+        popularSearches: popularSearchesDto,
+        demandMetrics,
+        recommendations,
+      };
+    } catch (err) {
+      this.logger.error('Failed to compute market insights', err as Error);
+      throw new InternalServerErrorException(
+        'Failed to compute market insights',
+      );
     }
+  }
 
-    /**
-     * Get landlord ratings for admin with Pagination
-     */
-    async getLandlordRatings(
-        page: number = 1,
-        limit: number = 10,
-        search?: string,
-    ): Promise<PaginatedLandlordRatingResponseDto> {
-        const offset = (page - 1) * limit;
+  /**
+   * Get landlord ratings for admin with Pagination
+   */
+  async getLandlordRatings(
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+  ): Promise<PaginatedLandlordRatingResponseDto> {
+    const offset = (page - 1) * limit;
 
-        const searchCondition = search ? `AND u.full_name ILIKE $1` : '';
+    const searchCondition = search ? `AND u.full_name ILIKE $1` : '';
 
-        const countQuery = `
+    const countQuery = `
       SELECT COUNT(DISTINCT l.user_id)::int as total
       FROM room_review r
       JOIN contract c ON r.contract_id = c.id
@@ -285,30 +296,30 @@ ${ward ? Prisma.sql`AND p.ward = ${ward}` : Prisma.empty}
       ${searchCondition}
     `;
 
-        const countParams: any[] = search ? [`%${search}%`] : [];
+    const countParams: any[] = search ? [`%${search}%`] : [];
 
-        const totalResult = await this.prisma.$queryRawUnsafe<[{ total: number }]>(
-            countQuery,
-            ...countParams
-        );
-        const total = Number(totalResult[0]?.total || 0);
+    const totalResult = await this.prisma.$queryRawUnsafe<[{ total: number }]>(
+      countQuery,
+      ...countParams,
+    );
+    const total = Number(totalResult[0]?.total || 0);
 
-        // 2. Get Data
-        let queryParams: any[] = [];
-        let searchPart = '';
+    // 2. Get Data
+    const queryParams: any[] = [];
+    let searchPart = '';
 
-        if (search) {
-            searchPart = `AND u.full_name ILIKE $1`;
-            queryParams.push(`%${search}%`);
-        }
+    if (search) {
+      searchPart = `AND u.full_name ILIKE $1`;
+      queryParams.push(`%${search}%`);
+    }
 
-        queryParams.push(limit);
-        queryParams.push(offset);
+    queryParams.push(limit);
+    queryParams.push(offset);
 
-        const limitPlaceholder = search ? '$2' : '$1';
-        const offsetPlaceholder = search ? '$3' : '$2';
+    const limitPlaceholder = search ? '$2' : '$1';
+    const offsetPlaceholder = search ? '$3' : '$2';
 
-        const dataQuery = `
+    const dataQuery = `
       SELECT 
         l.user_id as "landlordId",
         u.full_name as "landlordName",
@@ -326,29 +337,29 @@ ${ward ? Prisma.sql`AND p.ward = ${ward}` : Prisma.empty}
       LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}
     `;
 
-        const ratings = await this.prisma.$queryRawUnsafe<
-            Array<{
-                landlordId: string;
-                landlordName: string;
-                averageRating: number;
-                totalRatings: number;
-                reviewCount: number;
-            }>
-        >(dataQuery, ...queryParams);
+    const ratings = await this.prisma.$queryRawUnsafe<
+      Array<{
+        landlordId: string;
+        landlordName: string;
+        averageRating: number;
+        totalRatings: number;
+        reviewCount: number;
+      }>
+    >(dataQuery, ...queryParams);
 
-        const data = ratings.map((r) => ({
-            id: r.landlordId,
-            landlordId: r.landlordId,
-            landlordName: r.landlordName,
-            averageRating: Number(r.averageRating) || 0,
-            totalRatings: Number(r.totalRatings) || 0,
-            reviewCount: Number(r.reviewCount) || 0,
-        }));
+    const data = ratings.map((r) => ({
+      id: r.landlordId,
+      landlordId: r.landlordId,
+      landlordName: r.landlordName,
+      averageRating: Number(r.averageRating) || 0,
+      totalRatings: Number(r.totalRatings) || 0,
+      reviewCount: Number(r.reviewCount) || 0,
+    }));
 
-        return {
-            data,
-            total,
-            page,
-        };
-    }
+    return {
+      data,
+      total,
+      page,
+    };
+  }
 }

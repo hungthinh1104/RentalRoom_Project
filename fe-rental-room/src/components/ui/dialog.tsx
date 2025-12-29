@@ -6,16 +6,25 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+// Provide a stable id for dialog pairing to avoid hydration mismatches
+const DialogIdContext = React.createContext<string | null>(null)
+
+function Dialog({ id, children, ...props }: React.ComponentProps<typeof DialogPrimitive.Root> & { id?: string }) {
+  const generatedId = React.useId()
+  const [stableId] = React.useState(() => id ?? generatedId)
+
+  return (
+    <DialogPrimitive.Root data-slot="dialog" {...props}>
+      <DialogIdContext.Provider value={stableId}>{children}</DialogIdContext.Provider>
+    </DialogPrimitive.Root>
+  )
 }
 
 function DialogTrigger({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
+  const id = React.useContext(DialogIdContext)
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" aria-controls={id ?? undefined} {...props} />
 }
 
 function DialogPortal({
@@ -54,10 +63,13 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const id = React.useContext(DialogIdContext)
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
       <DialogPrimitive.Content
+        id={id ?? undefined}
         data-slot="dialog-content"
         className={cn(
           "bg-background/95 backdrop-blur-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-6 rounded-[28px] border p-8 shadow-[0_25px_50px_rgb(0,0,0,0.25)] duration-200 sm:max-w-lg",

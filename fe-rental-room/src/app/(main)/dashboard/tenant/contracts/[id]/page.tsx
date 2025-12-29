@@ -12,7 +12,8 @@ import { useInvoices } from '@/features/payments/hooks/use-payments';
 import { ContractStatus, type Contract } from '@/types';
 import { FileText } from 'lucide-react';
 import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
+import { contractsApi } from '@/features/contracts/api/contracts-api';
 
 export default function ContractDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = React.use(props.params);
@@ -20,7 +21,6 @@ export default function ContractDetailPage(props: { params: Promise<{ id: string
 }
 
 function ContractDetailClient({ id }: { id: string }) {
-  const { toast } = useToast();
   const contractQuery = useContract(id);
   const invoicesQuery = useInvoices({ status: undefined });
   const terminateMutation = useTerminateContract();
@@ -30,62 +30,95 @@ function ContractDetailClient({ id }: { id: string }) {
   const onConfirmTerminate = async (data: { reason: string; noticeDays: number }) => {
     try {
       await terminateMutation.mutateAsync({ id, data });
-      toast({ title: 'Hợp đồng đã được chấm dứt', description: 'Vui lòng kiểm tra thông báo để biết chi tiết xử lý tiền cọc.' });
+      toast.success('Hợp đồng đã được chấm dứt. Vui lòng kiểm tra thông báo để biết chi tiết xử lý tiền cọc.');
       setOpenTerminate(false);
-    } catch (e: any) {
-      toast({ title: 'Lỗi', description: e?.message || 'Không thể chấm dứt hợp đồng', variant: 'destructive' });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg || 'Không thể chấm dứt hợp đồng');
     }
   };
 
   // Calculate days remaining
   const daysRemaining = contract ? Math.ceil((new Date(contract.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!contract) return;
+    setDownloading(true);
+    try {
+      const blob = await contractsApi.downloadSigned(contract.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contract-${contract.id}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success('Đang tải hợp đồng...');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(msg || 'Không thể tải hợp đồng');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-      <Card className="rounded-2xl">
-        <CardHeader className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            <CardTitle>Chi tiết hợp đồng</CardTitle>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Chi tiết hợp đồng</h1>
+            <p className="text-muted-foreground mt-2">Xem thông tin chi tiết và lịch sử thanh toán</p>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {contractQuery.isLoading && (
-            <div className="space-y-3">
-              <Skeleton className="h-6 w-1/3" />
-              <Skeleton className="h-40 w-full rounded-lg" />
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <Button variant="outline" className="gap-2" onClick={handleDownload} disabled={downloading || !contract}>
+              <FileText className="w-4 h-4" />
+              {downloading ? 'Đang tải...' : 'Tải hợp đồng'}
+            </Button>
+            {contract?.status === ContractStatus.ACTIVE && (
+              <Button variant="destructive" onClick={() => setOpenTerminate(true)}>Chấm dứt hợp đồng</Button>
+            )}
+          </div>
+        </div>
 
-          {!contractQuery.isLoading && !contract && (
-            <div className="text-center py-8 text-muted-foreground">Không tìm thấy hợp đồng.</div>
-          )}
+        {contractQuery.isLoading && (
+          <div className="space-y-4">
+            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+        )}
 
-          {!contractQuery.isLoading && contract && (
-            <>
-              <ContractSummary contract={contract} />
-              <ContractTerms contract={contract} />
-              <div>
-                <h4 className="text-sm font-medium mb-2">Hóa đơn liên quan</h4>
+        {!contractQuery.isLoading && !contract && (
+          <div className="flex flex-col items-center justify-center p-12 text-center">
+            <p className="text-muted-foreground">Không tìm thấy hợp đồng.</p>
+            <Button variant="link" onClick={() => window.history.back()}>Quay lại</Button>
+          </div>
+        )}
+
+        {!contractQuery.isLoading && contract && (
+          <>
+            <ContractSummary contract={contract} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
                 <InvoiceList loading={invoicesQuery.isLoading} invoices={invoicesQuery.data?.data} />
               </div>
-              <div className="flex items-center justify-end gap-3">
-                <Button variant="outline" className="gap-2">Tải hợp đồng</Button>
-                {contract.status === ContractStatus.ACTIVE && (
-                  <Button variant="destructive" onClick={() => setOpenTerminate(true)}>Chấm dứt hợp đồng</Button>
-                )}
+              <div className="lg:col-span-1">
+                <ContractTerms contract={contract} />
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+          </>
+        )}
+      </div>
 
-      <TerminateDialog 
-        open={openTerminate} 
-        onOpenChange={setOpenTerminate} 
-        onConfirm={onConfirmTerminate} 
+      <TerminateDialog
+        open={openTerminate}
+        onOpenChange={setOpenTerminate}
+        onConfirm={onConfirmTerminate}
         loading={terminateMutation.isPending}
-        depositAmount={contract?.deposit || 0}
+        deposit={contract?.deposit || 0}
         daysRemaining={daysRemaining}
         isTenant={true}
       />

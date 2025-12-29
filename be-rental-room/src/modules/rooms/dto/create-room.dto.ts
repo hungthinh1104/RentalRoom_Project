@@ -5,8 +5,9 @@ import {
   IsEnum,
   IsOptional,
   IsInt,
+  IsArray,
 } from 'class-validator';
-import { RoomStatus } from '../entities/room.entity';
+import { RoomStatus, AmenityType } from '../entities';
 
 export class CreateRoomDto {
   @IsString()
@@ -36,4 +37,14 @@ export class CreateRoomDto {
   @IsInt()
   @IsOptional()
   maxOccupants?: number;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  images?: string[];
+
+  @IsArray()
+  @IsEnum(AmenityType, { each: true })
+  @IsOptional()
+  amenities?: AmenityType[];
 }

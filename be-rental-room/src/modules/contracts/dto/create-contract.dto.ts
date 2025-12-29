@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -7,13 +8,33 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ContractStatus } from '../entities';
+
+export class CreateContractResidentDto {
+  @IsString()
+  @IsNotEmpty()
+  fullName: string;
+
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  citizenId?: string;
+
+  @IsString()
+  @IsOptional()
+  relationship?: string;
+}
 
 export class CreateContractDto {
   @IsUUID()
-  @IsNotEmpty()
-  applicationId: string;
+  @IsOptional()
+  applicationId?: string;
 
   @IsUUID()
   @IsNotEmpty()
@@ -28,8 +49,8 @@ export class CreateContractDto {
   landlordId: string;
 
   @IsString()
-  @IsNotEmpty()
-  contractNumber: string;
+  @IsOptional()
+  contractNumber?: string;
 
   @IsDateString()
   @IsNotEmpty()
@@ -47,7 +68,27 @@ export class CreateContractDto {
   @IsNumber()
   @IsNotEmpty()
   @Min(0)
-  depositAmount: number;
+  deposit: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
+  paymentDay?: number;
+
+  @IsString()
+  @IsOptional()
+  terms?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(1)
+  maxOccupants?: number;
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CreateContractResidentDto)
+  residents?: CreateContractResidentDto[];
 
   @IsEnum(ContractStatus)
   @IsOptional()

@@ -66,7 +66,7 @@ export default function TenantFavoritesPage() {
 											<p className="font-semibold text-base">{room.name ?? "Phòng"}</p>
 											<div className="flex items-center gap-2 text-sm text-muted-foreground">
 												<MapPin className="h-4 w-4" />
-												{room.city ?? ""} {room.district ? `- ${room.district}` : ""}
+												{room.city ?? ""} {room.ward ? `- ${room.ward}` : ""}
 											</div>
 										</div>
 										{room.pricePerMonth && (

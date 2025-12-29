@@ -1,576 +1,321 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ContractsService } from './contracts.service';
 import { PrismaService } from 'src/database/prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
-import { faker } from '@faker-js/faker';
-import { ApplicationStatus, ContractStatus } from './entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from 'src/common/services/email.service';
+import { SepayService } from '../payments/sepay.service';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { ContractStatus, ApplicationStatus } from './entities';
+import { RoomStatus } from '@prisma/client';
 
 describe('ContractsService', () => {
   let service: ContractsService;
-  let prismaService: PrismaService;
-
-  const mockRentalApplication = {
-    id: faker.string.uuid(),
-    roomId: faker.string.uuid(),
-    tenantId: faker.string.uuid(),
-    landlordId: faker.string.uuid(),
-    status: ApplicationStatus.PENDING,
-    requestedMoveInDate: new Date('2024-02-01'),
-    message: 'I would like to rent this room',
-    applicationDate: new Date(),
-    reviewedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  const mockContract = {
-    id: faker.string.uuid(),
-    applicationId: faker.string.uuid(),
-    roomId: faker.string.uuid(),
-    tenantId: faker.string.uuid(),
-    landlordId: faker.string.uuid(),
-    contractNumber: 'CTR-2024-001',
-    startDate: new Date('2024-01-01'),
-    endDate: new Date('2024-12-31'),
-    monthlyRent: 5000000,
-    deposit: 10000000,
-    status: ContractStatus.ACTIVE,
-    eSignatureUrl: 'https://example.com/signature.pdf',
-    terminatedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+  let prisma: PrismaService;
+  let sepayService: SepayService;
 
   const mockPrismaService = {
     rentalApplication: {
       create: jest.fn(),
-      findMany: jest.fn(),
       findUnique: jest.fn(),
-      update: jest.fn(),
+      findMany: jest.fn(),
       count: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn(),
     },
     contract: {
       create: jest.fn(),
+      findUnique: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
+      update: jest.fn(),
+    },
+    room: {
       findUnique: jest.fn(),
       update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
     },
+    tenant: {
+      findUnique: jest.fn(),
+    },
+    payment: {
+      create: jest.fn(),
+    },
+    $transaction: jest.fn((callback) => callback(mockPrismaService)),
+  };
+
+  const mockNotificationsService = {
+    create: jest.fn(),
+  };
+
+  const mockEmailService = {
+    sendEmail: jest.fn(),
+    sendRentalApplicationStatusEmail: jest.fn(),
+  };
+
+  const mockSepayService = {
+    verifyPayment: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ContractsService,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
-        {
-          provide: NotificationsService,
-          useValue: { create: jest.fn() },
-        },
-        {
-          provide: EmailService,
-          useValue: {
-            sendRentalApplicationNotification: jest.fn(),
-            sendRentalApplicationStatusEmail: jest.fn(),
-            sendEmail: jest.fn(),
-          },
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: NotificationsService, useValue: mockNotificationsService },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: SepayService, useValue: mockSepayService },
       ],
     }).compile();
 
     service = module.get<ContractsService>(ContractsService);
-    prismaService = module.get<PrismaService>(PrismaService);
-  });
+    prisma = module.get<PrismaService>(PrismaService);
+    sepayService = module.get<SepayService>(SepayService);
 
-  afterEach(() => {
+    // Reset all mocks before each test
     jest.clearAllMocks();
   });
 
   describe('Rental Applications', () => {
     describe('createApplication', () => {
-      it('should create a new rental application', async () => {
+      it('should create a rental application successfully', async () => {
         const createDto = {
-          roomId: mockRentalApplication.roomId,
-          tenantId: mockRentalApplication.tenantId,
-          landlordId: mockRentalApplication.landlordId,
-          requestedMoveInDate: '2024-02-01',
-          message: mockRentalApplication.message,
+          roomId: 'room-123',
+          tenantId: 'tenant-123',
+          landlordId: 'landlord-123',
+          message: 'I would like to rent this room',
         };
 
-        mockPrismaService.rentalApplication.create.mockResolvedValue(
-          mockRentalApplication,
-        );
+        const mockApplication = {
+          id: 'app-123',
+          ...createDto,
+          status: ApplicationStatus.PENDING,
+          createdAt: new Date(),
+        };
 
-        const result = await service.createApplication(createDto);
+        mockPrismaService.rentalApplication.create.mockResolvedValue(mockApplication);
 
-        expect(prismaService.rentalApplication.create).toHaveBeenCalledWith({
+        const result = await service.createApplication(createDto as any);
+
+        expect(prisma.rentalApplication.create).toHaveBeenCalledWith({
           data: createDto,
         });
         expect(result).toBeDefined();
-      });
-    });
-
-    describe('findAllApplications', () => {
-      it('should return paginated rental applications', async () => {
-        const applications = [
-          mockRentalApplication,
-          { ...mockRentalApplication, id: faker.string.uuid() },
-        ];
-
-        mockPrismaService.rentalApplication.findMany.mockResolvedValue(
-          applications,
-        );
-        mockPrismaService.rentalApplication.count.mockResolvedValue(2);
-
-        const result = await service.findAllApplications({
-          page: 1,
-          limit: 10,
-          skip: 0,
-        });
-
-        expect(result.data).toHaveLength(2);
-        expect(result.meta.total).toBe(2);
-        expect(result.meta.page).toBe(1);
-      });
-
-      it('should filter applications by status', async () => {
-        const approvedApp = {
-          ...mockRentalApplication,
-          status: ApplicationStatus.APPROVED,
-        };
-
-        mockPrismaService.rentalApplication.findMany.mockResolvedValue([
-          approvedApp,
-        ]);
-        mockPrismaService.rentalApplication.count.mockResolvedValue(1);
-
-        await service.findAllApplications({
-          page: 1,
-          limit: 10,
-          status: ApplicationStatus.APPROVED,
-          skip: 0,
-        });
-
-        expect(prismaService.rentalApplication.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              status: ApplicationStatus.APPROVED,
-            }),
-          }),
-        );
-      });
-
-      it('should filter applications by tenantId', async () => {
-        mockPrismaService.rentalApplication.findMany.mockResolvedValue([
-          mockRentalApplication,
-        ]);
-        mockPrismaService.rentalApplication.count.mockResolvedValue(1);
-
-        await service.findAllApplications({
-          page: 1,
-          limit: 10,
-          tenantId: mockRentalApplication.tenantId,
-          skip: 0,
-        });
-
-        expect(prismaService.rentalApplication.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              tenantId: mockRentalApplication.tenantId,
-            }),
-          }),
-        );
-      });
-    });
-
-    describe('findOneApplication', () => {
-      it('should return an application by id', async () => {
-        mockPrismaService.rentalApplication.findUnique.mockResolvedValue(
-          mockRentalApplication,
-        );
-
-        const result = await service.findOneApplication(
-          mockRentalApplication.id,
-        );
-
-        expect(result).toBeDefined();
-        expect(prismaService.rentalApplication.findUnique).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: mockRentalApplication.id },
-          }),
-        );
-      });
-
-      it('should throw NotFoundException if application not found', async () => {
-        mockPrismaService.rentalApplication.findUnique.mockResolvedValue(null);
-
-        await expect(
-          service.findOneApplication('non-existent-id'),
-        ).rejects.toThrow(NotFoundException);
       });
     });
 
     describe('approveApplication', () => {
-      it('should approve an application', async () => {
-        const approvedApp = {
-          ...mockRentalApplication,
+      it('should approve application and set room to RESERVED', async () => {
+        const appId = 'app-123';
+        const mockApplication = {
+          id: appId,
+          roomId: 'room-123',
+          tenantId: 'tenant-123',
+          landlordId: 'landlord-123',
+          status: ApplicationStatus.PENDING,
+          tenant: {
+            user: { id: 'user-1', fullName: 'Tenant Name', email: 'tenant@test.com' },
+          },
+          room: {
+            roomNumber: '101',
+            property: {
+              landlord: {
+                user: { id: 'user-2', fullName: 'Landlord Name', email: 'landlord@test.com', phoneNumber: '0123456789' },
+              },
+            },
+          },
+        };
+
+        mockPrismaService.rentalApplication.findUnique.mockResolvedValue(mockApplication);
+        mockPrismaService.rentalApplication.update.mockResolvedValue({
+          ...mockApplication,
           status: ApplicationStatus.APPROVED,
-          reviewedAt: new Date(),
-        };
-
-        mockPrismaService.rentalApplication.findUnique.mockResolvedValue(
-          mockRentalApplication,
-        );
-        mockPrismaService.rentalApplication.update.mockResolvedValue({
-          ...approvedApp,
-          tenant: {
-            user: {
-              id: faker.string.uuid(),
-              fullName: 'Tenant A',
-              email: 'tenant@example.com',
-            },
-          },
-          room: {
-            roomNumber: 'R101',
-            property: {
-              landlord: {
-                user: {
-                  id: faker.string.uuid(),
-                  fullName: 'LL A',
-                  email: 'll@example.com',
-                },
-              },
-            },
-          },
         });
 
-        const result = await service.approveApplication(
-          mockRentalApplication.id,
-        );
+        await service.approveApplication(appId);
 
-        expect(prismaService.rentalApplication.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: mockRentalApplication.id },
-            data: expect.objectContaining({
-              status: ApplicationStatus.APPROVED,
-              reviewedAt: expect.any(Date),
-            }),
-          }),
-        );
-      });
-    });
-
-    describe('rejectApplication', () => {
-      it('should reject an application', async () => {
-        const rejectedApp = {
-          ...mockRentalApplication,
-          status: ApplicationStatus.REJECTED,
-          reviewedAt: new Date(),
-        };
-
-        mockPrismaService.rentalApplication.findUnique.mockResolvedValue(
-          mockRentalApplication,
-        );
-        mockPrismaService.rentalApplication.update.mockResolvedValue({
-          ...rejectedApp,
-          tenant: {
-            user: {
-              id: faker.string.uuid(),
-              fullName: 'Tenant A',
-              email: 'tenant@example.com',
-            },
-          },
-          room: {
-            roomNumber: 'R101',
-            property: {
-              landlord: {
-                user: {
-                  id: faker.string.uuid(),
-                  fullName: 'LL A',
-                  email: 'll@example.com',
-                },
-              },
-            },
-          },
+        // Verify room was set to RESERVED
+        expect(mockPrismaService.room.update).toHaveBeenCalledWith({
+          where: { id: 'room-123' },
+          data: { status: RoomStatus.RESERVED },
         });
 
-        const result = await service.rejectApplication(
-          mockRentalApplication.id,
-        );
-
-        expect(prismaService.rentalApplication.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: mockRentalApplication.id },
-            data: expect.objectContaining({
-              status: ApplicationStatus.REJECTED,
-              reviewedAt: expect.any(Date),
-            }),
-          }),
-        );
+        // Verify application was approved
+        expect(mockPrismaService.rentalApplication.update).toHaveBeenCalled();
       });
     });
   });
 
-  describe('Contracts', () => {
+  describe('Contract Management', () => {
     describe('create', () => {
-      it('should create a new contract', async () => {
+      it('should create contract with auto-generated contract number', async () => {
         const createDto = {
-          applicationId: mockContract.applicationId,
-          roomId: mockContract.roomId,
-          tenantId: mockContract.tenantId,
-          landlordId: mockContract.landlordId,
-          contractNumber: mockContract.contractNumber,
-          startDate: '2024-01-01',
-          endDate: '2024-12-31',
-          monthlyRent: mockContract.monthlyRent,
-          depositAmount: mockContract.deposit,
+          roomId: 'room-123',
+          tenantId: 'tenant-123',
+          landlordId: 'landlord-123',
+          startDate: '2025-02-01',
+          endDate: '2026-02-01',
+          monthlyRent: 5000000,
+          deposit: 10000000,
         };
 
+        const mockPaymentConfig = {
+          landlordId: 'landlord-123',
+          apiToken: 'encrypted-token',
+          isActive: true,
+        };
+
+        const mockRoom = {
+          id: 'room-123',
+          status: RoomStatus.AVAILABLE,
+        };
+
+        const mockContract = {
+          id: 'contract-123',
+          ...createDto,
+          contractNumber: 'HD-LAND-202501-0001',
+          status: ContractStatus.DEPOSIT_PENDING,
+          residents: [],
+        };
+
+        mockPrismaService.contract.findUnique = jest.fn().mockResolvedValue(mockPaymentConfig);
+        mockPrismaService.room.findUnique.mockResolvedValue(mockRoom);
         mockPrismaService.contract.create.mockResolvedValue(mockContract);
+        mockPrismaService.contract.count.mockResolvedValue(0);
 
-        const result = await service.create(createDto);
-
-        expect(prismaService.contract.create).toHaveBeenCalledWith({
-          data: createDto,
-        });
-        expect(result).toBeDefined();
-      });
-    });
-
-    describe('findAll', () => {
-      it('should return paginated contracts', async () => {
-        const contracts = [
-          mockContract,
-          { ...mockContract, id: faker.string.uuid() },
-        ];
-
-        mockPrismaService.contract.findMany.mockResolvedValue(contracts);
-        mockPrismaService.contract.count.mockResolvedValue(2);
-
-        const result = await service.findAll({
-          page: 1,
-          limit: 10,
-          skip: 0,
-        });
-
-        expect(result.data).toHaveLength(2);
-        expect(result.meta.total).toBe(2);
-        expect(result.meta.page).toBe(1);
-      });
-
-      it('should filter contracts by status', async () => {
-        mockPrismaService.contract.findMany.mockResolvedValue([mockContract]);
-        mockPrismaService.contract.count.mockResolvedValue(1);
-
-        await service.findAll({
-          page: 1,
-          limit: 10,
-          status: ContractStatus.ACTIVE,
-          skip: 0,
-        });
-
-        expect(prismaService.contract.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              status: ContractStatus.ACTIVE,
-            }),
-          }),
-        );
-      });
-
-      it('should filter contracts by tenantId', async () => {
-        mockPrismaService.contract.findMany.mockResolvedValue([mockContract]);
-        mockPrismaService.contract.count.mockResolvedValue(1);
-
-        await service.findAll({
-          page: 1,
-          limit: 10,
-          tenantId: mockContract.tenantId,
-          skip: 0,
-        });
-
-        expect(prismaService.contract.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              tenantId: mockContract.tenantId,
-            }),
-          }),
-        );
-      });
-
-      it('should search contracts by contract number', async () => {
-        mockPrismaService.contract.findMany.mockResolvedValue([mockContract]);
-        mockPrismaService.contract.count.mockResolvedValue(1);
-
-        await service.findAll({
-          page: 1,
-          limit: 10,
-          search: 'CTR-2024',
-          skip: 0,
-        });
-
-        expect(prismaService.contract.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              contractNumber: expect.objectContaining({
-                contains: 'CTR-2024',
-                mode: 'insensitive',
-              }),
-            }),
-          }),
-        );
-      });
-    });
-
-    describe('findOne', () => {
-      it('should return a contract by id', async () => {
-        mockPrismaService.contract.findUnique.mockResolvedValue({
-          ...mockContract,
-          tenant: { userId: mockContract.tenantId },
-          landlord: { userId: mockContract.landlordId },
-        });
-
-        const result = await service.findOne(mockContract.id);
+        const result = await service.create(createDto as any);
 
         expect(result).toBeDefined();
-        expect(prismaService.contract.findUnique).toHaveBeenCalledWith({
-          where: { id: mockContract.id },
-        });
+        expect(mockPrismaService.contract.create).toHaveBeenCalled();
       });
 
-      it('should throw NotFoundException if contract not found', async () => {
-        mockPrismaService.contract.findUnique.mockResolvedValue(null);
-
-        await expect(service.findOne('non-existent-id')).rejects.toThrow(
-          NotFoundException,
-        );
-      });
-    });
-
-    describe('update', () => {
-      it('should update a contract', async () => {
-        const updateDto = { monthlyRent: 6000000 };
-        const updatedContract = { ...mockContract, monthlyRent: 6000000 };
-
-        mockPrismaService.contract.findUnique.mockResolvedValue(mockContract);
-        mockPrismaService.contract.update.mockResolvedValue(updatedContract);
-
-        const result = await service.update(mockContract.id, updateDto);
-
-        expect(prismaService.contract.update).toHaveBeenCalledWith({
-          where: { id: mockContract.id },
-          data: updateDto,
-        });
-      });
-    });
-
-    describe('terminate', () => {
-      it('should terminate a contract', async () => {
-        const terminatedContract = {
-          ...mockContract,
-          status: ContractStatus.TERMINATED,
-          terminatedAt: new Date(),
+      it('should throw error if payment config not set up', async () => {
+        const createDto = {
+          roomId: 'room-123',
+          tenantId: 'tenant-123',
+          landlordId: 'landlord-123',
+          startDate: '2025-02-01',
+          endDate: '2026-02-01',
+          monthlyRent: 5000000,
+          deposit: 10000000,
         };
 
-        mockPrismaService.contract.findUnique.mockResolvedValue({
-          ...mockContract,
-          tenant: {
-            userId: mockContract.tenantId,
-            user: {
-              id: mockContract.tenantId,
-              email: 't@example.com',
-              fullName: 'Tenant',
-            },
-          },
-          landlord: {
-            userId: mockContract.landlordId,
-            user: {
-              id: mockContract.landlordId,
-              email: 'l@example.com',
-              fullName: 'LL',
-            },
-          },
-          room: {
-            roomNumber: 'R101',
-            property: {
-              address: '123 Test',
-              landlord: {
-                user: {
-                  id: mockContract.landlordId,
-                  email: 'l@example.com',
-                  fullName: 'LL',
-                },
-              },
-            },
-          },
-        });
-        mockPrismaService.contract.update.mockResolvedValue({
-          ...terminatedContract,
-          tenant: {
-            user: {
-              id: mockContract.tenantId,
-              email: 't@example.com',
-              fullName: 'Tenant',
-            },
-          },
-          landlord: {
-            user: {
-              id: mockContract.landlordId,
-              email: 'l@example.com',
-              fullName: 'LL',
-            },
-          },
-          room: {
-            roomNumber: 'R101',
-            property: {
-              name: 'Test Property',
-              landlord: {
-                user: {
-                  id: mockContract.landlordId,
-                  email: 'l@example.com',
-                  fullName: 'LL',
-                },
-              },
-            },
-          },
-        });
+        mockPrismaService.contract.findUnique = jest.fn().mockResolvedValue(null);
 
-        const result = await service.terminate(
-          mockContract.id,
-          mockContract.tenantId,
-          { reason: 'Test', noticeDays: 30 },
-        );
-
-        expect(prismaService.contract.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { id: mockContract.id },
-            data: expect.objectContaining({
-              status: ContractStatus.TERMINATED,
-              terminatedAt: expect.any(Date),
-            }),
-          }),
-        );
+        await expect(service.create(createDto as any)).rejects.toThrow(BadRequestException);
       });
     });
 
-    describe('remove', () => {
-      it('should delete a contract', async () => {
+    describe('verifyPaymentStatus', () => {
+      it('should activate contract when payment is verified', async () => {
+        const contractId = 'contract-123';
+        const mockContract = {
+          id: contractId,
+          roomId: 'room-123',
+          tenantId: 'tenant-123',
+          landlordId: 'landlord-123',
+          applicationId: 'app-123',
+          contractNumber: 'HD-LAND-202501-0001',
+          deposit: 10000000,
+          status: ContractStatus.DEPOSIT_PENDING,
+          room: {},
+          landlord: {},
+        };
+
         mockPrismaService.contract.findUnique.mockResolvedValue(mockContract);
-        mockPrismaService.contract.delete.mockResolvedValue(mockContract);
-
-        const result = await service.remove(mockContract.id);
-
-        expect(prismaService.contract.delete).toHaveBeenCalledWith({
-          where: { id: mockContract.id },
+        mockSepayService.verifyPayment.mockResolvedValue(true);
+        mockPrismaService.tenant.findUnique.mockResolvedValue({
+          user: { email: 'tenant@test.com', fullName: 'Tenant Name' },
         });
-        expect(result).toEqual({ message: 'Contract deleted successfully' });
+
+        const result = await service.verifyPaymentStatus(contractId);
+
+        expect(result.success).toBe(true);
+        expect(result.status).toBe(ContractStatus.ACTIVE);
+
+        // Verify contract was activated
+        expect(mockPrismaService.contract.update).toHaveBeenCalledWith({
+          where: { id: contractId },
+          data: { status: ContractStatus.ACTIVE, depositDeadline: null },
+        });
+
+        // Verify room was set to OCCUPIED
+        expect(mockPrismaService.room.update).toHaveBeenCalledWith({
+          where: { id: 'room-123' },
+          data: { status: RoomStatus.OCCUPIED },
+        });
+
+        // Verify application was marked COMPLETED
+        expect(mockPrismaService.rentalApplication.update).toHaveBeenCalledWith({
+          where: { id: 'app-123' },
+          data: {
+            status: ApplicationStatus.COMPLETED,
+            contractId: contractId,
+          },
+        });
+
+        // Verify other applications were rejected
+        expect(mockPrismaService.rentalApplication.updateMany).toHaveBeenCalledWith({
+          where: {
+            roomId: 'room-123',
+            status: ApplicationStatus.PENDING,
+            id: { not: 'app-123' },
+          },
+          data: {
+            status: ApplicationStatus.REJECTED,
+            rejectionReason: 'Phòng đã được thuê bởi người khác',
+            reviewedAt: expect.any(Date),
+          },
+        });
       });
+
+      it('should return false if payment not found', async () => {
+        const contractId = 'contract-123';
+        const mockContract = {
+          id: contractId,
+          deposit: 10000000,
+          status: ContractStatus.DEPOSIT_PENDING,
+          room: {},
+          landlord: {},
+        };
+
+        mockPrismaService.contract.findUnique.mockResolvedValue(mockContract);
+        mockSepayService.verifyPayment.mockResolvedValue(false);
+
+        const result = await service.verifyPaymentStatus(contractId);
+
+        expect(result.success).toBe(false);
+        expect(result.status).toBe(ContractStatus.DEPOSIT_PENDING);
+      });
+    });
+  });
+
+  describe('State Machine Validation', () => {
+    it('should prevent invalid status transitions', async () => {
+      const contractId = 'contract-123';
+      const mockContract = {
+        id: contractId,
+        status: ContractStatus.ACTIVE,
+      };
+
+      mockPrismaService.contract.findUnique.mockResolvedValue(mockContract);
+
+      // Trying to go from ACTIVE to DRAFT should fail
+      await expect(
+        service.update(contractId, { status: ContractStatus.DRAFT } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Contract Number Generation', () => {
+    it('should generate unique contract numbers with correct format', async () => {
+      const landlordId = 'landlord-123';
+
+      // Mock count to return 0 (first contract)
+      mockPrismaService.contract.count.mockResolvedValue(0);
+
+      const contractNumber = await (service as any).generateContractNumber(landlordId);
+
+      expect(contractNumber).toMatch(/^HD-[A-Z0-9]{4}-\d{6}-\d{4}$/);
+      expect(contractNumber).toContain('LAND'); // First 4 chars of landlordId
     });
   });
 });

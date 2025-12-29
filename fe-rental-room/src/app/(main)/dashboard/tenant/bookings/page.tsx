@@ -6,8 +6,8 @@ import { CalendarClock, CheckCircle2, Clock, Mail, MapPin, MessageSquare, XCircl
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useApplications } from "@/features/contracts/hooks/use-contracts";
+
+import { useApplications } from "@/features/rental-applications/hooks/use-rental-applications";
 import { ApplicationStatus, type RentalApplication } from "@/types";
 
 const statusCopy: Record<ApplicationStatus, { label: string; color: string; icon: typeof CheckCircle2 }> = {
@@ -15,10 +15,11 @@ const statusCopy: Record<ApplicationStatus, { label: string; color: string; icon
 	[ApplicationStatus.APPROVED]: { label: "Đã duyệt", color: "bg-success-light text-success border-success/20", icon: CheckCircle2 },
 	[ApplicationStatus.REJECTED]: { label: "Từ chối", color: "bg-destructive-light text-destructive border-destructive/20", icon: XCircle },
 	[ApplicationStatus.WITHDRAWN]: { label: "Đã rút", color: "bg-muted text-muted-foreground border-border", icon: Clock },
+	[ApplicationStatus.COMPLETED]: { label: "Hoàn thành", color: "bg-primary-light text-primary border-primary/20", icon: CheckCircle2 },
 };
 
 function formatDate(value?: string | null) {
-  return value ? format(new Date(value), "dd/MM/yyyy") : "—";
+	return value ? format(new Date(value), "dd/MM/yyyy") : "—";
 }
 
 export default function TenantBookingsPage() {
@@ -61,8 +62,8 @@ export default function TenantBookingsPage() {
 					{!applicationsQuery.isLoading && applications.map((app: RentalApplication) => {
 						const status = statusCopy[app.status];
 						const StatusIcon = status.icon;
-						    return (
-							    <Link href={`/dashboard/tenant/bookings/${app.id}`} key={app.id} className="rounded-3xl border border-border/70 bg-gradient-to-br from-card/90 via-card/70 to-muted/60 backdrop-blur-xl p-4 md:p-5 shadow-lg shadow-muted/30 flex flex-col gap-3 transition-all duration-200 hover:border-primary/30 hover:shadow-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/40">
+						return (
+							<Link href={`/dashboard/tenant/bookings/${app.id}`} key={app.id} className="rounded-3xl border border-border/70 bg-gradient-to-br from-card/90 via-card/70 to-muted/60 backdrop-blur-xl p-4 md:p-5 shadow-lg shadow-muted/30 flex flex-col gap-3 transition-all duration-200 hover:border-primary/30 hover:shadow-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/40">
 								<div className="flex items-center justify-between gap-3 flex-wrap">
 									<div className="flex items-center gap-3">
 										<div className="h-11 w-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-semibold ring-1 ring-primary/20">

@@ -89,7 +89,7 @@ export default function TestimonialsSection() {
           }}
           className="grid md:grid-cols-2 lg:grid-cols-3 gap-8"
         >
-          {testimonials.map((testimonial, index) => (
+          {testimonials.map((testimonial) => (
             <motion.div
               key={testimonial.name}
               variants={ANIMATION_VARIANTS.fadeInUp}
@@ -115,7 +115,7 @@ export default function TestimonialsSection() {
 
                   {/* Testimonial Text */}
                   <p className="text-base leading-relaxed text-foreground">
-                    "{testimonial.content}"
+                    &ldquo;{testimonial.content}&rdquo;
                   </p>
 
                   {/* Author */}

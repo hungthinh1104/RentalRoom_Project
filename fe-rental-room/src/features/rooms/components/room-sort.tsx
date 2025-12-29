@@ -16,6 +16,7 @@ interface RoomSortProps {
   sortOrder?: 'asc' | 'desc';
   onSortByChange: (value: string) => void;
   onSortOrderChange: (value: 'asc' | 'desc') => void;
+  compact?: boolean;
 }
 
 export function RoomSort({
@@ -23,6 +24,7 @@ export function RoomSort({
   sortOrder = 'desc',
   onSortByChange,
   onSortOrderChange,
+  compact = false,
 }: RoomSortProps) {
   const sortOptions = [
     { value: 'newest', label: 'Mới nhất', icon: Clock },
@@ -31,7 +33,41 @@ export function RoomSort({
     { value: 'rating', label: 'Đánh giá', icon: Star },
   ];
 
-  const currentSort = sortOptions.find((opt) => opt.value === sortBy);
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2">
+        <Select value={sortBy} onValueChange={onSortByChange}>
+          <SelectTrigger className="h-9 w-[140px]">
+            <SelectValue placeholder="Sắp xếp" />
+          </SelectTrigger>
+          <SelectContent>
+            {sortOptions.map((option) => {
+              const Icon = option.icon;
+              return (
+                <SelectItem key={option.value} value={option.value}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="size-4" />
+                    {option.label}
+                  </div>
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
+          title={sortOrder === 'asc' ? 'Tăng dần' : 'Giảm dần'}
+          className="h-9 w-9 p-0"
+        >
+          <ArrowUpDown className={`size-4 transition-transform ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'
+            }`} />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-end gap-3">
@@ -66,9 +102,8 @@ export function RoomSort({
         title={sortOrder === 'asc' ? 'Tăng dần' : 'Giảm dần'}
         className="mb-0.5"
       >
-        <ArrowUpDown className={`size-4 transition-transform ${
-          sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'
-        }`} />
+        <ArrowUpDown className={`size-4 transition-transform ${sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'
+          }`} />
       </Button>
     </div>
   );

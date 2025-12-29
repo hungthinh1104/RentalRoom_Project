@@ -24,6 +24,9 @@
 
 ## ✨ Key Improvements
 
+**Security update:** Refresh tokens are now **HttpOnly cookies** set by the backend. The frontend no longer persists refresh tokens in localStorage — it relies on the cookie-based refresh fallback for improved security (no BE change required because controller supports cookie fallback).
+
+
 ### Before Refactoring
 ❌ **Problem 1: God File**
 - `use-auth.ts` contained ALL 5 hooks in one file (47 lines)

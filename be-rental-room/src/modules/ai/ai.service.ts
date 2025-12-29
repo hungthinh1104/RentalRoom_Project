@@ -5,7 +5,6 @@ import { ChatService } from './services/chat.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { SubmitAiFeedbackDto } from './dto/ai.dto';
 
-
 /**
  * AIService - Implements Google Gemini integration via LangChain
  *
@@ -79,11 +78,21 @@ export class AIService {
    *
    * @param message - User message (can be Vietnamese or English)
    * @param context - Optional context for multi-turn conversations
-   * @returns Promise<string> - AI response
+   * @returns Promise<ChatResponse> - AI response with optional rooms array
    *
    * Use case: Tenant questions about properties, general inquiries
    */
-  async chatWithAI(message: string, context?: string): Promise<string> {
+  async chatWithAI(message: string, context?: string): Promise<{
+    response: string;
+    rooms?: Array<{
+      id: string;
+      roomNumber: string;
+      price: number;
+      propertyName?: string;
+      area?: number;
+      status?: string;
+    }>;
+  }> {
     return this.chatService.chatWithAI(message, context);
   }
 

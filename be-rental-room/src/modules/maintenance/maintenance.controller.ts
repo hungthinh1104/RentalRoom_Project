@@ -20,7 +20,7 @@ import { UserRole } from '../users/entities';
 
 @Controller('maintenance')
 export class MaintenanceController {
-  constructor(private readonly maintenanceService: MaintenanceService) { }
+  constructor(private readonly maintenanceService: MaintenanceService) {}
 
   @Post('requests')
   @Auth()

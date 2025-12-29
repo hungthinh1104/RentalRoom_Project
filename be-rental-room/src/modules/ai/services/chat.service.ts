@@ -2,6 +2,20 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AiModelFactory } from './ai-model.factory';
 import { SearchService } from './search.service';
 
+export interface ChatRoom {
+  id: string;
+  roomNumber: string;
+  price: number;
+  propertyName?: string;
+  area?: number;
+  status?: string;
+}
+
+export interface ChatResponse {
+  response: string;
+  rooms?: ChatRoom[];
+}
+
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
@@ -9,9 +23,9 @@ export class ChatService {
   constructor(
     private readonly modelFactory: AiModelFactory,
     private readonly searchService: SearchService,
-  ) {}
+  ) { }
 
-  async chatWithAI(message: string, context?: string): Promise<string> {
+  async chatWithAI(message: string, context?: string): Promise<ChatResponse> {
     if (!message || !message.trim()) {
       throw new Error('Message cannot be empty');
     }
@@ -28,15 +42,10 @@ QUY TẮC TRẢ LỜI:
 - Nếu cần liệt kê: dùng số thứ tự (1. 2. 3.) không dùng dấu gạch đầu dòng
 - Câu trả lời thân thiện, tự nhiên như chat thông thường
 - Tập trung vào thông tin thiết yếu, không dài dòng
+- KHÔNG liệt kê phòng trong câu trả lời, hệ thống sẽ tự động hiển thị kết quả tìm kiếm
 
 Ví dụ tốt:
-"Phòng gần trường ĐH giá dưới 3 triệu thường có ở khu vực sinh viên. Bạn nên tìm trong bán kính 2-3km từ trường. Các tiện nghi cơ bản như wifi, WC riêng thường có sẵn trong mức giá này."
-
-Ví dụ SAI (dùng markdown):
-"**Phòng gần trường** với giá dưới 3 triệu:
-- Tìm trong bán kính 2-3km
-- Nên có wifi
-## Lưu ý quan trọng"`;
+"Phòng gần trường ĐH giá dưới 3 triệu thường có ở khu vực sinh viên. Bạn nên tìm trong bán kính 2-3km từ trường. Tôi đang tìm các phòng phù hợp cho bạn..."`;
 
     let fullPrompt = message;
     if (context) {
@@ -100,21 +109,26 @@ Ví dụ SAI (dùng markdown):
         );
 
         if (searchResults && searchResults.length > 0) {
-          // Format search results with links
-          const roomLinks = searchResults
-            .map(
-              (room: any) =>
-                `• ${room.roomNumber} - ${room.price?.toLocaleString() || 'N/A'} VNĐ`,
-            )
-            .join('\n');
+          // Return structured response with rooms
+          const rooms: ChatRoom[] = searchResults.map((room: any) => ({
+            id: room.id,
+            roomNumber: room.roomNumber || 'N/A',
+            price: room.pricePerMonth || room.price || 0,
+            propertyName: room.property?.name || room.propertyName || undefined,
+            area: room.area || undefined,
+            status: room.status || undefined,
+          }));
 
-          return `${aiResponse}\n\nPhòng phù hợp:\n${roomLinks}\n\nBạn có thể xem chi tiết tại /rooms`;
+          return {
+            response: aiResponse + '\n\nĐây là các phòng phù hợp với yêu cầu của bạn:',
+            rooms,
+          };
         }
       } catch (error: unknown) {
         this.logger.debug('Search failed, returning AI response only:', error);
       }
     }
 
-    return aiResponse;
+    return { response: aiResponse };
   }
 }

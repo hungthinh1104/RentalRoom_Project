@@ -6,24 +6,7 @@ import { ArrowRight, MapPin, Play, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
-const ANIMATION_VARIANTS = {
-  fadeInUp: {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
-  },
-  fadeInLeft: {
-    hidden: { opacity: 0, x: -30 },
-    visible: { opacity: 1, x: 0 }
-  },
-  fadeInRight: {
-    hidden: { opacity: 0, x: 30 },
-    visible: { opacity: 1, x: 0 }
-  },
-  scaleIn: {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: { opacity: 1, scale: 1 }
-  }
-};
+
 
 export default function HeroSection() {
   return (
@@ -138,7 +121,7 @@ export default function HeroSection() {
                 { value: '10K+', label: 'Phòng trọ' },
                 { value: '63', label: 'Tỉnh thành' },
                 { value: '98%', label: 'Hài lòng' }
-              ].map((stat, index) => (
+              ].map((stat) => (
                 <div key={stat.label} className="space-y-1">
                   <div className="text-3xl md:text-4xl font-bold text-foreground">
                     {stat.value}
@@ -147,7 +130,7 @@ export default function HeroSection() {
                     {stat.label}
                   </div>
                 </div>
-              ))}
+              ))} 
             </motion.div>
           </motion.div>
 

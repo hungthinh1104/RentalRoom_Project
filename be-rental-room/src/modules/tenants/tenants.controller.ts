@@ -15,7 +15,7 @@ import { UserRole } from '@prisma/client';
 
 @Controller('tenants')
 export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) {}
+  constructor(private readonly tenantsService: TenantsService) { }
 
   @Post()
   @Auth(UserRole.ADMIN)
@@ -24,7 +24,7 @@ export class TenantsController {
   }
 
   @Get()
-  @Auth(UserRole.ADMIN)
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
   findAll(@Query() filterDto: FilterTenantsDto) {
     return this.tenantsService.findAll(filterDto);
   }

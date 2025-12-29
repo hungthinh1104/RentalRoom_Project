@@ -32,23 +32,25 @@ export function AiSearchInput({
   maxSuggestions = 6,
 }: AiSearchInputProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const history = localStorage.getItem("ai-search-history");
+      return history ? JSON.parse(history).slice(0, 5) : [];
+    } catch {
+      return [];
+    }
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load search history from localStorage
-  useEffect(() => {
-    const history = localStorage.getItem("ai-search-history");
-    if (history) {
-      setSearchHistory(JSON.parse(history).slice(0, 5));
-    }
-  }, []);
+  // Load search history from localStorage handled in state initializer
 
   // Fetch popular searches
   const { data: popularSearchesData } = usePopularSearches(showSuggestions);
   const popularSearches = (popularSearchesData?.searches || [])
     .slice(0, 3)
-    .map((item: any) => item.query);
+    .map((item: { query: string }) => item.query);
 
   // Build suggestions
   const suggestions: SearchSuggestion[] = [];
@@ -222,7 +224,7 @@ export function AiSearchInput({
       {isOpen && showSuggestions && suggestions.length === 0 && value.length > 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-2xl shadow-lg z-50 p-4 text-center">
           <p className="text-sm text-muted-foreground">
-            Hãy nhấn Enter để tìm kiếm "{value}"
+            Hãy nhấn Enter để tìm kiếm &quot;{value}&quot;
           </p>
         </div>
       )}

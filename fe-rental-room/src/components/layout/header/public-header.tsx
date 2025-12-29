@@ -7,13 +7,10 @@ import { Building2, Menu, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useSession, signOut } from 'next-auth/react';
+import { clearTokens } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 
-interface PublicHeaderProps {
-  className?: string;
-}
-
-export function PublicHeader({ className }: PublicHeaderProps) {
+export function PublicHeader() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -29,8 +26,15 @@ export function PublicHeader({ className }: PublicHeaderProps) {
   ];
 
   const handleLogout = async () => {
+    // Clear client-side tokens and NextAuth session
+    if (typeof window !== 'undefined') {
+      try {
+        clearTokens();
+      } catch {}
+    }
     await signOut({ redirect: false });
     router.push('/');
+    router.refresh();
   };
 
   return (

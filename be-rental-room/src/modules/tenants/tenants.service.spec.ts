@@ -52,6 +52,9 @@ describe('TenantsService', () => {
     it('should create a new tenant', async () => {
       const createDto = {
         userId: mockTenant.userId,
+        fullName: 'Test Tenant',
+        email: 'test@example.com',
+        phoneNumber: '0123456789',
         citizenId: mockTenant.citizenId,
         dateOfBirth: '1990-01-01',
         address: mockTenant.address,

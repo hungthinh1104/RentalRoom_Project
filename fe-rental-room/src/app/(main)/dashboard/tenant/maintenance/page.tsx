@@ -6,18 +6,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+import { useMaintenance } from "@/features/maintenance/hooks/use-maintenance";
+import { useSession } from "next-auth/react";
+import { MaintenanceCard } from "@/features/maintenance/components/maintenance-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { MaintenanceRequestSummary } from "@/features/maintenance/types";
+
 const tips = [
 	{ title: "Mô tả rõ ràng", desc: "Ghi chi tiết vấn đề và vị trí trong phòng để xử lý nhanh hơn." },
 	{ title: "Đính kèm hình ảnh", desc: "Thêm ảnh giúp kỹ thuật viên chẩn đoán chính xác." },
 	{ title: "Ưu tiên an toàn", desc: "Nếu có nguy cơ mất an toàn, hãy liên hệ khẩn cấp với chủ nhà." },
 ];
 
-const placeholders = [
-	{ title: "Rò rỉ nước", status: "Đang chờ", color: "bg-amber-100 text-amber-700 border-amber-200" },
-	{ title: "Điều hòa không mát", status: "Đã tiếp nhận", color: "bg-blue-100 text-blue-700 border-blue-200" },
-];
-
 export default function TenantMaintenancePage() {
+	const { data: session } = useSession();
+	const userId = session?.user?.id;
+	const maintenanceQuery = useMaintenance(userId ? { tenantId: userId } : undefined);
+	const requests = maintenanceQuery.data?.data || [];
+
 	return (
 		<div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 space-y-6">
 			<div className="flex flex-col gap-3">
@@ -35,33 +41,38 @@ export default function TenantMaintenancePage() {
 						<Badge variant="secondary" className="text-xs">Thời gian phản hồi tiêu chuẩn &lt; 24h</Badge>
 					</CardHeader>
 					<CardContent className="pt-4 space-y-4">
-						<div className="rounded-2xl border border-dashed border-border/80 p-8 text-center space-y-4">
-							<div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-								<ClipboardList className="h-6 w-6 text-muted-foreground" />
-							</div>
-							<div className="space-y-2">
-								<p className="font-semibold">Bạn chưa có yêu cầu nào</p>
-								<p className="text-sm text-muted-foreground">Tạo yêu cầu mới để chúng tôi hỗ trợ nhanh nhất.</p>
-							</div>
-							<div className="flex items-center justify-center">
-								<Button asChild className="gap-2">
-									<Link href="/dashboard/tenant/maintenance/new">
-										<Plus className="h-4 w-4" />
-										Tạo yêu cầu
-									</Link>
-								</Button>
-							</div>
+						<div className="flex items-center justify-between">
+							<p className="text-sm text-muted-foreground">Bạn có {requests.length} yêu cầu bảo trì.</p>
+							<Button asChild size="sm" className="gap-2">
+								<Link href="/dashboard/tenant/maintenance/new">
+									<Plus className="h-4 w-4" />
+									Tạo yêu cầu
+								</Link>
+							</Button>
 						</div>
 
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-							{placeholders.map((item) => (
-								<div key={item.title} className="rounded-2xl border border-border/80 bg-muted/40 p-4 space-y-2">
-									<div className="flex items-center justify-between">
-										<p className="font-semibold">{item.title}</p>
-										<Badge className={`border ${item.color}`}>{item.status}</Badge>
-									</div>
-									<p className="text-sm text-muted-foreground">Ví dụ minh họa để bạn hình dung quy trình xử lý.</p>
+						{maintenanceQuery.isLoading && (
+							<div className="space-y-3">
+								<Skeleton className="h-32 w-full rounded-2xl" />
+								<Skeleton className="h-32 w-full rounded-2xl" />
+							</div>
+						)}
+
+						{!maintenanceQuery.isLoading && requests.length === 0 && (
+							<div className="rounded-2xl border border-dashed border-border/80 p-8 text-center space-y-4">
+								<div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+									<ClipboardList className="h-6 w-6 text-muted-foreground" />
 								</div>
+								<div className="space-y-2">
+									<p className="font-semibold">Bạn chưa có yêu cầu nào</p>
+									<p className="text-sm text-muted-foreground">Tạo yêu cầu mới để chúng tôi hỗ trợ nhanh nhất.</p>
+								</div>
+							</div>
+						)}
+
+						<div className="grid gap-4">
+							{!maintenanceQuery.isLoading && requests.map((item: MaintenanceRequestSummary) => (
+								<MaintenanceCard key={item.id} request={item} />
 							))}
 						</div>
 					</CardContent>

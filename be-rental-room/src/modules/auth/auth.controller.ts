@@ -7,8 +7,6 @@ import {
   Res,
   Query,
   BadRequestException,
-  UsePipes,
-  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,7 +18,7 @@ import {
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { RegisterDto, AuthResponseDto, RefreshTokenDto, LoginDto } from './dto/auth.dto';
+import { RegisterDto, AuthResponseDto, LoginDto } from './dto/auth.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { LocalAuthGuard } from 'src/common/guards/local-auth.guard';
 
@@ -120,9 +118,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshToken(
-    @Req() req: Request,
-  ): Promise<{ access_token: string }> {
+  async refreshToken(@Req() req: Request): Promise<{ access_token: string }> {
     // Prefer refresh token from body, fall back to HttpOnly cookie (if present)
     const body = (req as any)?.body || {};
     const token =

@@ -22,7 +22,7 @@ import {
   FilterRentalApplicationsDto,
   FilterContractsDto,
 } from './dto';
-import { UserRole } from '../users/entities';
+import { User, UserRole } from '../users/entities';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
@@ -32,7 +32,7 @@ export class ContractsController {
     private readonly contractsService: ContractsService,
     private readonly contractSigningService: ContractSigningService,
     private readonly pdfQueueService: PdfQueueService,
-  ) {}
+  ) { }
 
   // ===== RENTAL APPLICATIONS ENDPOINTS =====
 
@@ -68,8 +68,16 @@ export class ContractsController {
 
   @Patch('applications/:id/withdraw')
   @Auth(UserRole.TENANT)
-  withdrawApplication(@Param('id') id: string, @CurrentUser() user: any) {
+  withdrawApplication(@Param('id') id: string, @CurrentUser() user: User) {
     return this.contractsService.withdrawApplication(id, user.id);
+  }
+
+  // ===== CONTRACT APPROVAL (Two-Party Agreement) =====
+
+  @Patch(':id/tenant-approve')
+  @Auth(UserRole.TENANT)
+  tenantApproveContract(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contractsService.tenantApproveContract(id, user.id);
   }
 
   // ===== CONTRACT MANAGEMENT ENDPOINTS =====
@@ -120,7 +128,7 @@ export class ContractsController {
   terminate(
     @Param('id') id: string,
     @Body() terminateDto: { reason: string; noticeDays?: number },
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
   ) {
     return this.contractsService.terminate(id, user.id, terminateDto);
   }
@@ -197,7 +205,7 @@ export class ContractsController {
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
   async signContract(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: User,
     @Body() body: { reason: string },
   ) {
     if (!user) {
@@ -229,6 +237,16 @@ export class ContractsController {
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
   async verifyContract(@Param('id') id: string) {
     return this.contractSigningService.verifyContract(id);
+  }
+
+  /**
+   * GET /contracts/:id/payment-status
+   * - Check Payment Status (Polling)
+   */
+  @Get(':id/payment-status')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async verifyPaymentStatus(@Param('id') id: string) {
+    return this.contractsService.verifyPaymentStatus(id);
   }
 
   /**

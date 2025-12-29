@@ -22,7 +22,7 @@ import { Auth } from 'src/common/decorators/auth.decorator';
 
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) {}
+  constructor(private readonly propertiesService: PropertiesService) { }
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -31,15 +31,15 @@ export class PropertiesController {
   }
 
   @Get()
-  @UseInterceptors(CacheInterceptor)
-  @CacheTTL(300) // Cache for 5 minutes
+  // @UseInterceptors(CacheInterceptor)
+  // @CacheTTL(300) // Cache for 5 minutes
   findAll(@Query() filterDto: FilterPropertiesDto) {
     return this.propertiesService.findAll(filterDto);
   }
 
   @Get(':id')
-  @UseInterceptors(CacheInterceptor)
-  @CacheTTL(600) // Cache for 10 minutes
+  // @UseInterceptors(CacheInterceptor)
+  // @CacheTTL(600) // Cache for 10 minutes
   findOne(@Param('id') id: string) {
     return this.propertiesService.findOne(id);
   }

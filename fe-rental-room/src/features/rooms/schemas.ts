@@ -1,15 +1,17 @@
 import { z } from "zod";
-import { RoomStatus } from "@/types/enums";
+import { RoomStatus, AmenityType } from "@/types/enums";
 
 export const roomSchema = z.object({
   propertyId: z.string().min(1, "Property is required"),
   roomNumber: z.string().min(1, "Room number is required"),
-  area: z.number().positive("Area must be positive"),
-  pricePerMonth: z.number().positive("Price must be positive"),
-  deposit: z.number().min(0, "Deposit cannot be negative"),
+  area: z.number().positive("Diện tích phải lớn hơn 0"),
+  pricePerMonth: z.number().positive("Giá phòng phải lớn hơn 0").max(99999999, "Giá phòng không được vượt quá 99.999.999 VNĐ"),
+  deposit: z.number().min(0, "Tiền cọc không được âm").max(99999999, "Tiền cọc không được vượt quá 99.999.999 VNĐ"),
   maxOccupants: z.number().int().positive("Max occupants must be positive").optional(),
   status: z.nativeEnum(RoomStatus).optional().default(RoomStatus.AVAILABLE),
   description: z.string().optional(),
+  images: z.array(z.string().url("URL không hợp lệ")).optional().default([]),
+  amenities: z.array(z.nativeEnum(AmenityType)).optional().default([]),
 });
 
 export const roomFilterSchema = z.object({

@@ -1,4 +1,4 @@
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Transform } from 'class-transformer';
 
 @Exclude()
 export class PaymentResponseDto {
@@ -12,6 +12,12 @@ export class PaymentResponseDto {
   tenantId: string;
 
   @Expose()
+  @Transform(({ value }) => {
+    if (value && typeof value === 'object' && 'toNumber' in value) {
+      return value.toNumber();
+    }
+    return value ? Number(value) : null;
+  })
   amount: number;
 
   @Expose()

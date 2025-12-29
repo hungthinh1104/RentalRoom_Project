@@ -3,6 +3,7 @@ import api from './client';
 interface CreateApplicationParams {
   roomId: string;
   tenantId: string;
+  landlordId: string;
   message?: string;
   requestedMoveInDate?: string;
 }
@@ -28,6 +29,7 @@ export const contractsApi = {
     const { data } = await api.post<RentalApplicationResponse>('/contracts/applications', {
       roomId: params.roomId,
       tenantId: params.tenantId,
+      landlordId: params.landlordId,
       message: params.message,
       requestedMoveInDate: params.requestedMoveInDate,
     });
@@ -54,7 +56,7 @@ export const contractsApi = {
     const query = queryParams.toString();
     const url = query ? `/contracts/applications?${query}` : '/contracts/applications';
 
-    const { data } = await api.get(url);
+    const { data } = await api.get<{ data: RentalApplicationResponse[]; total: number }>(url);
     return data;
   },
 

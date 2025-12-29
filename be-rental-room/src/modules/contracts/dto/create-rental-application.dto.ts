@@ -18,8 +18,8 @@ export class CreateRentalApplicationDto {
   tenantId: string;
 
   @IsUUID()
-  @IsNotEmpty()
-  landlordId: string;
+  @IsOptional()
+  landlordId?: string;
 
   @IsEnum(ApplicationStatus)
   @IsOptional()

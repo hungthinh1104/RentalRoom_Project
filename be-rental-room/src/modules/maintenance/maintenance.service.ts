@@ -4,7 +4,6 @@ import { CreateMaintenanceRequestDto } from './dto/create-maintenance-request.dt
 import { UpdateMaintenanceRequestDto } from './dto/update-maintenance-request.dto';
 import { FilterMaintenanceRequestsDto } from './dto/filter-maintenance-requests.dto';
 import { CreateMaintenanceFeedbackDto } from './dto/create-maintenance-feedback.dto';
-import { Prisma } from '@prisma/client';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
 import { MaintenanceStatus } from './entities';
@@ -12,7 +11,7 @@ import { MaintenanceRequestResponseDto } from './dto'; // This import is still n
 
 @Injectable()
 export class MaintenanceService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createDto: CreateMaintenanceRequestDto) {
     const request = await this.prisma.maintenanceRequest.create({
@@ -71,12 +70,12 @@ export class MaintenanceService {
         where,
         include: landlordId
           ? {
-            room: {
-              include: {
-                property: true,
+              room: {
+                include: {
+                  property: true,
+                },
               },
-            },
-          }
+            }
           : undefined,
         skip: filterDto.skip,
         take: limit,

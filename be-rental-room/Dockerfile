@@ -54,7 +54,7 @@ RUN find node_modules -name "*.md" -delete && \
     find node_modules -name "*.test.ts" -delete
 
 # Clean up Prisma engines (keep only Linux musl)
-RUN find node_modules/@prisma/engines -type f ! -name '*linux-musl*' -delete 2>/dev/null || true
+# RUN find node_modules/@prisma/engines -type f ! -name '*linux-musl*' -delete 2>/dev/null || true
 
 # ============================================
 # Stage 3: Production
@@ -103,8 +103,8 @@ USER app
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:3000/api/docs', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+    CMD node -e "require('http').get('http://localhost:3001/api/docs', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["node", "dist/src/main.js"]

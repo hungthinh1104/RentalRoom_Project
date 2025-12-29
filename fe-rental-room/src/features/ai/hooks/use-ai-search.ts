@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { semanticSearchApi, type SemanticSearchResponse } from '../api/semantic-search-api';
+import { semanticSearchApi } from '../api/semantic-search-api';
 import { type RoomFilterInput } from '@/features/rooms/schemas';
 import { useDebounce } from '@/hooks/use-debounce';
 
@@ -72,6 +72,23 @@ export function useAiSearch(
     retry: 1,
   });
 
+  // Fallback: if semantic/hybrid returns 0 results, try standard search with the same query
+  const standardFallbackQuery = useQuery({
+    queryKey: ['rooms', 'semantic-fallback', debouncedQuery, filters],
+    queryFn: async () => {
+      setSearchMethod('standard');
+      return semanticSearchApi.standardSearch(
+        { ...(filters || {}), search: debouncedQuery },
+        1,
+        limit,
+      );
+    },
+    enabled: shouldUseSemanticSearch && !!semanticQuery.data && (semanticQuery.data.count ?? semanticQuery.data.results?.length ?? 0) === 0,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
   // Standard search query (filters only, no semantic)
   const standardQuery = useQuery({
     queryKey: ['rooms', 'standard-search', filters],
@@ -88,19 +105,31 @@ export function useAiSearch(
   // Merge results from both queries
   const data = useMemo(() => {
     if (shouldUseSemanticSearch && semanticQuery.data) {
-      return semanticQuery.data;
-    } else if (standardQuery.data) {
+      // Prefer semantic results when available and non-empty
+      if ((semanticQuery.data.count ?? semanticQuery.data.results?.length ?? 0) > 0) {
+        return semanticQuery.data;
+      }
+      // Fall back to standard search when semantic returned empty
+      if (standardFallbackQuery.data) {
+        return {
+          ...standardFallbackQuery.data,
+          method: 'STANDARD',
+        };
+      }
+    }
+
+    if (standardQuery.data) {
       return {
         ...standardQuery.data,
         method: 'STANDARD',
       };
     }
     return null;
-  }, [shouldUseSemanticSearch, semanticQuery.data, standardQuery.data]);
+  }, [shouldUseSemanticSearch, semanticQuery.data, standardQuery.data, standardFallbackQuery.data]);
 
   const isLoading = shouldUseSemanticSearch ? semanticQuery.isLoading : standardQuery.isLoading;
-  const isFetching = shouldUseSemanticSearch ? semanticQuery.isFetching : standardQuery.isFetching;
-  const error = shouldUseSemanticSearch ? semanticQuery.error : standardQuery.error;
+  const isFetching = shouldUseSemanticSearch ? (semanticQuery.isFetching || standardFallbackQuery.isFetching) : standardQuery.isFetching;
+  const error = shouldUseSemanticSearch ? semanticQuery.error ?? standardFallbackQuery.error : standardQuery.error;
 
   // Prefetch popular searches for suggestions
   const prefetchPopularSearches = useCallback(async () => {

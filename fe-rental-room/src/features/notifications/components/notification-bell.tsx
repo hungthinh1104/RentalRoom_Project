@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Bell, CheckCheck, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,10 +24,11 @@ interface NotificationBellProps {
 export function NotificationBell({ count: externalCount }: NotificationBellProps) {
   const { data: session } = useSession();
   const userId = session?.user?.id;
-  const { notifications, unreadCount, isLoading, refetch } = useNotifications();
+  const [open, setOpen] = useState(false);
+  // Reduce polling further by increasing interval to 2 minutes (120s)
+  const { notifications, unreadCount, isLoading, refetch } = useNotifications(open, 120000);
   const { toast } = useToast();
   const [marking, setMarking] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
 
   const handleMarkAsRead = async (id: string) => {
     try {
@@ -37,7 +39,7 @@ export function NotificationBell({ count: externalCount }: NotificationBellProps
         description: 'Đã đánh dấu là đã đọc.',
       });
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Lỗi',
         description: 'Không thể đánh dấu thông báo.',
@@ -58,7 +60,7 @@ export function NotificationBell({ count: externalCount }: NotificationBellProps
         description: 'Tất cả thông báo đã được đánh dấu là đã đọc.',
       });
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Lỗi',
         description: 'Không thể đánh dấu tất cả thông báo.',
@@ -75,7 +77,7 @@ export function NotificationBell({ count: externalCount }: NotificationBellProps
         description: 'Thông báo đã bị xóa.',
       });
       refetch();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Lỗi',
         description: 'Không thể xóa thông báo.',
@@ -84,7 +86,33 @@ export function NotificationBell({ count: externalCount }: NotificationBellProps
     }
   };
 
-  const displayCount = externalCount ?? unreadCount;
+  // Lightweight count query: fetch unread count once (no polling) to show badge without continuous polling
+  const countQuery = useQuery({
+    queryKey: ['notifications-count', userId],
+    queryFn: () => notificationsApi.getAll({ userId, isRead: false, limit: 1 }),
+    enabled: !!userId,
+    refetchInterval: false,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    cacheTime: 30 * 60 * 1000, // keep cached for 30 minutes,
+  });
+
+  const lightweightCount = countQuery.data?.total || 0;
+  const displayCount = externalCount ?? (open ? unreadCount : lightweightCount);
+
+  // Throttle refetches on open to avoid rapid repeated calls (10s)
+  const lastRefetchRef = React.useRef<number>(0);
+
+  React.useEffect(() => {
+    if (open) {
+      const now = Date.now();
+      if (now - lastRefetchRef.current > 10000) {
+        refetch();
+        // also refresh lightweight count
+        countQuery.refetch();
+        lastRefetchRef.current = now;
+      }
+    }
+  }, [open, refetch, countQuery]);
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>

@@ -9,7 +9,7 @@ import type {
 export const propertiesApi = {
 	async getAll(params?: PaginationParams & { landlordId?: string }) {
 		const { data } = await api.get<PaginatedResponse<Property>>('/properties', {
-			params,
+			params: params as Record<string, unknown>,
 		});
 		return data;
 	},

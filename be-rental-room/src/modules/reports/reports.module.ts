@@ -18,4 +18,4 @@ import { TenantReportService } from './services/tenant-report.service';
   controllers: [ReportsController],
   exports: [AdminReportService, LandlordReportService, TenantReportService],
 })
-export class ReportsModule { }
+export class ReportsModule {}

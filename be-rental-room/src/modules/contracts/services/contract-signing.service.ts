@@ -42,8 +42,8 @@ export class ContractSigningService {
         // Verify we can write
         fs.accessSync(dir, fs.constants.W_OK);
         return true;
-      } catch (err) {
-        this.logger.warn(`Cannot create/access directory ${dir}: ${(err as Error).message}`);
+      } catch {
+        this.logger.warn(`Cannot create/access directory ${dir}`);
         return false;
       }
     };
@@ -53,7 +53,9 @@ export class ContractSigningService {
     // Fallback to system temp directory if project storage is not writable
     const fallback = path.join(os.tmpdir(), 'rental-room-storage', 'contracts');
     if (tryEnsure(fallback)) {
-      this.logger.warn(`Falling back to temporary storage directory: ${fallback}`);
+      this.logger.warn(
+        `Falling back to temporary storage directory: ${fallback}`,
+      );
       this.storagePath = fallback;
       return;
     }
@@ -120,7 +122,7 @@ export class ContractSigningService {
         startDate: contract.startDate,
         endDate: contract.endDate,
         monthlyRent: contract.monthlyRent.toString(),
-        depositAmount: contract.depositAmount.toString(),
+        depositAmount: contract.deposit.toString(),
         utilityIncluded: 'Water, Electricity, Internet',
       };
 
@@ -141,7 +143,7 @@ export class ContractSigningService {
       // Ensure storage writable before updating DB with file paths
       try {
         fs.accessSync(this.storagePath, fs.constants.W_OK);
-      } catch (err) {
+      } catch {
         this.logger.error(`Storage path not writable: ${this.storagePath}`);
         throw new InternalServerErrorException('Storage path not writable');
       }
@@ -220,7 +222,7 @@ export class ContractSigningService {
       // Ensure storage writable before writing signed file
       try {
         fs.accessSync(this.storagePath, fs.constants.W_OK);
-      } catch (err) {
+      } catch {
         this.logger.error(`Storage path not writable: ${this.storagePath}`);
         throw new InternalServerErrorException('Storage path not writable');
       }

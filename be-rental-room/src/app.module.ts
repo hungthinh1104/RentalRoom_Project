@@ -26,6 +26,8 @@ import {
   MaintenanceModule,
   NotificationsModule,
   RecommendationModule,
+  UploadModule,
+  FavoritesModule,
 } from './modules';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AIModule } from './modules/ai/ai.module';
@@ -66,6 +68,8 @@ import { SystemFeedbackModule } from './modules/system-feedback/system-feedback.
     ReportsModule,
     AIModule,
     SystemFeedbackModule,
+    UploadModule,
+    FavoritesModule,
   ],
   providers: [
     PrismaService,

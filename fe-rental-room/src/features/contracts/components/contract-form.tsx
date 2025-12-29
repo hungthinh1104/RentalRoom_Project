@@ -19,7 +19,7 @@ export function ContractForm({ defaultValues, onSubmit, isLoading }: ContractFor
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({
+  } = useForm<ContractInput>({
     resolver: zodResolver(contractSchema),
     defaultValues: {
       tenantId: "",
@@ -31,8 +31,8 @@ export function ContractForm({ defaultValues, onSubmit, isLoading }: ContractFor
       deposit: 0,
       status: "ACTIVE",
       ...defaultValues,
-    },
-  } as any);
+    } as ContractInput,
+  });
 
   return (
     <Card>
@@ -40,7 +40,7 @@ export function ContractForm({ defaultValues, onSubmit, isLoading }: ContractFor
         <CardTitle>{defaultValues ? "Edit Contract" : "Create New Contract"}</CardTitle>
       </CardHeader>
       <CardContent>
-      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label htmlFor="tenantId">Tenant ID</Label>

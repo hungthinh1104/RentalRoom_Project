@@ -5,16 +5,25 @@ import * as PopoverPrimitive from "@radix-ui/react-popover"
 
 import { cn } from "@/lib/utils"
 
-function Popover({
-  ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+// Provide a stable id for popover pairing to avoid hydration mismatches
+const PopoverIdContext = React.createContext<string | null>(null)
+
+function Popover({ id, children, ...props }: React.ComponentProps<typeof PopoverPrimitive.Root> & { id?: string }) {
+  const generatedId = React.useId()
+  const [stableId] = React.useState(() => id ?? generatedId)
+
+  return (
+    <PopoverPrimitive.Root data-slot="popover" {...props}>
+      <PopoverIdContext.Provider value={stableId}>{children}</PopoverIdContext.Provider>
+    </PopoverPrimitive.Root>
+  )
 }
 
 function PopoverTrigger({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
+  const id = React.useContext(PopoverIdContext)
+  return <PopoverPrimitive.Trigger data-slot="popover-trigger" aria-controls={id ?? undefined} {...props} />
 }
 
 function PopoverContent({
@@ -23,9 +32,12 @@ function PopoverContent({
   sideOffset = 4,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  const id = React.useContext(PopoverIdContext)
+
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
+        id={id ?? undefined}
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}

@@ -3,12 +3,17 @@ export enum ApplicationStatus {
   APPROVED = 'APPROVED',
   REJECTED = 'REJECTED',
   WITHDRAWN = 'WITHDRAWN',
+  COMPLETED = 'COMPLETED',
 }
 
 export enum ContractStatus {
   ACTIVE = 'ACTIVE',
   TERMINATED = 'TERMINATED',
   EXPIRED = 'EXPIRED',
+  DRAFT = 'DRAFT',
+  PENDING_SIGNATURE = 'PENDING_SIGNATURE',
+  DEPOSIT_PENDING = 'DEPOSIT_PENDING',
+  CANCELLED = 'CANCELLED',
 }
 
 export class RentalApplication {

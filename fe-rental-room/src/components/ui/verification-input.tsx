@@ -22,7 +22,8 @@ export function VerificationInput({
   error = false,
   autoFocus = true,
 }: VerificationInputProps) {
-  const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
+  const hasCompletedRef = React.useRef(false);
+  const inputRefs = React.useRef<Array<HTMLInputElement | null>>(Array(length).fill(null));
 
   React.useEffect(() => {
     if (autoFocus && inputRefs.current[0]) {
@@ -31,8 +32,11 @@ export function VerificationInput({
   }, [autoFocus]);
 
   React.useEffect(() => {
-    if (value.length === length && onComplete) {
+    if (value.length === length && onComplete && !hasCompletedRef.current) {
+      hasCompletedRef.current = true;
       onComplete(value);
+    } else if (value.length < length) {
+      hasCompletedRef.current = false;
     }
   }, [value, length, onComplete]);
 

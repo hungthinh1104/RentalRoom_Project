@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,8 +9,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import { contractsApi } from '@/lib/api/contractsApi';
+import { toast } from 'sonner';
+import { contractsApi } from '@/features/contracts/api/contracts-api';
 import { useSession } from '@/features/auth/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
 
@@ -20,6 +19,7 @@ interface ContactLandlordModalProps {
   onOpenChange: (open: boolean) => void;
   roomId: string;
   roomName: string;
+  landlordId?: string;
   landlordName: string;
 }
 
@@ -28,10 +28,9 @@ export function ContactLandlordModal({
   onOpenChange,
   roomId,
   roomName,
+  landlordId,
   landlordName,
 }: ContactLandlordModalProps) {
-  const router = useRouter();
-  const { toast } = useToast();
   const { data: session } = useSession();
   const userId = session?.user?.id;
   const [loading, setLoading] = useState(false);
@@ -43,56 +42,56 @@ export function ContactLandlordModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log('[ContactLandlordModal] Submit triggered', {
+      userId,
+      landlordId,
+      message: formData.message,
+      roomId,
+    });
+
     if (!userId) {
-      toast({
-        title: 'Lỗi',
-        description: 'Vui lòng đăng nhập để gửi đơn đăng ký.',
-        variant: 'destructive',
-      });
+      toast.error('Vui lòng đăng nhập để gửi đơn đăng ký.');
       return;
     }
 
     if (!formData.message.trim()) {
-      toast({
-        title: 'Cảnh báo',
-        description: 'Vui lòng nhập tin nhắn.',
-        variant: 'destructive',
-      });
+      toast.error('Vui lòng nhập tin nhắn.');
       return;
     }
 
+    console.log('[ContactLandlordModal] Starting API call...');
     setLoading(true);
 
     try {
-      await contractsApi.createApplication({
+      const result = await contractsApi.createApplication({
         roomId,
         tenantId: userId,
+        ...(landlordId && { landlordId }), // Only include if exists
         message: formData.message,
         requestedMoveInDate: formData.requestedMoveInDate
           ? new Date(formData.requestedMoveInDate).toISOString()
           : undefined,
       });
 
-      toast({
-        title: 'Thành công',
-        description: `Đơn đăng ký của bạn đã được gửi cho ${landlordName}. Chúng tôi sẽ thông báo cho bạn khi có phản hồi.`,
-      });
+      console.log('[ContactLandlordModal] API success:', result);
+      toast.success(`Đơn đăng ký của bạn đã được gửi cho ${landlordName}. Chúng tôi sẽ thông báo cho bạn khi có phản hồi.`);
 
       // Reset form
       setFormData({ message: '', requestedMoveInDate: '' });
       onOpenChange(false);
-
-      // Optional: Navigate to applications page
-      // router.push('/dashboard/tenant/applications');
-    } catch (error: any) {
-      console.error('Error creating rental application:', error);
-      toast({
-        title: 'Lỗi',
-        description:
-          error?.response?.data?.message ||
-          'Có lỗi xảy ra. Vui lòng thử lại.',
-        variant: 'destructive',
-      });
+    } catch (error: unknown) {
+      console.error('[ContactLandlordModal] API error:', error);
+      let description = 'Có lỗi xảy ra. Vui lòng thử lại.';
+      if (error instanceof Error) {
+        description = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        const eObj = error as Record<string, unknown>;
+        const resp = eObj['response'] as Record<string, unknown> | undefined;
+        const data = resp?.['data'] as Record<string, unknown> | undefined;
+        const maybe = data?.['message'];
+        if (typeof maybe === 'string') description = maybe;
+      }
+      toast.error(description);
     } finally {
       setLoading(false);
     }
@@ -104,7 +103,7 @@ export function ContactLandlordModal({
         <DialogHeader>
           <DialogTitle>Liên Hệ Chủ Nhà</DialogTitle>
           <DialogDescription>
-            Gửi đơn đăng ký thuê phòng "{roomName}" cho {landlordName}
+            Gửi đơn đăng ký thuê phòng &ldquo;{roomName}&rdquo; cho {landlordName}
           </DialogDescription>
         </DialogHeader>
 

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { TrendingUp, Award, MapPin } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 
 interface CityCardProps {

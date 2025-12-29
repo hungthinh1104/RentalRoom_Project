@@ -4,7 +4,7 @@ import { SystemFeedbackController } from './system-feedback.controller';
 import { PrismaService } from '../../database/prisma/prisma.service';
 
 @Module({
-    controllers: [SystemFeedbackController],
-    providers: [SystemFeedbackService, PrismaService],
+  controllers: [SystemFeedbackController],
+  providers: [SystemFeedbackService, PrismaService],
 })
-export class SystemFeedbackModule { }
+export class SystemFeedbackModule {}

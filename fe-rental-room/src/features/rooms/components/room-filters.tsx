@@ -16,9 +16,12 @@ interface RoomFiltersProps {
 export function RoomFilters({ onFiltersChange }: RoomFiltersProps) {
   const [filters, setFilters] = useState<RoomFilterInput>({});
 
-  const handleChange = (key: keyof RoomFilterInput, value: any) => {
-    const newFilters = { ...filters, [key]: value };
-    if (!value) delete newFilters[key];
+  const handleChange = (key: keyof RoomFilterInput, value: RoomFilterInput[keyof RoomFilterInput] | undefined) => {
+    const newFilters: RoomFilterInput = { ...filters, [key]: value } as RoomFilterInput;
+    if (value === undefined || value === null || value === "") {
+      const rec = newFilters as Record<string, unknown>;
+      delete rec[key as string];
+    }
     setFilters(newFilters);
   };
 

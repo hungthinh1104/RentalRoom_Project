@@ -1,15 +1,13 @@
 "use client";
 import React from 'react';
 import { format } from 'date-fns';
-import { useSession } from 'next-auth/react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useApplication } from '@/features/contracts/hooks/use-contracts';
-import { useWithdrawApplication } from '@/features/contracts/hooks/use-contracts';
+import { useApplication, useWithdrawApplication } from '@/features/rental-applications/hooks/use-rental-applications';
 import { ApplicationStatus, type RentalApplication } from '@/types';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 function formatDate(value?: string | null) {
   return value ? format(new Date(value), 'dd/MM/yyyy HH:mm') : '—';
@@ -30,18 +28,17 @@ function statusBadge(status?: ApplicationStatus) {
 
 export default function BookingDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = React.use(props.params);
-  const { data: session } = useSession();
   const appQuery = useApplication(id);
   const application: RentalApplication | undefined = appQuery.data ?? undefined;
   const withdrawMutation = useWithdrawApplication();
-  const { toast } = useToast();
 
   const handleWithdraw = async () => {
     try {
       await withdrawMutation.mutateAsync(id);
-      toast({ title: 'Đã rút đơn', description: 'Đơn của bạn đã được rút.' });
-    } catch (error: any) {
-      toast({ title: 'Lỗi', description: error?.message || 'Không thể rút đơn', variant: 'destructive' });
+      toast.success('Đã rút đơn. Đơn của bạn đã được rút.');
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(msg || 'Không thể rút đơn');
     }
   };
 

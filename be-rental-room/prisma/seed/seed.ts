@@ -62,7 +62,7 @@ async function main() {
 
   // 1. CREATE USERS
   console.log('👤 Creating users...');
-  
+
   const adminUser = await prisma.user.create({
     data: {
       fullName: 'Admin Hệ Thống',
@@ -151,15 +151,15 @@ async function main() {
 
   // 2. CREATE PROPERTIES
   console.log('🏢 Creating properties...');
-  
+
   const properties: any[] = [];
   for (const { landlord } of landlords) {
     const propertyCount = faker.number.int({ min: 2, max: 3 });
-    
+
     for (let i = 0; i < propertyCount; i++) {
       const city = faker.helpers.arrayElement(Object.keys(WARDS_BY_CITY));
       const ward = faker.helpers.arrayElement(WARDS_BY_CITY[city]);
-      
+
       const property = await prisma.property.create({
         data: {
           landlordId: landlord.userId,
@@ -202,13 +202,13 @@ async function main() {
 
   // 3. CREATE ROOMS
   console.log('🚪 Creating rooms...');
-  
+
   const rooms: any[] = [];
   let globalRoomCounter = 1;
-  
+
   for (const property of properties) {
     const roomCount = faker.number.int({ min: 3, max: 8 });
-    
+
     for (let i = 1; i <= roomCount; i++) {
       const price = faker.number.int({ min: 2000000, max: 15000000, multipleOf: 100000 });
       const status = faker.helpers.weightedArrayElement([
@@ -218,7 +218,7 @@ async function main() {
       ]);
 
       const roomNumber = `R${String(globalRoomCounter++).padStart(3, '0')}`;
-      
+
       const room = await prisma.room.create({
         data: {
           propertyId: property.id,
@@ -235,7 +235,7 @@ async function main() {
       // Create room embedding
       const vectorEmbedding = generateRandomVector(768);
       const rawText = `${property.name} ${property.ward} ${property.city} Giá ${price} VNĐ`;
-      
+
       await prisma.$executeRaw`
         INSERT INTO room_embedding (id, room_id, raw_text, embedding, embedding_model, last_updated)
         VALUES (
@@ -269,7 +269,7 @@ async function main() {
 
       rooms.push(room);
     }
-    
+
     console.log(`  ✅ Created ${roomCount} rooms for ${property.name}`);
   }
 
@@ -277,15 +277,15 @@ async function main() {
 
   // 4. CREATE CONTRACTS
   console.log('📝 Creating contracts...');
-  
+
   const occupiedRooms = rooms.filter((r) => r.status === RoomStatus.OCCUPIED);
   const contracts: any[] = [];
-  
+
   for (let i = 0; i < Math.min(occupiedRooms.length, tenants.length); i++) {
     const room = occupiedRooms[i];
     const tenant = tenants[i % tenants.length];
     const property = properties.find((p) => p.id === room.propertyId);
-    
+
     if (!property) continue;
 
     const application = await prisma.rentalApplication.create({
@@ -312,7 +312,7 @@ async function main() {
         startDate,
         endDate: new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000),
         monthlyRent: room.pricePerMonth,
-        depositAmount: room.deposit,
+        deposit: room.deposit,
         status: ContractStatus.ACTIVE,
         signedAt: faker.date.recent({ days: 5 }),
       },
@@ -326,14 +326,14 @@ async function main() {
 
   // 5. CREATE INVOICES
   console.log('💰 Creating invoices...');
-  
+
   for (const contract of contracts) {
     for (let month = 0; month < 3; month++) {
       const issueDate = new Date();
       issueDate.setMonth(issueDate.getMonth() - month);
-      
+
       const totalAmount = Number(contract.monthlyRent) + faker.number.float({ min: 100000, max: 500000 });
-      
+
       const invoice = await prisma.invoice.create({
         data: {
           contractId: contract.id,
@@ -367,7 +367,7 @@ async function main() {
 
   // 6. CREATE POPULAR SEARCHES
   console.log('🔍 Creating popular searches...');
-  
+
   const searchQueries = [
     `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hồ Chí Minh'])}`,
     `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hà Nội'])}`,
@@ -398,7 +398,7 @@ async function main() {
   console.log(`   - Rooms: ${rooms.length}`);
   console.log(`   - Contracts: ${contracts.length}`);
   console.log(`   - Vector Embeddings: ${rooms.length} (768 dimensions each)\n`);
-  
+
   console.log('🔑 Test Accounts:');
   console.log('   Admin: admin@rentalroom.vn / password123');
   console.log('   Landlord: landlord1@example.com / password123');

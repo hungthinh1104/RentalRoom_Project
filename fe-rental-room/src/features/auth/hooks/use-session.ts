@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession as useNextAuthSession } from 'next-auth/react';
 import { authApi } from '../api/auth-api';
+import { setAccessToken, clearTokens } from '@/lib/api/client';
 
 /**
  * Hook for accessing current user session
@@ -14,7 +16,21 @@ import { authApi } from '../api/auth-api';
  * }
  */
 export function useSession() {
-	return useNextAuthSession();
+	const sessionResult = useNextAuthSession();
+
+	// Sync tokens from NextAuth session to API client helpers (client-side)
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const { accessToken } = sessionResult.data ?? {};
+		if (accessToken) setAccessToken(accessToken);
+		// We no longer persist refresh tokens client-side (cookie-only refresh)
+		// If session lost, clear client tokens
+		if (!accessToken && sessionResult.status === 'unauthenticated') {
+			clearTokens();
+		}
+	}, [sessionResult.data, sessionResult.status]);
+
+	return sessionResult;
 }
 
 /**
@@ -33,6 +49,7 @@ export function useLogout() {
 
 	return useMutation({
 		mutationFn: () => {
+			// Clear localStorage tokens
 			authApi.logout();
 			return Promise.resolve();
 		},

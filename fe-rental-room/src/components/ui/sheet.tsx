@@ -6,14 +6,28 @@ import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
-  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+// Use a React context + React.useId to provide a stable id for Sheet
+// so Radix's generated aria-controls/id pairing remains stable across SSR and hydration.
+const SheetIdContext = React.createContext<string | null>(null)
+
+function Sheet({ id, children, ...props }: React.ComponentProps<typeof SheetPrimitive.Root> & { id?: string }) {
+  // useId is SSR-safe and consistent between server and client
+  const generatedId = React.useId()
+  // keep the id in state to ensure it does not change after initial render
+  const [stableId] = React.useState(() => id ?? generatedId)
+
+  return (
+    <SheetPrimitive.Root data-slot="sheet" {...props}>
+      <SheetIdContext.Provider value={stableId}>{children}</SheetIdContext.Provider>
+    </SheetPrimitive.Root>
+  )
 }
 
 function SheetTrigger({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
+  const id = React.useContext(SheetIdContext)
+  return <SheetPrimitive.Trigger data-slot="sheet-trigger" aria-controls={id ?? undefined} {...props} />
 }
 
 function SheetClose({
@@ -52,10 +66,13 @@ function SheetContent({
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
 }) {
+  const id = React.useContext(SheetIdContext)
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
+        id={id ?? undefined}
         data-slot="sheet-content"
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",

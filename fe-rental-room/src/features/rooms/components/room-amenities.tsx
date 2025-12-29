@@ -1,9 +1,8 @@
 import { Check } from "lucide-react";
-import { RoomAmenity } from "@/types";
 import { AmenityType } from "@/types/enums";
 
 interface RoomAmenitiesProps {
-  amenities?: RoomAmenity[];
+  amenities?: AmenityType[];
 }
 
 export function RoomAmenities({ amenities = [] }: RoomAmenitiesProps) {
@@ -13,12 +12,12 @@ export function RoomAmenities({ amenities = [] }: RoomAmenitiesProps) {
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      {amenities.map((amenity) => (
-        <div key={amenity.id} className="flex items-center gap-2 text-sm">
+      {amenities.map((amenityType) => (
+        <div key={amenityType} className="flex items-center gap-2 text-sm">
           <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Check className="h-3 w-3" />
           </div>
-          <span>{formatAmenityType(amenity.amenityType)}</span>
+          <span>{formatAmenityType(amenityType)}</span>
         </div>
       ))}
     </div>

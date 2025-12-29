@@ -127,6 +127,50 @@ export class ChatRequestDto {
 }
 
 /**
+ * Room info in chat response
+ */
+export class ChatRoomDto {
+  @ApiProperty({
+    description: 'Room ID',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  id: string;
+
+  @ApiProperty({
+    description: 'Room number',
+    example: '101',
+  })
+  roomNumber: string;
+
+  @ApiProperty({
+    description: 'Price per month in VND',
+    example: 3500000,
+  })
+  price: number;
+
+  @ApiProperty({
+    description: 'Property name',
+    required: false,
+    example: 'Chung cư ABC',
+  })
+  propertyName?: string;
+
+  @ApiProperty({
+    description: 'Room area in m²',
+    required: false,
+    example: 25,
+  })
+  area?: number;
+
+  @ApiProperty({
+    description: 'Room status',
+    required: false,
+    example: 'AVAILABLE',
+  })
+  status?: string;
+}
+
+/**
  * Response DTO for chat endpoint
  */
 export class ChatResponseDto {
@@ -136,6 +180,13 @@ export class ChatResponseDto {
       'Dựa trên yêu cầu của bạn, tôi có thể tìm các phòng trọ gần các trường đại học TP.HCM...',
   })
   response: string;
+
+  @ApiProperty({
+    description: 'Rooms matching the search query',
+    required: false,
+    type: [ChatRoomDto],
+  })
+  rooms?: ChatRoomDto[];
 
   @ApiProperty({
     description: 'Processing time in milliseconds',

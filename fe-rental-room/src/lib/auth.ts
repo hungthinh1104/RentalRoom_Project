@@ -27,6 +27,8 @@ export const authOptions: NextAuthOptions = {
               email: response.user.email,
               name: response.user.fullName || response.user.email,
               role: response.user.role,
+              accessToken: response.access_token,
+              refreshToken: response.refresh_token,
             };
           }
         } catch (error) {
@@ -40,9 +42,13 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // On initial sign-in, store tokens from the API response
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        // Store tokens in JWT for persistence across requests
+        if (user.accessToken) token.accessToken = user.accessToken;
+        if (user.refreshToken) token.refreshToken = user.refreshToken;
       }
       return token;
     },
@@ -51,6 +57,9 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
       }
+      // Expose tokens on session so client can sync to localStorage
+      session.accessToken = token.accessToken as string | undefined;
+      session.refreshToken = token.refreshToken as string | undefined;
       return session;
     },
     async redirect({ url, baseUrl }) {

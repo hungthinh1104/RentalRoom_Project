@@ -246,9 +246,9 @@ describe('AuthController', () => {
     });
 
     it('should use cookie-supplied refresh token when body is empty', async () => {
-      const cookieReq = { 
+      const cookieReq = {
         body: {},
-        cookies: { refresh_token: 'cookie-refresh-token' } 
+        cookies: { refresh_token: 'cookie-refresh-token' },
       } as any;
       const mockResponse = { access_token: 'cookie-access' };
 

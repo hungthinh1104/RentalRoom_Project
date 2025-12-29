@@ -1,73 +1,8 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { contractsApi } from '../api/contracts-api';
-import type { CreateContractDto, PaginationParams, Contract, RentalApplication } from '@/types';
+import type { CreateContractDto, PaginationParams, Contract } from '@/types';
 
-// Application hooks
-export function useApplications(
-	params?: PaginationParams & { tenantId?: string; landlordId?: string; roomId?: string; status?: string },
-	options?: { enabled?: boolean }
-) {
-	return useQuery({
-		queryKey: ['applications', params],
-		queryFn: () => contractsApi.getApplications(params),
-		enabled: options?.enabled ?? true,
-		placeholderData: keepPreviousData,
-	});
-}
-
-export function useApplication(id: string) {
-	return useQuery({
-		queryKey: ['applications', id],
-		queryFn: () => contractsApi.getApplicationById(id),
-		enabled: !!id,
-	});
-}
-
-export function useCreateApplication() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (dto: { tenantId: string; roomId: string; message?: string }) =>
-			contractsApi.createApplication(dto),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['applications'] });
-		},
-	});
-}
-
-export function useApproveApplication() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (id: string) => contractsApi.approveApplication(id),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['applications'] });
-			queryClient.invalidateQueries({ queryKey: ['rooms'] });
-		},
-	});
-}
-
-export function useRejectApplication() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (id: string) => contractsApi.rejectApplication(id),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['applications'] });
-		},
-	});
-}
-
-export function useWithdrawApplication() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (id: string) => contractsApi.withdrawApplication(id),
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['applications'] });
-		},
-	});
-}
+// Application hooks have been moved to features/rental-applications/hooks/use-rental-applications.ts
 
 // Contract hooks
 export function useContracts(params?: PaginationParams & { tenantId?: string; landlordId?: string; status?: string }) {
@@ -114,7 +49,7 @@ export function useTerminateContract() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: ({ id, data }: { id: string; data: { reason: string; noticeDays?: number } }) => 
+		mutationFn: ({ id, data }: { id: string; data: { reason: string; noticeDays?: number } }) =>
 			contractsApi.terminateContract(id, data),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['contracts'] });

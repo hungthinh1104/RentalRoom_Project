@@ -70,7 +70,9 @@ export interface Property {
 	name: string;
 	address: string;
 	city: string;
-	district: string;
+	cityCode?: string | null;
+	ward: string;
+	wardCode?: string | null;
 	propertyType: PropertyType;
 	totalRooms: number;
 	description: string | null;
@@ -93,8 +95,10 @@ export interface Room {
 	deletedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
-	amenities?: RoomAmenity[];
-	images?: RoomImage[];
+	averageRating?: number;
+	reviewCount?: number;
+	amenities?: AmenityType[];
+	images?: string[];
 	reviews?: RoomReview[];
 }
 
@@ -134,6 +138,11 @@ export interface RentalApplication {
 	message: string | null;
 	createdAt: string;
 	updatedAt: string;
+	contractId: string | null;
+	contract?: Contract;
+	landlordId: string;
+	landlord?: Landlord;
+	rejectionReason: string | null;
 	// Denormalized fields returned by backend for UI convenience
 	tenantName?: string;
 	tenantEmail?: string;
@@ -144,6 +153,7 @@ export interface RentalApplication {
 
 export interface Contract {
 	id: string;
+	contractNumber: string;
 	tenantId: string;
 	tenant?: Tenant;
 	landlordId: string;
@@ -156,6 +166,15 @@ export interface Contract {
 	endDate: string;
 	monthlyRent: number;
 	deposit: number;
+	paymentDay?: number;
+	residents?: Array<{
+		id?: string;
+		fullName: string;
+		citizenId?: string;
+		relationship: 'SPOUSE' | 'CHILD' | 'PARENT' | 'FRIEND' | 'OTHER';
+		phoneNumber?: string;
+	}>;
+	maxOccupants?: number;
 	terms: string | null;
 	status: ContractStatus;
 	createdAt: string;
@@ -259,8 +278,18 @@ export interface AIAnalysisResult {
 	key_features: string[];
 }
 
+export interface AIChatRoom {
+	id: string;
+	roomNumber: string;
+	price: number;
+	propertyName?: string;
+	area?: number;
+	status?: string;
+}
+
 export interface AIChatResponse {
 	response: string;
+	rooms?: AIChatRoom[];
 	model: string;
 	timestamp: string;
 }
@@ -288,7 +317,9 @@ export interface CreatePropertyDto {
 	name: string;
 	address: string;
 	city: string;
-	district: string;
+	cityCode?: string;
+	ward: string;
+	wardCode?: string;
 	propertyType: PropertyType;
 	description?: string;
 }
@@ -302,6 +333,8 @@ export interface CreateRoomDto {
 	maxOccupants?: number;
 	status: RoomStatus;
 	description?: string;
+	images?: string[];
+	amenities?: AmenityType[];
 }
 
 export interface CreateContractDto {
@@ -313,6 +346,14 @@ export interface CreateContractDto {
 	endDate: string;
 	monthlyRent: number;
 	deposit: number;
+	paymentDay?: number;
+	maxOccupants?: number;
+	residents?: Array<{
+		fullName: string;
+		citizenId?: string;
+		relationship: string;
+		phoneNumber?: string;
+	}>;
 	terms?: string;
 }
 
@@ -333,7 +374,7 @@ export interface RegisterDto {
 	email: string;
 	password: string;
 	fullName: string;
-	phone?: string;
+	phone: string;
 	role: UserRole;
 }
 

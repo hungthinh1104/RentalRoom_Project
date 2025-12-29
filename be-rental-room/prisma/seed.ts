@@ -24,7 +24,7 @@ console.log(`🔁 Seed: ${SEED} — DRY_RUN: ${DRY_RUN ? 'yes' : 'no'} — CLEAN
 
 // Lightweight seeded RNG (mulberry32)
 function mulberry32(a: number) {
-  return function() {
+  return function () {
     let t = a += 0x6D2B79F5;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -123,12 +123,12 @@ function generateRoomDescription(propertyName: string, ward: string, city: strin
 } {
   const template = faker.helpers.arrayElement(ROOM_DESCRIPTIONS_TEMPLATES);
   const amenitiesSample = faker.helpers.arrayElements(AMENITIES_DESCRIPTIONS, 4);
-  
+
   const description = `${template}. Tiện ích: ${amenitiesSample.join(', ')}. Liên hệ ngay để xem phòng!`;
-  
+
   // Raw text for vector embedding (what AI will search)
   const rawText = `${propertyName} ${ward} ${city} ${description} Giá ${price.toLocaleString('vi-VN')} VNĐ/tháng Diện tích ${faker.number.int({ min: 15, max: 40 })}m2`;
-  
+
   return { description, rawText };
 }
 
@@ -222,7 +222,7 @@ async function main() {
   // 1. CREATE USERS (10 users: 5 landlords, 4 tenants, 1 admin)
   // ============================================================================
   console.log('👤 Creating users...');
-  
+
   const adminUser = DRY_RUN ? {
     id: faker.string.uuid(),
     fullName: 'Admin Hệ Thống',
@@ -377,13 +377,13 @@ async function main() {
   // 2. CREATE PROPERTIES (Each landlord has 2-3 properties)
   // ============================================================================
   console.log('🏢 Creating properties...');
-  
+
   const properties: any[] = [];
   for (const { landlord } of landlords) {
     const propertyCount = faker.number.int({ min: 2, max: 3 });
-    
+
     for (let i = 0; i < propertyCount; i++) {
-      const city = faker.helpers.arrayElement(Object.keys(WARDS_BY_CITY) as Array<'Hồ Chí Minh'|'Hà Nội'|'Đà Nẵng'>);
+      const city = faker.helpers.arrayElement(Object.keys(WARDS_BY_CITY) as Array<'Hồ Chí Minh' | 'Hà Nội' | 'Đà Nẵng'>);
       const ward = faker.helpers.arrayElement(WARDS_BY_CITY[city]);
       const baseName = faker.helpers.arrayElement(PROPERTY_NAMES);
       const address = getRandomAddress(city, ward);
@@ -420,71 +420,71 @@ async function main() {
               unitPrice: 3500,
               unit: 'kWh',
             },
-          {
-            propertyId: property.id,
-            serviceName: 'Nước',
-            serviceType: ServiceType.WATER,
-            billingMethod: BillingMethod.METERED,
-            unitPrice: 15000,
-            unit: 'm³',
-          },
-          {
-            propertyId: property.id,
-            serviceName: 'Internet',
-            serviceType: ServiceType.INTERNET,
-            billingMethod: BillingMethod.FIXED,
-            unitPrice: 100000,
-            unit: 'tháng',
-          },
-        ],
-      });
+            {
+              propertyId: property.id,
+              serviceName: 'Nước',
+              serviceType: ServiceType.WATER,
+              billingMethod: BillingMethod.METERED,
+              unitPrice: 15000,
+              unit: 'm³',
+            },
+            {
+              propertyId: property.id,
+              serviceName: 'Internet',
+              serviceType: ServiceType.INTERNET,
+              billingMethod: BillingMethod.FIXED,
+              unitPrice: 100000,
+              unit: 'tháng',
+            },
+          ],
+        });
 
-      properties.push(property);
-      console.log(`  ✅ Created Property: ${property.name} (${property.ward})`);
+        properties.push(property);
+        console.log(`  ✅ Created Property: ${property.name} (${property.ward})`);
+      }
     }
-  }
 
-  console.log(`\n📊 Total Properties: ${properties.length}\n`);
+    console.log(`\n📊 Total Properties: ${properties.length}\n`);
 
-  // ============================================================================
-  // 3. CREATE ROOMS (Each property has 3-8 rooms)
-  // ============================================================================
-  console.log('🚪 Creating rooms with embeddings...');
-  
-  const rooms: any[] = [];
-  for (const property of properties) {
-    const roomCount = faker.number.int({ min: 3, max: 8 });
-    
-    for (let i = 1; i <= roomCount; i++) {
-      const price = faker.number.int({ min: 2000000, max: 15000000, multipleOf: 100000 });
-      const { description, rawText } = generateRoomDescription(property.name, property.ward, property.city, price);
-      const status = faker.helpers.weightedArrayElement([
-        { value: RoomStatus.AVAILABLE, weight: 6 },
-        { value: RoomStatus.OCCUPIED, weight: 3 },
-        { value: RoomStatus.MAINTENANCE, weight: 1 },
-      ]);
+    // ============================================================================
+    // 3. CREATE ROOMS (Each property has 3-8 rooms)
+    // ============================================================================
+    console.log('🚪 Creating rooms with embeddings...');
 
-      const roomNumber = `${String.fromCharCode(65 + Math.floor(i / 10))}${(i % 10) + 1}`.padStart(4, '0');
-      const roomData = {
-        propertyId: property.id,
-        roomNumber,
-        area: faker.number.float({ min: 15, max: 45, fractionDigits: 1 }),
-        pricePerMonth: price,
-        deposit: price * faker.helpers.arrayElement([1, 1.5, 2]),
-        status,
-        description,
-        maxOccupants: faker.number.int({ min: 1, max: 3 }),
-      };
+    const rooms: any[] = [];
+    for (const property of properties) {
+      const roomCount = faker.number.int({ min: 3, max: 8 });
 
-      const room = DRY_RUN ? ({ id: faker.string.uuid(), ...roomData } as any) : await prisma.room.create({ data: roomData });
+      for (let i = 1; i <= roomCount; i++) {
+        const price = faker.number.int({ min: 2000000, max: 15000000, multipleOf: 100000 });
+        const { description, rawText } = generateRoomDescription(property.name, property.ward, property.city, price);
+        const status = faker.helpers.weightedArrayElement([
+          { value: RoomStatus.AVAILABLE, weight: 6 },
+          { value: RoomStatus.OCCUPIED, weight: 3 },
+          { value: RoomStatus.MAINTENANCE, weight: 1 },
+        ]);
 
-      // Create room embedding (IMPORTANT for AI search)
-      const vectorEmbedding = generateRandomVector(768);
-      // Use raw SQL to insert vector embedding (Prisma doesn't fully support Unsupported types)
-      if (DRY_RUN) {
-        console.log(`⚠️ DRY RUN: would insert embedding for room ${room.id || roomNumber} (first 3 values):`, vectorEmbedding.slice(0,3));
-      } else {
-        await prisma.$executeRaw`
+        const roomNumber = `${String.fromCharCode(65 + Math.floor(i / 10))}${(i % 10) + 1}`.padStart(4, '0');
+        const roomData = {
+          propertyId: property.id,
+          roomNumber,
+          area: faker.number.float({ min: 15, max: 45, fractionDigits: 1 }),
+          pricePerMonth: price,
+          deposit: price * faker.helpers.arrayElement([1, 1.5, 2]),
+          status,
+          description,
+          maxOccupants: faker.number.int({ min: 1, max: 3 }),
+        };
+
+        const room = DRY_RUN ? ({ id: faker.string.uuid(), ...roomData } as any) : await prisma.room.create({ data: roomData });
+
+        // Create room embedding (IMPORTANT for AI search)
+        const vectorEmbedding = generateRandomVector(768);
+        // Use raw SQL to insert vector embedding (Prisma doesn't fully support Unsupported types)
+        if (DRY_RUN) {
+          console.log(`⚠️ DRY RUN: would insert embedding for room ${room.id || roomNumber} (first 3 values):`, vectorEmbedding.slice(0, 3));
+        } else {
+          await prisma.$executeRaw`
           INSERT INTO room_embedding (id, room_id, raw_text, embedding, embedding_model, last_updated)
           VALUES (
             gen_random_uuid(),
@@ -495,105 +495,92 @@ async function main() {
             NOW()
           )
         `;
+        }
+
+        // Add amenities
+        const amenityTypes = faker.helpers.arrayElements(
+          Object.values(AmenityType),
+          faker.number.int({ min: 2, max: 4 })
+        );
+        if (!DRY_RUN) {
+          await prisma.roomAmenity.createMany({
+            data: amenityTypes.map((type) => ({
+              roomId: room.id,
+              amenityType: type,
+              quantity: 1,
+            })),
+          });
+        } else {
+          console.log(`⚠️ DRY RUN: skipping amenities for room ${(room as any).id || roomNumber}`);
+        }
+
+        // Add images
+        if (!DRY_RUN) {
+          await prisma.roomImage.createMany({
+            data: Array.from({ length: faker.number.int({ min: 2, max: 5 }) }, (_, idx) => ({
+              roomId: room.id,
+              imageUrl: `https://picsum.photos/800/600?random=${room.id}-${idx}`,
+              displayOrder: idx,
+            })),
+          });
+        } else {
+          console.log(`⚠️ DRY RUN: skipping images for room ${(room as any).id || roomNumber}`);
+        }
+
+        rooms.push(room);
       }
 
-      // Add amenities
-      const amenityTypes = faker.helpers.arrayElements(
-        Object.values(AmenityType),
-        faker.number.int({ min: 2, max: 4 })
-      );
-      if (!DRY_RUN) {
-        await prisma.roomAmenity.createMany({
-          data: amenityTypes.map((type) => ({
-            roomId: room.id,
-            amenityType: type,
-            quantity: 1,
-          })),
-        });
-      } else {
-        console.log(`⚠️ DRY RUN: skipping amenities for room ${(room as any).id || roomNumber}`);
-      }
-
-      // Add images
-      if (!DRY_RUN) {
-        await prisma.roomImage.createMany({
-          data: Array.from({ length: faker.number.int({ min: 2, max: 5 }) }, (_, idx) => ({
-            roomId: room.id,
-            imageUrl: `https://picsum.photos/800/600?random=${room.id}-${idx}`,
-            displayOrder: idx,
-          })),
-        });
-      } else {
-        console.log(`⚠️ DRY RUN: skipping images for room ${(room as any).id || roomNumber}`);
-      }
-
-      rooms.push(room);
+      console.log(`  ✅ Created ${roomCount} rooms for ${property.name}`);
     }
-    
-    console.log(`  ✅ Created ${roomCount} rooms for ${property.name}`);
-  }
 
-  console.log(`\n📊 Total Rooms: ${rooms.length}\n`);
+    console.log(`\n📊 Total Rooms: ${rooms.length}\n`);
 
-  // ============================================================================
-  // 4. CREATE RENTAL APPLICATIONS & CONTRACTS
-  // ============================================================================
-  console.log('📝 Creating applications and contracts...');
-  
-  const occupiedRooms = rooms.filter((r) => r.status === RoomStatus.OCCUPIED);
-  const contracts: any[] = [];
-  
-  for (let i = 0; i < Math.min(occupiedRooms.length, tenants.length); i++) {
-    const room = occupiedRooms[i];
-    const tenant = tenants[i % tenants.length];
-    const property = properties.find((p) => p.id === room.propertyId);
-    
-    if (!property) continue;
+    // ============================================================================
+    // 4. CREATE RENTAL APPLICATIONS & CONTRACTS
+    // ============================================================================
+    console.log('📝 Creating applications and contracts...');
 
-    // Create application
-    const application = DRY_RUN ? ({
-      id: faker.string.uuid(),
-      roomId: room.id,
-      tenantId: (tenant as any).tenant?.userId || (tenant as any).userId,
-      landlordId: property.landlordId,
-      applicationDate: faker.date.past({ years: 1 }),
-      status: ApplicationStatus.APPROVED,
-      requestedMoveInDate: faker.date.soon({ days: 14 }),
-      message: 'Tôi rất quan tâm đến phòng này. Mong được thuê ạ!',
-      reviewedAt: faker.date.recent({ days: 3 }),
-    } as any) : await prisma.rentalApplication.create({
-      data: {
+    const occupiedRooms = rooms.filter((r) => r.status === RoomStatus.OCCUPIED);
+    const contracts: any[] = [];
+
+    for (let i = 0; i < Math.min(occupiedRooms.length, tenants.length); i++) {
+      const room = occupiedRooms[i];
+      const tenant = tenants[i % tenants.length];
+      const property = properties.find((p) => p.id === room.propertyId);
+
+      if (!property) continue;
+
+      // Create application
+      const application = DRY_RUN ? ({
+        id: faker.string.uuid(),
         roomId: room.id,
-        tenantId: tenant.tenant.userId,
+        tenantId: (tenant as any).tenant?.userId || (tenant as any).userId,
         landlordId: property.landlordId,
         applicationDate: faker.date.past({ years: 1 }),
         status: ApplicationStatus.APPROVED,
         requestedMoveInDate: faker.date.soon({ days: 14 }),
         message: 'Tôi rất quan tâm đến phòng này. Mong được thuê ạ!',
         reviewedAt: faker.date.recent({ days: 3 }),
-      },
-    });
+      } as any) : await prisma.rentalApplication.create({
+        data: {
+          roomId: room.id,
+          tenantId: tenant.tenant.userId,
+          landlordId: property.landlordId,
+          applicationDate: faker.date.past({ years: 1 }),
+          status: ApplicationStatus.APPROVED,
+          requestedMoveInDate: faker.date.soon({ days: 14 }),
+          message: 'Tôi rất quan tâm đến phòng này. Mong được thuê ạ!',
+          reviewedAt: faker.date.recent({ days: 3 }),
+        },
+      });
 
-    // Create contract
-    const startDate = faker.date.recent({ days: 30 });
-    const contract = DRY_RUN ? ({
-      id: faker.string.uuid(),
-      applicationId: (application as any).id,
-      roomId: room.id,
-      tenantId: (tenant as any).tenant?.userId || (tenant as any).userId,
-      landlordId: property.landlordId,
-      contractNumber: `HD-${faker.string.numeric(8)}`,
-      startDate,
-      endDate: new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000), // 1 year
-      monthlyRent: room.pricePerMonth,
-      depositAmount: room.deposit,
-      status: ContractStatus.ACTIVE,
-      signedAt: faker.date.recent({ days: 5 }),
-    } as any) : await prisma.contract.create({
-      data: {
-        applicationId: application.id,
+      // Create contract
+      const startDate = faker.date.recent({ days: 30 });
+      const contract = DRY_RUN ? ({
+        id: faker.string.uuid(),
+        applicationId: (application as any).id,
         roomId: room.id,
-        tenantId: tenant.tenant.userId,
+        tenantId: (tenant as any).tenant?.userId || (tenant as any).userId,
         landlordId: property.landlordId,
         contractNumber: `HD-${faker.string.numeric(8)}`,
         startDate,
@@ -602,41 +589,44 @@ async function main() {
         depositAmount: room.deposit,
         status: ContractStatus.ACTIVE,
         signedAt: faker.date.recent({ days: 5 }),
-      },
-    });
-
-    contracts.push(contract);
-    console.log(`  ✅ Created Contract for Room ${room.roomNumber}`);
-  }
-
-  console.log(`\n📊 Total Contracts: ${contracts.length}\n`);
-
-  // ============================================================================
-  // 5. CREATE INVOICES & PAYMENTS
-  // ============================================================================
-  console.log('💰 Creating invoices and payments...');
-  
-  for (const contract of contracts) {
-    // Create 3 invoices (past 3 months)
-    for (let month = 0; month < 3; month++) {
-      const issueDate = new Date();
-      issueDate.setMonth(issueDate.getMonth() - month);
-      
-      const extraCharges = faker.number.float({ min: 100000, max: 500000, fractionDigits: 2 });
-      const totalAmount = Number(contract.monthlyRent) + extraCharges;
-      
-      const invoice = DRY_RUN ? ({
-        id: faker.string.uuid(),
-        contractId: contract.id,
-        tenantId: contract.tenantId,
-        invoiceNumber: `INV-${faker.string.numeric(10)}`,
-        issueDate,
-        dueDate: new Date(issueDate.getTime() + 5 * 24 * 60 * 60 * 1000),
-        totalAmount: parseFloat(totalAmount.toFixed(2)),
-        status: month === 0 ? InvoiceStatus.PENDING : InvoiceStatus.PAID,
-        paidAt: month === 0 ? null : faker.date.recent({ days: 10 }),
-      } as any) : await prisma.invoice.create({
+      } as any) : await prisma.contract.create({
         data: {
+          applicationId: application.id,
+          roomId: room.id,
+          tenantId: tenant.tenant.userId,
+          landlordId: property.landlordId,
+          contractNumber: `HD-${faker.string.numeric(8)}`,
+          startDate,
+          endDate: new Date(startDate.getTime() + 365 * 24 * 60 * 60 * 1000), // 1 year
+          monthlyRent: room.pricePerMonth,
+          deposit: room.deposit,
+          status: ContractStatus.ACTIVE,
+          signedAt: faker.date.recent({ days: 5 }),
+        },
+      });
+
+      contracts.push(contract);
+      console.log(`  ✅ Created Contract for Room ${room.roomNumber}`);
+    }
+
+    console.log(`\n📊 Total Contracts: ${contracts.length}\n`);
+
+    // ============================================================================
+    // 5. CREATE INVOICES & PAYMENTS
+    // ============================================================================
+    console.log('💰 Creating invoices and payments...');
+
+    for (const contract of contracts) {
+      // Create 3 invoices (past 3 months)
+      for (let month = 0; month < 3; month++) {
+        const issueDate = new Date();
+        issueDate.setMonth(issueDate.getMonth() - month);
+
+        const extraCharges = faker.number.float({ min: 100000, max: 500000, fractionDigits: 2 });
+        const totalAmount = Number(contract.monthlyRent) + extraCharges;
+
+        const invoice = DRY_RUN ? ({
+          id: faker.string.uuid(),
           contractId: contract.id,
           tenantId: contract.tenantId,
           invoiceNumber: `INV-${faker.string.numeric(10)}`,
@@ -645,82 +635,92 @@ async function main() {
           totalAmount: parseFloat(totalAmount.toFixed(2)),
           status: month === 0 ? InvoiceStatus.PENDING : InvoiceStatus.PAID,
           paidAt: month === 0 ? null : faker.date.recent({ days: 10 }),
-        },
-      });
+        } as any) : await prisma.invoice.create({
+          data: {
+            contractId: contract.id,
+            tenantId: contract.tenantId,
+            invoiceNumber: `INV-${faker.string.numeric(10)}`,
+            issueDate,
+            dueDate: new Date(issueDate.getTime() + 5 * 24 * 60 * 60 * 1000),
+            totalAmount: parseFloat(totalAmount.toFixed(2)),
+            status: month === 0 ? InvoiceStatus.PENDING : InvoiceStatus.PAID,
+            paidAt: month === 0 ? null : faker.date.recent({ days: 10 }),
+          },
+        });
 
-      // Create payment if invoice is paid
-      if (invoice.status === InvoiceStatus.PAID) {
-        if (DRY_RUN) {
-          console.log(`⚠️ DRY RUN: skipping payment creation for invoice ${invoice.invoiceNumber}`);
-        } else {
-          await prisma.payment.create({
-            data: {
-              invoiceId: invoice.id,
-              tenantId: contract.tenantId,
-              amount: invoice.totalAmount,
-              paymentMethod: randomEnum(PaymentMethod),
-              paymentDate: faker.date.recent({ days: 10 }),
-              status: PaymentStatus.COMPLETED,
-              paidAt: faker.date.recent({ days: 10 }),
-            },
-          });
+        // Create payment if invoice is paid
+        if (invoice.status === InvoiceStatus.PAID) {
+          if (DRY_RUN) {
+            console.log(`⚠️ DRY RUN: skipping payment creation for invoice ${invoice.invoiceNumber}`);
+          } else {
+            await prisma.payment.create({
+              data: {
+                invoiceId: invoice.id,
+                tenantId: contract.tenantId,
+                amount: invoice.totalAmount,
+                paymentMethod: randomEnum(PaymentMethod),
+                paymentDate: faker.date.recent({ days: 10 }),
+                status: PaymentStatus.COMPLETED,
+                paidAt: faker.date.recent({ days: 10 }),
+              },
+            });
+          }
         }
       }
     }
-  }
 
-  console.log(`✅ Created invoices and payments\n`);
+    console.log(`✅ Created invoices and payments\n`);
 
-  // ============================================================================
-  // 6. CREATE POPULAR SEARCHES (for market insights)
-  // ============================================================================
-  console.log('🔍 Creating popular searches...');
-  
-  const searchQueries = [
-    `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hồ Chí Minh'])}`,
-    `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hà Nội'])}`,
-    `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Đà Nẵng'])}`,
-    'chung cư mini giá rẻ',
-    'căn hộ gần trường đại học',
-    `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hồ Chí Minh'])} giá rẻ`,
-    `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hà Nội'])} cho sinh viên`,
-    `phòng cho thuê ${faker.helpers.arrayElement(WARDS_BY_CITY['Đà Nẵng'])} có gác lửng`,
-  ];
+    // ============================================================================
+    // 6. CREATE POPULAR SEARCHES (for market insights)
+    // ============================================================================
+    console.log('🔍 Creating popular searches...');
 
-  for (const query of searchQueries) {
-    if (DRY_RUN) {
-      console.log(`⚠️ DRY RUN: would create popularSearch for '${query}'`);
-    } else {
-      await prisma.popularSearch.create({
-        data: {
-          query,
-          searchCount: faker.number.int({ min: 10, max: 500 }),
-          lastSearched: faker.date.recent({ days: 7 }),
-        },
-      });
+    const searchQueries = [
+      `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hồ Chí Minh'])}`,
+      `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hà Nội'])}`,
+      `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Đà Nẵng'])}`,
+      'chung cư mini giá rẻ',
+      'căn hộ gần trường đại học',
+      `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hồ Chí Minh'])} giá rẻ`,
+      `phòng trọ ${faker.helpers.arrayElement(WARDS_BY_CITY['Hà Nội'])} cho sinh viên`,
+      `phòng cho thuê ${faker.helpers.arrayElement(WARDS_BY_CITY['Đà Nẵng'])} có gác lửng`,
+    ];
+
+    for (const query of searchQueries) {
+      if (DRY_RUN) {
+        console.log(`⚠️ DRY RUN: would create popularSearch for '${query}'`);
+      } else {
+        await prisma.popularSearch.create({
+          data: {
+            query,
+            searchCount: faker.number.int({ min: 10, max: 500 }),
+            lastSearched: faker.date.recent({ days: 7 }),
+          },
+        });
+      }
     }
+
+    console.log(`✅ Created ${searchQueries.length} popular searches\n`);
+
+    // ============================================================================
+    // FINAL SUMMARY
+    // ============================================================================
+    console.log('🎉 Database seeding completed!\n');
+    console.log('📊 Summary:');
+    console.log(`   - Users: ${1 + landlords.length + tenants.length}`);
+    console.log(`   - Landlords: ${landlords.length}`);
+    console.log(`   - Tenants: ${tenants.length}`);
+    console.log(`   - Properties: ${properties.length}`);
+    console.log(`   - Rooms: ${rooms.length}`);
+    console.log(`   - Contracts: ${contracts.length}`);
+    console.log(`   - Vector Embeddings: ${rooms.length} (768 dimensions each)\n`);
+
+    console.log('🔑 Test Accounts:');
+    console.log('   Admin: admin@rentalroom.vn / password123');
+    console.log('   Landlord: landlord1@example.com / password123');
+    console.log('   Tenant: tenant1@example.com / password123\n');
   }
-
-  console.log(`✅ Created ${searchQueries.length} popular searches\n`);
-
-  // ============================================================================
-  // FINAL SUMMARY
-  // ============================================================================
-  console.log('🎉 Database seeding completed!\n');
-  console.log('📊 Summary:');
-  console.log(`   - Users: ${1 + landlords.length + tenants.length}`);
-  console.log(`   - Landlords: ${landlords.length}`);
-  console.log(`   - Tenants: ${tenants.length}`);
-  console.log(`   - Properties: ${properties.length}`);
-  console.log(`   - Rooms: ${rooms.length}`);
-  console.log(`   - Contracts: ${contracts.length}`);
-  console.log(`   - Vector Embeddings: ${rooms.length} (768 dimensions each)\n`);
-  
-  console.log('🔑 Test Accounts:');
-  console.log('   Admin: admin@rentalroom.vn / password123');
-  console.log('   Landlord: landlord1@example.com / password123');
-  console.log('   Tenant: tenant1@example.com / password123\n');
-}
 }
 
 main()

@@ -73,7 +73,7 @@ export default function TenantDashboardPage() {
             <div className="space-y-3">
               <Badge className="bg-primary/15 text-primary border-primary/30 font-semibold">Bảng điều khiển người thuê</Badge>
               <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                <ShieldCheck className="w-4 h-4 text-green-500" />
+                <ShieldCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
                 Trạng thái: Tài khoản an toàn
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function TenantDashboardPage() {
               <div key={room.id} className="flex items-center justify-between rounded-2xl border border-border/80 p-4 bg-muted/40">
                 <div className="space-y-1">
                   <p className="font-semibold text-foreground">{room.name ?? 'Phòng'}</p>
-                  <p className="text-sm text-muted-foreground">{room.city ?? ''} {room.district ? `- ${room.district}` : ''}</p>
+                  <p className="text-sm text-muted-foreground">{room.city ?? ''} {room.ward ? `- ${room.ward}` : ''}</p>
                   {room.pricePerMonth && (
                     <p className="text-sm text-primary font-semibold">{room.pricePerMonth.toLocaleString('vi-VN')}đ / tháng</p>
                   )}
@@ -233,7 +233,7 @@ export default function TenantDashboardPage() {
                     <p className="font-semibold text-foreground">{item.name ?? 'Phòng gợi ý'}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <MapPin className="w-4 h-4" />
-                      {item.city ?? ''} {item.district ? `- ${item.district}` : ''}
+                      {item.city ?? ''} {item.ward ? `- ${item.ward}` : ''}
                     </div>
                     {item.pricePerMonth && (
                       <p className="text-sm text-primary font-semibold">{item.pricePerMonth.toLocaleString('vi-VN')}đ / tháng</p>

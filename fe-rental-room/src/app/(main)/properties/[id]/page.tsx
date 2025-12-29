@@ -1,5 +1,6 @@
 import React from 'react';
 
-export default function PropertyPage({ params }: { params: { id: string } }) {
-	return <div className="container py-6">Property ID: {params.id}</div>;
+export default async function PropertyPage({ params }: { params: Promise<{ id: string }> }) {
+	const { id } = await params;
+	return <div className="container py-6">Property ID: {id}</div>;
 }

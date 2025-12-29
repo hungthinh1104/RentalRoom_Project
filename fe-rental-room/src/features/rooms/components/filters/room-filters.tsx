@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RoomSearchInput } from "./room-search-input";
+import { ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   RoomPriceFilter,
   RoomStatusFilter,
   RoomSizeFilter,
 } from "./room-filter-controls";
-import { RoomFiltersActions } from "./room-filters-actions";
+import { RoomStatus } from "@/types/enums";
 import { RoomSort } from "../room-sort";
 import { RoomAmenitiesFilter } from "../room-amenities-filter";
 import { type RoomFilterInput } from "../../schemas";
@@ -20,47 +21,26 @@ interface RoomFiltersProps {
 
 export function RoomFilters({ onFiltersChange, isLoading = false }: RoomFiltersProps) {
   const [filters, setFilters] = useState<RoomFilterInput>({});
-
-  const handleSearchChange = useCallback((value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      search: value || undefined,
-    }));
-  }, []);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleMinPriceChange = useCallback((value: number | undefined) => {
-    setFilters((prev) => ({
-      ...prev,
-      minPrice: value,
-    }));
+    setFilters((prev) => ({ ...prev, minPrice: value }));
   }, []);
 
   const handleMaxPriceChange = useCallback((value: number | undefined) => {
-    setFilters((prev) => ({
-      ...prev,
-      maxPrice: value,
-    }));
+    setFilters((prev) => ({ ...prev, maxPrice: value }));
   }, []);
 
   const handleMinAreaChange = useCallback((value: number | undefined) => {
-    setFilters((prev) => ({
-      ...prev,
-      minArea: value,
-    }));
+    setFilters((prev) => ({ ...prev, minArea: value }));
   }, []);
 
   const handleMaxAreaChange = useCallback((value: number | undefined) => {
-    setFilters((prev) => ({
-      ...prev,
-      maxArea: value,
-    }));
+    setFilters((prev) => ({ ...prev, maxArea: value }));
   }, []);
 
-  const handleStatusChange = useCallback((value: any) => {
-    setFilters((prev) => ({
-      ...prev,
-      status: value,
-    }));
+  const handleStatusChange = useCallback((value: RoomStatus | undefined) => {
+    setFilters((prev) => ({ ...prev, status: value }));
   }, []);
 
   const handleSortByChange = useCallback((value: string) => {
@@ -71,10 +51,7 @@ export function RoomFilters({ onFiltersChange, isLoading = false }: RoomFiltersP
   }, []);
 
   const handleSortOrderChange = useCallback((value: "asc" | "desc") => {
-    setFilters((prev) => ({
-      ...prev,
-      sortOrder: value,
-    }));
+    setFilters((prev) => ({ ...prev, sortOrder: value }));
   }, []);
 
   const handleAmenitiesChange = useCallback((amenities: string[]) => {
@@ -85,14 +62,15 @@ export function RoomFilters({ onFiltersChange, isLoading = false }: RoomFiltersP
   }, []);
 
   const handleApply = useCallback(() => {
-    // Clean up undefined values
-    const cleanFilters: RoomFilterInput = {};
+    const cleanFilters: Partial<RoomFilterInput> = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length > 0)) {
-        cleanFilters[key as keyof RoomFilterInput] = value as any;
+        const k = key as keyof RoomFilterInput;
+        (cleanFilters as Partial<Record<keyof RoomFilterInput, unknown>>)[k] = value as unknown;
       }
     });
-    onFiltersChange(cleanFilters);
+    onFiltersChange(cleanFilters as RoomFilterInput);
+    setIsExpanded(false);
   }, [filters, onFiltersChange]);
 
   const handleReset = useCallback(() => {
@@ -105,63 +83,106 @@ export function RoomFilters({ onFiltersChange, isLoading = false }: RoomFiltersP
     [filters]
   );
 
+  const activeFilterCount = useMemo(() => {
+    return Object.values(filters).filter((v) => v !== undefined && v !== null && v !== "" && (!Array.isArray(v) || v.length > 0)).length;
+  }, [filters]);
+
   return (
-    <Card className="border border-border/50 rounded-[20px] shadow-sm bg-card/80 backdrop-blur-xl">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-2xl font-bold">
-          Bộ lọc phòng {hasActiveFilters && <span className="text-sm font-semibold text-primary ml-2">(Đã áp dụng)</span>}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-5 space-y-6">
-        {/* Basic Filters Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <RoomSearchInput
-            value={filters.search || ""}
-            onChange={handleSearchChange}
-          />
-          <RoomStatusFilter
-            status={filters.status}
-            onChange={handleStatusChange}
-          />
-          <RoomPriceFilter
-            minPrice={filters.minPrice}
-            maxPrice={filters.maxPrice}
-            onMinPriceChange={handleMinPriceChange}
-            onMaxPriceChange={handleMaxPriceChange}
-          />
-          <RoomSizeFilter
-            minArea={filters.minArea}
-            maxArea={filters.maxArea}
-            onMinAreaChange={handleMinAreaChange}
-            onMaxAreaChange={handleMaxAreaChange}
-          />
+    <div className="space-y-3">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="gap-2"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            <span>Bộ lọc</span>
+            {activeFilterCount > 0 && (
+              <Badge variant="default" className="ml-1 h-5 min-w-5 px-1.5">
+                {activeFilterCount}
+              </Badge>
+            )}
+            <ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+          </Button>
+
+          {/* Quick Sort */}
+          <div className="flex items-center gap-2">
+            <RoomSort
+              sortBy={filters.sortBy || "newest"}
+              sortOrder={filters.sortOrder || "desc"}
+              onSortByChange={handleSortByChange}
+              onSortOrderChange={handleSortOrderChange}
+              compact
+            />
+          </div>
         </div>
 
-        {/* Sorting Section */}
-        <div className="border-t border-border/50 pt-4">
-          <RoomSort
-            sortBy={filters.sortBy || "newest"}
-            sortOrder={filters.sortOrder || "desc"}
-            onSortByChange={handleSortByChange}
-            onSortOrderChange={handleSortOrderChange}
-          />
-        </div>
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleReset}
+            className="gap-1 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+            Xóa bộ lọc
+          </Button>
+        )}
+      </div>
 
-        {/* Amenities Section */}
-        <div className="border-t border-border/50 pt-4">
-          <RoomAmenitiesFilter
-            selectedAmenities={filters.amenities || []}
-            onAmenitiesChange={handleAmenitiesChange}
-          />
-        </div>
+      {/* Expandable Filter Panel */}
+      {isExpanded && (
+        <div className="rounded-xl border border-border bg-card/50 backdrop-blur-sm p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+          {/* Compact Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <RoomStatusFilter
+              status={filters.status}
+              onChange={handleStatusChange}
+            />
+            <RoomPriceFilter
+              minPrice={filters.minPrice}
+              maxPrice={filters.maxPrice}
+              onMinPriceChange={handleMinPriceChange}
+              onMaxPriceChange={handleMaxPriceChange}
+            />
+            <RoomSizeFilter
+              minArea={filters.minArea}
+              maxArea={filters.maxArea}
+              onMinAreaChange={handleMinAreaChange}
+              onMaxAreaChange={handleMaxAreaChange}
+            />
+          </div>
 
-        {/* Action Buttons */}
-        <RoomFiltersActions
-          onApply={handleApply}
-          onReset={handleReset}
-          isLoading={isLoading}
-        />
-      </CardContent>
-    </Card>
+          {/* Amenities */}
+          <div className="border-t border-border/50 pt-3">
+            <RoomAmenitiesFilter
+              selectedAmenities={filters.amenities || []}
+              onAmenitiesChange={handleAmenitiesChange}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsExpanded(false)}
+            >
+              Đóng
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleApply}
+              disabled={isLoading}
+            >
+              Áp dụng
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

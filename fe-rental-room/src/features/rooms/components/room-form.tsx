@@ -1,6 +1,7 @@
 "use client";
 
 import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { roomSchema, type RoomInput } from "../schemas";
 
 interface RoomFormProps {
   defaultValues?: Partial<RoomInput>;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: RoomInput) => void;
   isLoading?: boolean;
 }
 
@@ -20,8 +21,8 @@ export function RoomForm({ defaultValues, onSubmit, isLoading }: RoomFormProps) 
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(roomSchema),
+  } = useForm<RoomInput>({
+    resolver: zodResolver(roomSchema) as Resolver<RoomInput>,
     defaultValues: {
       propertyId: "",
       roomNumber: "",
@@ -31,7 +32,7 @@ export function RoomForm({ defaultValues, onSubmit, isLoading }: RoomFormProps) 
       status: RoomStatus.AVAILABLE,
       ...defaultValues,
     },
-  } as any);
+  });
 
   return (
     <Card>

@@ -1,19 +1,13 @@
 'use client';
 
-import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import vietnamMapPaths, { mapConfig, cities } from './landing/vietnam-map-data';
 import CityCard from './landing/city-card';
 
-interface VietnamMap3DProps {
-  isDark?: boolean;
-}
-
-export default function VietnamMap3D({ isDark = true }: VietnamMap3DProps) {
+export default function VietnamMap3D() {
   const [hoveredCity, setHoveredCity] = useState<string | null>(null);
   const router = useRouter();
-  const [svgSize, setSvgSize] = useState({ width: 800, height: 800 });
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   // Use CSS variables for backgrounds and grid colors to respect the global theme
@@ -23,32 +17,9 @@ export default function VietnamMap3D({ isDark = true }: VietnamMap3DProps) {
       gridColor: 'var(--color-muted-foreground)',
       bgFill: 'var(--color-background)',
     };
-  }, [isDark]);
+  }, []);
 
-  // Measure SVG size and respond to resizes without causing update loops
-  useLayoutEffect(() => {
-    if (!svgRef.current) return;
-    const node = svgRef.current;
-    const updateSize = () => {
-      const r = node.getBoundingClientRect();
-      const newSize = { width: Math.round(r.width), height: Math.round(r.height) };
-      if (newSize.width !== svgSize.width || newSize.height !== svgSize.height) {
-        setSvgSize(newSize);
-      }
-    };
-
-    updateSize();
-    let ro: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => updateSize());
-      ro.observe(node);
-    }
-    window.addEventListener('resize', updateSize);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener('resize', updateSize);
-    };
-  }, [svgRef.current]);
+  // Removed resize tracking to avoid unnecessary re-renders and ref access warnings
 
   return (
     <div 
@@ -148,26 +119,28 @@ export default function VietnamMap3D({ isDark = true }: VietnamMap3DProps) {
       </svg>
 
       {/* City info tooltip - floats on map */}
-      {hoveredCity && (
-        <div className="absolute inset-0 pointer-events-none">
-          {cities.map((city) => (
-            hoveredCity === city.name && (
-              <div
-                key={city.name}
-                style={{
-                  position: 'absolute',
-                  left: Math.max(0, Math.min(svgSize.width, (city.x / 800) * svgSize.width + 12)),
-                  top: Math.max(0, Math.min(svgSize.height, (city.y / 800) * svgSize.height - 16)),
-                  transform: 'translate(-50%, -100%)',
-                  pointerEvents: 'auto',
-                }}
-              >
-                <CityCard name={city.name} rooms={city.rooms} searchQuery={city.searchQuery} />
-              </div>
-            )
-          ))}
-        </div>
-      )}
+      {hoveredCity && (() => {
+        const city = cities.find((c) => c.name === hoveredCity);
+        if (!city) return null;
+        const leftPercent = (city.x / 800) * 100;
+        const topPercent = (city.y / 800) * 100;
+        return (
+          <div className="absolute pointer-events-none inset-0">
+            <div
+              key={city.name}
+              style={{
+                position: 'absolute',
+                left: `${leftPercent}%`,
+                top: `${topPercent}%`,
+                transform: 'translate(-50%, -100%)',
+                pointerEvents: 'auto',
+              }}
+            >
+              <CityCard name={city.name} rooms={city.rooms} searchQuery={city.searchQuery} />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -27,16 +27,15 @@ export function PaymentForm({ defaultValues, onSubmit, isLoading }: PaymentFormP
     handleSubmit,
     formState: { errors },
     setValue,
-  } = useForm({
+  } = useForm<PaymentInput>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      contractId: "",
       amount: 0,
       paymentMethod,
       paymentDate: defaultValues?.paymentDate || new Date().toISOString().split("T")[0],
       ...defaultValues,
     },
-  } as any);
+  });
 
   const handlePaymentMethodChange = (method: PaymentMethod) => {
     setPaymentMethod(method);
@@ -49,7 +48,7 @@ export function PaymentForm({ defaultValues, onSubmit, isLoading }: PaymentFormP
         <CardTitle>Record Payment</CardTitle>
       </CardHeader>
       <CardContent>
-      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="invoiceId">Invoice ID</Label>

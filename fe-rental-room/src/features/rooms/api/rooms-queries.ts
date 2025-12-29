@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 export function useRooms(params?: PaginationParams) {
   return useQuery({
-    queryKey: queryKeys.rooms.list(params),
+    queryKey: queryKeys.rooms.list(params as Record<string, unknown>),
     queryFn: () => roomsApi.getAll(params),
     staleTime: 5 * 60 * 1000, // 5 minutes (match backend cache)
   });
@@ -29,7 +29,7 @@ export function useCreateRoom() {
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
       toast.success('Room created successfully');
     },
-    onError: (error: unknown) => {
+    onError: () => {
       toast.error('Failed to create room');
     },
   });
