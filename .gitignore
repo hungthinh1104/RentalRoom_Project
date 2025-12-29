@@ -11,6 +11,7 @@ dist/
 out/
 build/
 *.tsbuildinfo
+next-env.d.ts
 
 # OS files
 .DS_Store
@@ -27,6 +28,7 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+.cursorrules
 
 # Coverage
 coverage/
@@ -57,3 +59,13 @@ be-rental-room/.env.example
 fe-rental-room/src/env.mjs
 fe-rental-room/.github/copilot-instructions.md
 be-rental-room/scripts/test-reports-api.sh
+
+# Junk/Temp files
+debug_dto.json
+be-rental-room/debug_dto.json
+verify_amenities.sh
+*.prompt.md
+package-lock.json
+package.json
+node_modules/
+fe-rental-room/tsconfig.tsbuildinfo
