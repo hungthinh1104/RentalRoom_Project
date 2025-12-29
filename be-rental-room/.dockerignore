@@ -62,8 +62,7 @@ docker-compose*.yml
 azure-deploy.yml
 deploy-azure.sh
 
-# Prisma migrations (only schema needed)
-prisma/migrations
+# prisma/migrations
 
 # Development scripts
 scripts
