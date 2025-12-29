@@ -25,12 +25,6 @@ export function PublicHeader() {
   ];
 
   const handleLogout = async () => {
-    // Clear client-side tokens and NextAuth session
-    if (typeof window !== 'undefined') {
-      try {
-        clearTokens();
-      } catch { }
-    }
     await signOut({ redirect: false });
     router.push('/');
     router.refresh();
