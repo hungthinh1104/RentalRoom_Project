@@ -125,7 +125,7 @@ export class RoomsService {
         where,
         skip: filterDto.skip,
         take: limit,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: { [actualSortBy]: sortOrder },
         include: {
           property: {
             select: {
