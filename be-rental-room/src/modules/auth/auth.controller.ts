@@ -7,6 +7,7 @@ import {
   Res,
   Query,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,7 +26,7 @@ import { LocalAuthGuard } from 'src/common/guards/local-auth.guard';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
@@ -128,6 +129,27 @@ export class AuthController {
       throw new BadRequestException('Refresh token is required');
     }
     return this.authService.refreshToken(token);
+  }
+
+  @Post('session')
+  @ApiOperation({ summary: 'Validate credentials and return user session (for NextAuth)' })
+  @ApiResponse({ status: 200, description: 'Session data returned' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async session(@Body() loginDto: LoginDto): Promise<{ id: string; email: string; name: string; role: string }> {
+    // Validate user credentials
+    const user = await this.authService.validateUser(loginDto.email, loginDto.password);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Return user data for NextAuth session
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.fullName,
+      role: user.role,
+    };
   }
 
   @Post('logout')

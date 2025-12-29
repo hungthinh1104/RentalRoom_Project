@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { authApi } from "@/features/auth/api/auth-api";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3001';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -16,66 +17,66 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          const response = await authApi.login({
-            email: credentials.email,
-            password: credentials.password,
+          // Call the new /auth/session endpoint
+          const response = await fetch(`${API_URL}/api/v1/auth/session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+            credentials: 'include', // Important: send cookies
           });
 
-          if (response.user) {
-            return {
-              id: response.user.id,
-              email: response.user.email,
-              name: response.user.fullName || response.user.email,
-              role: response.user.role,
-              accessToken: response.access_token,
-              refreshToken: response.refresh_token,
-            };
+          if (!response.ok) {
+            console.error('[NextAuth] Session validation failed:', response.status);
+            return null;
           }
+
+          const user = await response.json();
+
+          // Return user data for NextAuth session
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
         } catch (error) {
-          console.error("Auth error:", error);
+          console.error("[NextAuth] Auth error:", error);
           return null;
         }
-
-        return null;
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // On initial sign-in, store tokens from the API response
+      // On initial sign-in, store user data in JWT
       if (user) {
         token.id = user.id;
         token.role = user.role;
-        // Store tokens in JWT for persistence across requests
-        if (user.accessToken) token.accessToken = user.accessToken;
-        if (user.refreshToken) token.refreshToken = user.refreshToken;
       }
       return token;
     },
     async session({ session, token }) {
+      // Pass user data to client session
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
       }
-      // Expose tokens on session so client can sync to localStorage
-      session.accessToken = token.accessToken as string | undefined;
-      session.refreshToken = token.refreshToken as string | undefined;
       return session;
     },
     async redirect({ url, baseUrl }) {
-      // Nếu URL không tồn tại, fallback
+      // Redirect logic after sign in/out
       if (!url) return baseUrl;
-      // Nếu URL là relative (bắt đầu bằng /) thì dùng nó
       if (typeof url === 'string' && url.startsWith('/')) {
         return url;
       }
-      // Nếu URL là absolute, thử parse origin (bảo vệ khi URL không hợp lệ)
       try {
         const parsed = new URL(url);
         if (parsed.origin === baseUrl) return url;
       } catch (e) {
-        // URL invalid, fallback
-        console.warn('[auth] redirect: invalid url', url, e);
+        console.warn('[NextAuth] redirect: invalid url', url, e);
       }
       return baseUrl;
     },
@@ -86,6 +87,18 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60, // 7 days to match backend refresh token
   },
   secret: process.env.NEXTAUTH_SECRET,
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
 };

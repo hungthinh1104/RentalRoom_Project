@@ -9,21 +9,43 @@ export async function middleware(request: NextRequest) {
 	const protectedRoutes = ["/dashboard", "/profile", "/properties", "/rooms"];
 	const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
 	const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
+
+	// Role-based route checks
 	const isAdminRoute = pathname.startsWith("/dashboard/admin");
+	const isLandlordRoute = pathname.startsWith("/dashboard/landlord");
+	const isTenantRoute = pathname.startsWith("/dashboard/tenant");
 
 	// Redirect anonymous users away from protected areas
 	if (isProtectedRoute && !token) {
 		return NextResponse.redirect(new URL("/login", request.url));
 	}
 
-	// Enforce admin RBAC for /dashboard/admin/*
+	// ======== ROLE-BASED ACCESS CONTROL ========
+
+	// Admin routes - ONLY for ADMIN role
 	if (isAdminRoute && token?.role !== "ADMIN") {
-		return NextResponse.redirect(new URL("/dashboard", request.url));
+		return NextResponse.redirect(new URL("/unauthorized", request.url));
 	}
 
-	// Redirect signed-in users away from auth pages
+	// Landlord routes - ONLY for LANDLORD role
+	if (isLandlordRoute && token?.role !== "LANDLORD") {
+		return NextResponse.redirect(new URL("/unauthorized", request.url));
+	}
+
+	// Tenant routes - ONLY for TENANT role
+	if (isTenantRoute && token?.role !== "TENANT") {
+		return NextResponse.redirect(new URL("/unauthorized", request.url));
+	}
+
+	// Redirect signed-in users away from auth pages (to their appropriate dashboard)
 	if (isAuthRoute && token) {
-		return NextResponse.redirect(new URL("/dashboard", request.url));
+		const redirectMap = {
+			ADMIN: "/dashboard/admin",
+			LANDLORD: "/dashboard/landlord",
+			TENANT: "/dashboard/tenant",
+		};
+		const dashboardUrl = redirectMap[token.role as keyof typeof redirectMap] || "/dashboard";
+		return NextResponse.redirect(new URL(dashboardUrl, request.url));
 	}
 
 	return NextResponse.next();

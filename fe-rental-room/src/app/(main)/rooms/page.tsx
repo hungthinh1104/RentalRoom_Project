@@ -23,10 +23,7 @@ export default function RoomsPage() {
     reviews?: Review[];
     createdAt: string | Date;
   };
-  const [filters, setFilters] = useState<RoomFilterInput>({
-    sortBy: "newest",
-    sortOrder: "desc"
-  });
+  const [filters, setFilters] = useState<RoomFilterInput>({});
   const [aiQuery, setAiQuery] = useState("");
   const [searchTab, setSearchTab] = useState<"ai" | "filters">("ai");
   const [page, setPage] = useState(1);
@@ -44,19 +41,10 @@ export default function RoomsPage() {
     enabled: searchTab === "ai",
   });
 
-  // Standard Search (with all filters passed to backend)
+  // Standard Search (filters only)
   const apiParams = {
     page,
     limit: 12,
-    ...(filters.minPrice && { minPrice: filters.minPrice }),
-    ...(filters.maxPrice && { maxPrice: filters.maxPrice }),
-    ...(filters.minArea && { minArea: filters.minArea }),
-    ...(filters.maxArea && { maxArea: filters.maxArea }),
-    ...(filters.status && { status: filters.status }),
-    ...(filters.city && { city: filters.city }),
-    ...(filters.ward && { ward: filters.ward }),
-    ...(filters.sortBy && { sortBy: filters.sortBy }),
-    ...(filters.sortOrder && { sortOrder: filters.sortOrder }),
   };
   const { data: standardData, isLoading: standardLoading } = useRooms(apiParams);
 
@@ -65,14 +53,59 @@ export default function RoomsPage() {
     if (searchTab === "ai" && aiQuery.trim()) {
       return aiRooms;
     } else if (searchTab === "filters" || !aiQuery.trim()) {
-      // Return backend results directly (already filtered and sorted)
-      return (standardData?.data as Room[]) || [];
+      // Apply client-side filters to standard results
+      let filtered: Room[] = (standardData?.data as Room[]) || [];
+
+      if (filters.minPrice) {
+        filtered = filtered.filter((room: Room) => room.pricePerMonth >= (filters.minPrice as number));
+      }
+      if (filters.maxPrice) {
+        filtered = filtered.filter((room: Room) => room.pricePerMonth <= (filters.maxPrice as number));
+      }
+      if (filters.minArea) {
+        filtered = filtered.filter((room: Room) => room.area >= (filters.minArea as number));
+      }
+      if (filters.maxArea) {
+        filtered = filtered.filter((room: Room) => room.area <= (filters.maxArea as number));
+      }
+      if (filters.status) {
+        filtered = filtered.filter((room: Room) => room.status === filters.status);
+      }
+      if (filters.amenities && filters.amenities.length > 0) {
+        filtered = filtered.filter((room: Room) => {
+          const roomAmenities = room.amenities?.map((a: Amenity) => a.type) || [];
+          return (filters.amenities as string[]).some((amenity) => roomAmenities.includes(amenity));
+        });
+      }
+
+      // Apply sorting
+      const sortBy = filters.sortBy || "newest";
+      const sortOrder = filters.sortOrder || "desc";
+      const multiplier = sortOrder === "asc" ? 1 : -1;
+
+      filtered.sort((a: Room, b: Room) => {
+        switch (sortBy) {
+          case "price":
+            return (a.pricePerMonth - b.pricePerMonth) * multiplier;
+          case "area":
+            return (a.area - b.area) * multiplier;
+          case "rating":
+            const ratingA = (a.reviews?.reduce((sum: number, r: Review) => sum + r.rating, 0) || 0) / (a.reviews?.length || 1);
+            const ratingB = (b.reviews?.reduce((sum: number, r: Review) => sum + r.rating, 0) || 0) / (b.reviews?.length || 1);
+            return (ratingA - ratingB) * multiplier;
+          case "newest":
+          default:
+            return (new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) * multiplier;
+        }
+      });
+
+      return filtered;
     }
     return [];
-  }, [searchTab, aiQuery, aiRooms, standardData?.data]);
+  }, [searchTab, aiQuery, aiRooms, standardData?.data, filters]);
 
   const isLoading = searchTab === "ai" ? aiLoading : standardLoading;
-  const totalResults = searchTab === "filters" ? (standardData?.total || 0) : results.length;
+  const totalResults = results.length;
   const totalPages = Math.ceil(totalResults / 12);
 
   return (
@@ -317,8 +350,8 @@ export default function RoomsPage() {
                     key={pageNum}
                     onClick={() => setPage(pageNum)}
                     className={`min-w-[44px] h-11 px-4 rounded-lg font-semibold transition-all duration-200 ${page === pageNum
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 scale-105"
-                      : "bg-card border border-border text-foreground hover:bg-muted hover:border-primary/30 hover:scale-105"
+                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 scale-105"
+                        : "bg-card border border-border text-foreground hover:bg-muted hover:border-primary/30 hover:scale-105"
                       }`}
                   >
                     {pageNum}
