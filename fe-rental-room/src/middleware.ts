@@ -4,7 +4,9 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 	const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-	console.log(`[Middleware] Path: ${pathname}, Token found: ${!!token}, Role: ${token?.role}`); // DEBUG LOG
+	if (process.env.NODE_ENV === 'development') {
+		console.log(`[Middleware] Path: ${pathname}, Token found: ${!!token}, Role: ${token?.role}`); // DEBUG LOG
+	}
 
 	const authRoutes = ["/login", "/register"];
 	const protectedRoutes = ["/dashboard", "/profile", "/properties", "/rooms"];

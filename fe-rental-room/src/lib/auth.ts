@@ -54,7 +54,9 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       // On initial sign-in, store user data in JWT
       if (user) {
-        console.log('[NextAuth] JWT Callback - User:', user);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[NextAuth] JWT Callback - User:', user);
+        }
         token.id = user.id;
         token.role = user.role;
         token.accessToken = (user as any).accessToken; // Store backend token
@@ -63,7 +65,9 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       // Pass user data to client session
-      console.log('[NextAuth] Session Callback - Token:', token);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[NextAuth] Session Callback - Token:', token);
+      }
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
