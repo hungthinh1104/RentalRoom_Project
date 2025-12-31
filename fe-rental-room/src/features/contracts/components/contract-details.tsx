@@ -1,36 +1,44 @@
 "use client";
 
 import { Contract } from "@/types";
-import { format } from "date-fns";
-import { vi } from "date-fns/locale";
-import {
-    CalendarDays,
-    CreditCard,
-    FileText,
-    Home,
-    User,
-    Users,
-    AlertTriangle,
-    Download,
-    Ban,
-    Copy,
-    CheckCircle2,
-    MapPin,
-    Maximize,
-    DollarSign,
-    Calendar,
-    Shield
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ContractStatus } from "@/types/enums";
 import { useState } from "react";
-import { TerminateDialog } from "./terminate-dialog";
-import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useSession } from "@/features/auth/hooks/use-session";
+import { contractsApi } from "@/features/contracts/api/contracts-api";
+import { UserRole, ContractStatus } from "@/types/enums";
+import { ContractStepper } from "./details/contract-stepper"; // Add ContractStepper import
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, Receipt, Pencil, Send, Ban, Check, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+
+// Sub-components
+import { ContractHeader } from "./details/contract-header";
+import { ContractInfo } from "./details/contract-info";
+import { ContractFinancials } from "./details/contract-financials";
+import { ContractInvoices } from "./details/contract-invoices";
+import { ContractTerms } from "./contract-terms"; // Existing simple component if valid, or inline content. 
+// NOTE: I notice there was a ContractTerms content in original file. Let's create a wrapper or just use Card.
+// Original used a Card with prose. I'll include it directly or create ContractTerms component now?
+// To be safe, I'll inline the Terms card here or check if ContractTerms component exists.
+// ls showed "contract-terms.tsx". Let's use it or inline.
+// Original file Lines 563-577 showed inline card. I'll stick to a clean structure and maybe create it if needed, but for now I'll use the Card structure here or distinct component.
+// Re-reading file structure: "contract-terms.tsx" exists (1101 bytes). It probably just renders the terms. I should check it.
+// Assuming it's good, I'll use it. If not, I'll render the cleanup version.
+
+import { TerminateDialog } from "./terminate-dialog";
+import { EditContractDialog } from "./edit-contract-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Needed for Terms container if I don't use simple component
 
 interface ContractDetailsProps {
     contract: Contract;
@@ -41,61 +49,105 @@ interface ContractDetailsProps {
 export function ContractDetails({
     contract,
     onTerminate,
-    isTerminating,
+    isTerminating: isTerminatingProp,
 }: ContractDetailsProps) {
+    const { data: session } = useSession();
+    const user = session?.user;
+
+    // States
+    const [showRevokeDialog, setShowRevokeDialog] = useState(false);
+    const [showRequestChangesDialog, setShowRequestChangesDialog] = useState(false);
+    const [changeReason, setChangeReason] = useState("");
     const [showTerminateDialog, setShowTerminateDialog] = useState(false);
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [showSendDialog, setShowSendDialog] = useState(false);
+    const [showApproveDialog, setShowApproveDialog] = useState(false);
+    const [isActionLoading, setIsActionLoading] = useState(false);
 
-    const formatMoney = (amount: number) => {
-        return new Intl.NumberFormat("vi-VN", {
-            style: "currency",
-            currency: "VND",
-        }).format(amount);
-    };
+    const isLandlord = user?.role === UserRole.LANDLORD || user?.role === UserRole.ADMIN;
 
-    const copyToClipboard = (text: string, label: string) => {
-        navigator.clipboard.writeText(text);
-        toast.success(`Đã sao chép ${label}`);
-    };
-
-    const getStatusConfig = (status: ContractStatus) => {
-        switch (status) {
-            case ContractStatus.ACTIVE:
-                return {
-                    label: "Đang hoạt động",
-                    bg: "bg-green-50 dark:bg-green-950",
-                    text: "text-green-700 dark:text-green-400",
-                    border: "border-green-200 dark:border-green-800",
-                    icon: CheckCircle2
-                };
-            case ContractStatus.EXPIRED:
-                return {
-                    label: "Đã hết hạn",
-                    bg: "bg-muted",
-                    text: "text-muted-foreground",
-                    border: "border-muted",
-                    icon: Calendar
-                };
-            case ContractStatus.TERMINATED:
-                return {
-                    label: "Đã chấm dứt",
-                    bg: "bg-destructive/10",
-                    text: "text-destructive",
-                    border: "border-destructive/20",
-                    icon: Ban
-                };
-            default:
-                return {
-                    label: status,
-                    bg: "bg-muted",
-                    text: "text-muted-foreground",
-                    border: "border",
-                    icon: FileText
-                };
+    // Handlers
+    const handleRevokeContract = async () => {
+        setIsActionLoading(true);
+        try {
+            await contractsApi.revokeContract(contract.id);
+            toast.success("Đã thu hồi hợp đồng thành công");
+            window.location.reload();
+        } catch (error) {
+            toast.error("Thu hồi thất bại");
+            console.error(error);
+        } finally {
+            setIsActionLoading(false);
+            setShowRevokeDialog(false);
         }
     };
 
-    const statusConfig = getStatusConfig(contract.status);
-    const StatusIcon = statusConfig.icon;
+    const handleRequestChanges = async () => {
+        if (!changeReason.trim()) {
+            toast.error("Vui lòng nhập lý do yêu cầu sửa");
+            return;
+        }
+        setIsActionLoading(true);
+        try {
+            await contractsApi.requestChanges(contract.id, changeReason);
+            toast.success("Đã gửi yêu cầu chỉnh sửa");
+            window.location.reload();
+        } catch (error) {
+            toast.error("Gửi yêu cầu thất bại");
+            console.error(error);
+        } finally {
+            setIsActionLoading(false);
+            setShowRequestChangesDialog(false);
+        }
+    };
+
+    const handleSendContract = async () => {
+        setIsActionLoading(true);
+        try {
+            await contractsApi.sendContract(contract.id);
+            toast.success("Đã gửi hợp đồng cho khách thuê");
+            window.location.reload();
+        } catch (error) {
+            toast.error("Gửi hợp đồng thất bại");
+            console.error(error);
+        } finally {
+            setIsActionLoading(false);
+            setShowSendDialog(false);
+        }
+    };
+
+    const handleApproveContract = async () => {
+        setIsActionLoading(true);
+        try {
+            await contractsApi.tenantApproveContract(contract.id);
+            toast.success("Đã phê duyệt hợp đồng");
+            window.location.reload();
+        } catch (error) {
+            toast.error("Phê duyệt thất bại");
+            console.error(error);
+        } finally {
+            setIsActionLoading(false);
+            setShowApproveDialog(false);
+        }
+    };
+
+    const handleCheckPayment = async () => {
+        setIsActionLoading(true);
+        try {
+            const res = await contractsApi.verifyPaymentStatus(contract.id);
+            if (res.success) {
+                toast.success("Thanh toán thành công! Hợp đồng đã kích hoạt.");
+                window.location.reload();
+            } else {
+                toast.info("Chưa nhận được thanh toán. Vui lòng thử lại sau ít phút.");
+            }
+        } catch (error) {
+            toast.error("Kiểm tra thanh toán thất bại");
+            console.error(error);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -123,160 +175,60 @@ export function ContractDetails({
             animate="visible"
             variants={containerVariants}
         >
-            {/* Header Section */}
-            <motion.div variants={itemVariants} className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between bg-card p-6 rounded-xl border shadow-sm">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-lg">
-                            <FileText className="w-6 h-6 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                                Hợp đồng #{contract.contractNumber}
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 ml-1 text-muted-foreground hover:text-foreground" onClick={() => copyToClipboard(contract.contractNumber, "Mã hợp đồng")}>
-                                                <Copy className="w-3.5 h-3.5" />
-                                            </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Sao chép mã HĐ</TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </h1>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                <CalendarDays className="w-4 h-4" />
-                                <span>
-                                    {format(new Date(contract.startDate), "dd/MM/yyyy", { locale: vi })} - {format(new Date(contract.endDate), "dd/MM/yyyy", { locale: vi })}
-                                </span>
-                            </div>
-                        </div>
+            <ContractHeader
+                contract={contract}
+                userRole={user?.role}
+                onEdit={() => setShowEditDialog(true)}
+                onSend={() => setShowSendDialog(true)}
+                onRevoke={() => setShowRevokeDialog(true)}
+                onRequestChanges={() => setShowRequestChangesDialog(true)}
+                onApprove={() => setShowApproveDialog(true)}
+                onCheckPayment={handleCheckPayment}
+                onTerminate={() => setShowTerminateDialog(true)}
+                isActionLoading={isActionLoading}
+            />
+
+            <ContractStepper status={contract.status} />
+
+            {contract.status === ContractStatus.PENDING_SIGNATURE && (
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md flex items-start gap-3">
+                    <FileText className="w-5 h-5 mt-0.5" />
+                    <div>
+                        <p className="font-semibold">Vui lòng ký hợp đồng</p>
+                        <p className="text-sm">Xem kỹ các điều khoản bên dưới và nhấn "Phê duyệt" để tiến hành thanh toán cọc.</p>
                     </div>
                 </div>
+            )}
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-                    <div className={`px-4 py-2 rounded-full border flex items-center gap-2 font-medium ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}>
-                        <StatusIcon className="w-4 h-4" />
-                        {statusConfig.label}
-                    </div>
-
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        <Button variant="outline" className="flex-1 sm:flex-none gap-2">
-                            <Download className="w-4 h-4" />
-                            Tải PDF
-                        </Button>
-
-                        {contract.status === ContractStatus.ACTIVE && (
-                            <Button
-                                variant="destructive"
-                                className="flex-1 sm:flex-none gap-2"
-                                onClick={() => setShowTerminateDialog(true)}
-                            >
-                                <Ban className="w-4 h-4" />
-                                Chấm dứt
-                            </Button>
-                        )}
+            {contract.status === ContractStatus.DEPOSIT_PENDING && (
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md flex items-start gap-3">
+                    <FileText className="w-5 h-5 mt-0.5" />
+                    <div>
+                        <p className="font-semibold">Chờ thanh toán cọc</p>
+                        <p className="text-sm">Hợp đồng đã được ký. Vui lòng hoàn tất thanh toán cọc để kích hoạt hợp đồng.</p>
                     </div>
                 </div>
-            </motion.div>
+            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Content Column */}
-                <div className="lg:col-span-2 space-y-6">
+            <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-6">
+                    <TabsTrigger value="overview" className="flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Tổng quan & Điều khoản
+                    </TabsTrigger>
+                    <TabsTrigger value="invoices" className="flex items-center gap-2">
+                        <Receipt className="w-4 h-4" />
+                        Hóa đơn & Thanh toán
+                    </TabsTrigger>
+                </TabsList>
 
-                    {/* Room Highlights */}
-                    <motion.div variants={itemVariants}>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Home className="w-5 h-5 text-primary" />
-                                    Thông tin phòng
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
-                                        <div className="p-2 bg-primary/10 text-primary rounded-md">
-                                            <MapPin className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-muted-foreground">Địa chỉ & Phòng</p>
-                                            <p className="font-semibold text-base mt-0.5">{contract.room?.roomNumber}</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5 max-w-[200px] truncate">
-                                                {contract.room?.property?.address || "N/A"}
-                                            </p>
-                                        </div>
-                                    </div>
+                <TabsContent value="overview" className="space-y-6">
+                    <ContractInfo contract={contract} />
 
-                                    <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
-                                        <div className="p-2 bg-accent text-accent-foreground rounded-md">
-                                            <Maximize className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-muted-foreground">Diện tích & Loại</p>
-                                            <p className="font-semibold text-base mt-0.5">{contract.room?.area || 0} m²</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">Phòng tiêu chuẩn</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
+                    <ContractFinancials contract={contract} />
 
-                    {/* Financial Overview */}
-                    <motion.div variants={itemVariants}>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <CreditCard className="w-5 h-5 text-primary" />
-                                    Tài chính & Thanh toán
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                    <div className="flex flex-col">
-                                        <span className="text-sm text-muted-foreground mb-1">Giá thuê hàng tháng</span>
-                                        <div className="flex items-baseline gap-1">
-                                            <span className="text-2xl font-bold text-primary">{formatMoney(contract.monthlyRent)}</span>
-                                            <span className="text-xs text-muted-foreground">/tháng</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col relative">
-                                        <span className="text-sm text-muted-foreground mb-1">Tiền cọc giữ chỗ</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xl font-bold text-primary">{formatMoney(contract.deposit)}</span>
-                                            <Shield className="w-4 h-4 text-primary" />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex flex-col">
-                                        <span className="text-sm text-muted-foreground mb-1">Lịch thanh toán</span>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <Calendar className="w-4 h-4 text-primary" />
-                                            <span className="font-medium">Ngày {contract.paymentDay || 5} hàng tháng</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <Separator className="my-6" />
-                                <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
-                                    <div className="flex items-start gap-3">
-                                        <DollarSign className="w-5 h-5 text-primary mt-0.5" />
-                                        <div>
-                                            <p className="text-sm font-medium text-primary">Thông tin thanh toán</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                Tiền phòng sẽ được tính từ ngày {format(new Date(contract.startDate), "dd/MM/yyyy")}.
-                                                Hóa đơn đầu tiên đã bao gồm tiền cọc và tiền thuê tháng đầu.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-
-                    {/* Terms */}
-                    <motion.div variants={itemVariants}>
+                    {/* Terms Section */}
+                    <motion.div variants={itemVariants} initial="hidden" animate="visible">
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
@@ -284,185 +236,168 @@ export function ContractDetails({
                                     Điều khoản hợp đồng
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-6">
                                 <div className="prose prose-sm max-w-none text-muted-foreground bg-muted/30 p-4 rounded-lg border">
                                     {contract.terms ? contract.terms : "Không có điều khoản bổ sung đặc biệt."}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
 
-                    {/* Residents Section */}
-                    {contract.residents && contract.residents.length > 0 && (
-                        <motion.div variants={itemVariants}>
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Users className="w-5 h-5 text-primary" />
-                                        Danh sách cư dân ({contract.residents.length + 1} người)
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        {/* Primary Tenant */}
-                                        <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
-                                            <div className="p-2 bg-primary/10 rounded-full">
-                                                <User className="w-4 h-4 text-primary" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="font-semibold">{contract.tenant?.user?.fullName}</p>
-                                                <p className="text-xs text-muted-foreground">Người thuê chính</p>
-                                            </div>
-                                        </div>
-
-                                        {/* Additional Residents */}
-                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                        {contract.residents.map((resident: any, index: number) => (
-                                            <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border">
-                                                <div className="p-2 bg-muted rounded-full">
-                                                    <User className="w-4 h-4" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className="font-medium">{resident.fullName}</p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {resident.relationship === 'SPOUSE' && 'Vợ/chồng'}
-                                                            {resident.relationship === 'CHILD' && 'Con'}
-                                                            {resident.relationship === 'PARENT' && 'Cha/mẹ'}
-                                                            {resident.relationship === 'FRIEND' && 'Bạn'}
-                                                            {resident.relationship === 'OTHER' && 'Khác'}
-                                                        </span>
-                                                        {resident.citizenId && (
-                                                            <>
-                                                                <span className="text-xs text-muted-foreground">•</span>
-                                                                <span className="text-xs text-muted-foreground">CCCD: {resident.citizenId}</span>
-                                                            </>
-                                                        )}
-                                                        {resident.phoneNumber && (
-                                                            <>
-                                                                <span className="text-xs text-muted-foreground">•</span>
-                                                                <span className="text-xs text-muted-foreground">{resident.phoneNumber}</span>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {contract.maxOccupants && (
-                                        <div className="mt-4 p-3 bg-muted/30 rounded-lg border">
-                                            <p className="text-sm text-muted-foreground">
-                                                Giới hạn cư dân: <span className="font-semibold text-foreground">{contract.residents.length + 1}/{contract.maxOccupants} người</span>
-                                            </p>
-                                        </div>
+                                {/* Action Buttons Area */}
+                                <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+                                    {/* Landlord Buttons */}
+                                    {contract.status === ContractStatus.DRAFT && isLandlord && (
+                                        <>
+                                            <Button variant="outline" onClick={() => setShowEditDialog(true)} disabled={isActionLoading} className="gap-2">
+                                                <Pencil className="w-4 h-4" />
+                                                Chỉnh sửa
+                                            </Button>
+                                            <Button onClick={() => setShowSendDialog(true)} disabled={isActionLoading} className="gap-2">
+                                                <Send className="w-4 h-4" />
+                                                Gửi cho khách
+                                            </Button>
+                                        </>
                                     )}
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    )}
-                </div>
 
-                {/* Sidebar Column */}
-                <div className="space-y-6">
+                                    {contract.status === ContractStatus.PENDING_SIGNATURE && isLandlord && (
+                                        <Button variant="destructive" onClick={() => setShowRevokeDialog(true)} disabled={isActionLoading} className="gap-2">
+                                            <Ban className="w-4 h-4" />
+                                            Thu hồi hợp đồng
+                                        </Button>
+                                    )}
 
-                    {/* Status Alert if needed */}
-                    {contract.status === ContractStatus.EXPIRED && (
-                        <motion.div variants={itemVariants}>
-                            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                                <div className="flex items-start gap-3">
-                                    <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                                    <div>
-                                        <h4 className="font-medium text-sm text-destructive">Hợp đồng hết hạn</h4>
-                                        <p className="text-xs text-destructive/80 mt-1">
-                                            Đã kết thúc vào {format(new Date(contract.endDate), "dd/MM/yyyy")}.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
+                                    {/* Tenant Buttons */}
+                                    {contract.status === ContractStatus.PENDING_SIGNATURE && !isLandlord && (
+                                        <>
+                                            <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-2" onClick={() => setShowRequestChangesDialog(true)} disabled={isActionLoading}>
+                                                <Pencil className="w-4 h-4" />
+                                                Yêu cầu sửa
+                                            </Button>
+                                            <Button variant="ghost" className="text-muted-foreground hover:text-foreground gap-2" onClick={() => setShowRevokeDialog(true)} disabled={isActionLoading}>
+                                                <Ban className="w-4 h-4" />
+                                                Từ chối
+                                            </Button>
+                                            <Button onClick={() => setShowApproveDialog(true)} disabled={isActionLoading} className="gap-2">
+                                                <Check className="w-4 h-4" />
+                                                Phê duyệt & Ký
+                                            </Button>
+                                        </>
+                                    )}
 
-                    {/* Tenant Profile */}
-                    <motion.div variants={itemVariants}>
-                        <Card>
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <User className="w-4 h-4 text-primary" />
-                                    Người thuê (Bên B)
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex flex-col items-center text-center p-2">
-                                    <Avatar className="w-20 h-20 mb-3 border-2 border-muted">
-                                        <AvatarImage src={`https://ui-avatars.com/api/?name=${contract.tenant?.user?.fullName}&background=random`} />
-                                        <AvatarFallback>{contract.tenant?.user?.fullName?.substring(0, 2).toUpperCase() || "CN"}</AvatarFallback>
-                                    </Avatar>
-                                    <h3 className="font-bold text-lg">{contract.tenant?.user?.fullName || "Chưa cập nhật"}</h3>
-                                    <p className="text-sm text-muted-foreground mb-4">{contract.tenant?.user?.email}</p>
-
-                                    <div className="w-full space-y-3 text-sm">
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">Điện thoại</span>
-                                            <span className="font-medium">{contract.tenant?.user?.phoneNumber || "---"}</span>
-                                        </div>
-                                        <div className="flex justify-between py-2 border-b">
-                                            <span className="text-muted-foreground">CCCD/CMND</span>
-                                            <span className="font-medium">{contract.tenant?.citizenId || "---"}</span>
-                                        </div>
-                                    </div>
+                                    {contract.status === ContractStatus.DEPOSIT_PENDING && !isLandlord && (
+                                        <>
+                                            <Button variant="ghost" className="text-muted-foreground hover:text-foreground gap-2" onClick={() => setShowRevokeDialog(true)} disabled={isActionLoading}>
+                                                <Ban className="w-4 h-4" />
+                                                Hủy giao dịch
+                                            </Button>
+                                            <Button className="bg-green-600 hover:bg-green-700 text-white gap-2" onClick={handleCheckPayment} disabled={isActionLoading}>
+                                                <RefreshCw className={`w-4 h-4 ${isActionLoading ? "animate-spin" : ""}`} />
+                                                Tôi đã chuyển khoản
+                                            </Button>
+                                        </>
+                                    )}
                                 </div>
                             </CardContent>
                         </Card>
                     </motion.div>
+                </TabsContent>
 
-                    {/* Landlord Profile */}
-                    <motion.div variants={itemVariants}>
-                        <Card>
-                            <CardHeader className="pb-4">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <Users className="w-4 h-4 text-primary" />
-                                    Chủ nhà (Bên A)
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center gap-4 mb-4">
-                                    <Avatar className="w-12 h-12 border">
-                                        <AvatarImage src={`https://ui-avatars.com/api/?name=${contract.landlord?.user?.fullName}&background=0ea5e9&color=fff`} />
-                                        <AvatarFallback>LA</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <p className="font-bold">{contract.landlord?.user?.fullName || "Unknown"}</p>
-                                        <p className="text-xs text-muted-foreground">Chủ sở hữu bất động sản</p>
-                                    </div>
-                                </div>
-                                <div className="space-y-2 text-sm bg-muted/30 p-3 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
-                                        <span className="text-muted-foreground">Email:</span>
-                                        <span className="ml-auto font-medium truncate max-w-[120px]" title={contract.landlord?.user?.email}>
-                                            {contract.landlord?.user?.email}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-primary"></div>
-                                        <span className="text-muted-foreground">SĐT:</span>
-                                        <span className="ml-auto font-medium">{contract.landlord?.user?.phoneNumber || "---"}</span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
+                <TabsContent value="invoices">
+                    <ContractInvoices contract={contract} />
+                </TabsContent>
+            </Tabs>
 
-                </div>
-            </div>
+            {/* --- Dialogs --- */}
 
             <TerminateDialog
                 open={showTerminateDialog}
                 onOpenChange={setShowTerminateDialog}
                 onConfirm={({ reason, noticeDays }) => onTerminate(reason, noticeDays)}
-                loading={isTerminating}
+                loading={isTerminatingProp}
             />
+
+            <EditContractDialog
+                contract={contract}
+                open={showEditDialog}
+                onOpenChange={setShowEditDialog}
+                onSuccess={() => window.location.reload()}
+            />
+
+            <AlertDialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Phê duyệt hợp đồng thuê?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Bằng việc nhấn "Phê duyệt", bạn đồng ý với tất cả các điều khoản trong hợp đồng.
+                            Bước tiếp theo là thanh toán tiền cọc để kích hoạt hợp đồng.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isActionLoading}>Xem lại</AlertDialogCancel>
+                        <AlertDialogAction disabled={isActionLoading} onClick={handleApproveContract}>
+                            {isActionLoading ? "Đang xử lý..." : "Phê duyệt"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Gửi hợp đồng cho khách thuê?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Hợp đồng sẽ chuyển sang trạng thái "Chờ khách ký". Bạn sẽ không thể chỉnh sửa các điều khoản sau khi gửi.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isActionLoading}>Hủy</AlertDialogCancel>
+                        <AlertDialogAction disabled={isActionLoading} onClick={handleSendContract}>
+                            {isActionLoading ? "Đang gửi..." : "Gửi ngay"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={showRevokeDialog} onOpenChange={setShowRevokeDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>{isLandlord ? 'Thu hồi hợp đồng?' : 'Từ chối ký hợp đồng?'}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Bạn có chắc chắn muốn {isLandlord ? 'thu hồi' : 'từ chối'} hợp đồng này? Hợp đồng sẽ chuyển về trạng thái {isLandlord ? 'NHÁP' : 'ĐÃ HỦY'}.
+                            Phòng sẽ được mở lại thành "Trống" (Available).
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isActionLoading}>Hủy</AlertDialogCancel>
+                        <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isActionLoading} onClick={handleRevokeContract}>
+                            {isActionLoading ? "Đang xử lý..." : `Xác nhận ${isLandlord ? 'thu hồi' : 'từ chối'}`}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Tenant Request Changes Dialog */}
+            <AlertDialog open={showRequestChangesDialog} onOpenChange={setShowRequestChangesDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Yêu cầu chỉnh sửa</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Vui lòng nhập lý do bạn muốn chỉnh sửa hoặc từ chối hợp đồng này:
+                            <textarea
+                                className="w-full mt-3 p-3 border rounded-md min-h-[100px]"
+                                placeholder="Ví dụ: Sai thông tin CMND, muốn thương lượng lại giá thuê..."
+                                value={changeReason}
+                                onChange={(e) => setChangeReason(e.target.value)}
+                            />
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isActionLoading}>Hủy</AlertDialogCancel>
+                        <AlertDialogAction disabled={isActionLoading} onClick={handleRequestChanges}>
+                            {isActionLoading ? "Đang gửi..." : "Gửi yêu cầu"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
         </motion.div>
     );
 }

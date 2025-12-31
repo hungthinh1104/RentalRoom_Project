@@ -39,12 +39,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Search, MoreHorizontal, Eye, XCircle, X, Calendar } from "lucide-react";
-import { useAdminContracts, useTerminateContract } from "@/features/admin/hooks/use-admin-contracts";
+import { FileText, Search, MoreHorizontal, Eye, XCircle, X, Calendar, Printer } from "lucide-react";
+import { useAdminContracts, useTerminateContract, type Contract } from "@/features/admin/hooks/use-admin-contracts";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
+import { ContractPrintDialog } from "@/features/contracts/components/contract-print-dialog";
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
   ACTIVE: {
@@ -215,7 +216,7 @@ export default function AdminContractsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {contracts.map((contract) => (
+                {contracts.map((contract: Contract) => (
                   <TableRow key={contract.id}>
                     <TableCell className="font-mono text-sm">{contract.contractNumber}</TableCell>
                     <TableCell>
@@ -239,30 +240,41 @@ export default function AdminContractsPage() {
                     <TableCell className="text-right font-medium">{formatPrice(contract.rentAmount)}</TableCell>
                     <TableCell>{getStatusBadge(contract.status)}</TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Xem chi tiết
-                          </DropdownMenuItem>
-                          {contract.status === "ACTIVE" && (
-                            <DropdownMenuItem
-                              onClick={() => setTerminateId(contract.id)}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <XCircle className="mr-2 h-4 w-4" />
-                              Chấm dứt
+                      <div className="flex items-center justify-end gap-1">
+                        <ContractPrintDialog
+                          contractId={contract.id}
+                          contractNumber={contract.contractNumber}
+                          trigger={
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          }
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Xem chi tiết
                             </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            {contract.status === "ACTIVE" && (
+                              <DropdownMenuItem
+                                onClick={() => setTerminateId(contract.id)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Chấm dứt
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

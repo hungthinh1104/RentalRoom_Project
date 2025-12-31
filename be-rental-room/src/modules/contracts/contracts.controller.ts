@@ -10,8 +10,10 @@ import {
   BadRequestException,
   Res,
   NotFoundException,
+  HttpCode,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { ContractPdfService } from './contract-pdf.service';
 import { ContractsService } from './contracts.service';
 import { ContractSigningService } from './services/contract-signing.service';
 import { PdfQueueService } from './services/pdf-queue.service';
@@ -32,14 +34,18 @@ export class ContractsController {
     private readonly contractsService: ContractsService,
     private readonly contractSigningService: ContractSigningService,
     private readonly pdfQueueService: PdfQueueService,
+    private readonly contractPdfService: ContractPdfService,
   ) { }
 
   // ===== RENTAL APPLICATIONS ENDPOINTS =====
 
   @Post('applications')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
-  createApplication(@Body() createDto: CreateRentalApplicationDto) {
-    return this.contractsService.createApplication(createDto);
+  createApplication(
+    @Body() createDto: CreateRentalApplicationDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.contractsService.createApplication(createDto, user);
   }
 
   @Get('applications')
@@ -121,6 +127,30 @@ export class ContractsController {
     @Body() updateContractDto: UpdateContractDto,
   ) {
     return this.contractsService.update(id, updateContractDto);
+  }
+
+  @Patch(':id/send')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  send(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contractsService.sendContract(id, user.id);
+  }
+
+  @Patch(':id/revoke')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  revoke(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contractsService.revokeContract(id, user.id);
+  }
+
+  @Patch(':id/request-changes')
+  @Auth(UserRole.TENANT)
+  @HttpCode(200)
+  requestChanges(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body('reason') reason: string,
+  ) {
+    if (!reason) throw new BadRequestException('Reason is required');
+    return this.contractsService.requestChanges(id, user.id, reason);
   }
 
   @Patch(':id/terminate')
@@ -247,6 +277,20 @@ export class ContractsController {
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
   async verifyPaymentStatus(@Param('id') id: string) {
     return this.contractsService.verifyPaymentStatus(id);
+  }
+
+  // ----- PDF Generation Endpoint -----
+  @Get(':id/pdf')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  async getContractPdf(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const pdfBuffer = await this.contractPdfService.generatePdf(id, user.id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="contract-${id}.pdf"`);
+    res.send(pdfBuffer);
   }
 
   /**

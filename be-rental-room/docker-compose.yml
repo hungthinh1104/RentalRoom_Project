@@ -33,10 +33,10 @@ services:
           cpus: '0.75'
           memory: 512M
     ports:
-      - "3001:3001"
+      - "3005:3005"
     environment:
       DATABASE_URL: ${DATABASE_URL}
-      PORT: 3001
+      PORT: 3005
       NODE_ENV: ${NODE_ENV}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}

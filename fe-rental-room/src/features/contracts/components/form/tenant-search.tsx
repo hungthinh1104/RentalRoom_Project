@@ -103,10 +103,9 @@ export function TenantSearch({ onSelect, error, disabled }: TenantSearchProps) {
                             </div>
                         ) : (
                             <ul className="space-y-1">
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {tenants.map((tenant: any) => (
+                                {tenants.map((tenant: any, index: number) => (
                                     <li
-                                        key={tenant.id}
+                                        key={`${tenant.id}-${index}`}
                                         onClick={() => handleSelect(tenant)}
                                         className={cn(
                                             "relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 px-3 text-sm outline-none hover:bg-accent hover:text-accent-foreground transition-colors",

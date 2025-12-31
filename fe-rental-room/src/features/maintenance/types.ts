@@ -21,8 +21,37 @@ export interface MaintenanceRequestSummary {
   description: string;
   category: MaintenanceCategory;
   priority: MaintenancePriority;
-  status: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   requestDate?: string;
+  completedAt?: string;
+  cost?: number;
+  rating?: number;
+  feedback?: string;
   createdAt: string;
   updatedAt: string;
+  room?: {
+    roomNumber: string;
+    property?: {
+      name: string;
+      address: string;
+    };
+  };
+  tenant?: {
+    user?: {
+      fullName: string;
+      email: string;
+    };
+  };
+}
+
+export interface UpdateMaintenanceRequest {
+  status?: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  priority?: MaintenancePriority;
+  assignedTo?: string;
+  cost?: number;
+}
+
+export interface MaintenanceFeedback {
+  rating: number;
+  feedback?: string;
 }

@@ -79,13 +79,9 @@ export class RoomResponseDto {
   property?: PropertyBasicDto;
 
   @Expose()
-  @Transform(({ value }) => value?.map((img: any) => img.imageUrl) || [])
   images: string[];
 
   @Expose()
-  @Transform(
-    ({ value }) => value?.map((amenity: any) => amenity.amenityType) || [],
-  )
   amenities: string[];
 
   @Expose()

@@ -135,7 +135,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Validate credentials and return user session (for NextAuth)' })
   @ApiResponse({ status: 200, description: 'Session data returned' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async session(@Body() loginDto: LoginDto): Promise<{ id: string; email: string; name: string; role: string }> {
+  async session(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ id: string; email: string; name: string; role: string; access_token: string }> {
     // Validate user credentials
     const user = await this.authService.validateUser(loginDto.email, loginDto.password);
 
@@ -143,12 +146,25 @@ export class AuthController {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Generate backend JWT and set cookie
+    // This allows the frontend (port 3000) to make authenticated requests to backend (port 3005)
+    // because credentials: "include" sends this cookie.
+    const { access_token } = await this.authService.login(user);
+
+    res.cookie('access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
+
     // Return user data for NextAuth session
     return {
       id: user.id,
       email: user.email,
       name: user.fullName,
       role: user.role,
+      access_token, // Return token so NextAuth can store it
     };
   }
 

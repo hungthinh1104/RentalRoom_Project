@@ -12,7 +12,7 @@ import { PaymentStatus } from './entities';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(createPaymentDto: CreatePaymentDto) {
     const payment = await this.prisma.payment.create({
@@ -30,14 +30,14 @@ export class PaymentsService {
     });
   }
 
-  async findAll(filterDto: FilterPaymentsDto) {
+  async findAll(filterDto: FilterPaymentsDto, user?: any) {
     const {
       page = 1,
       limit = 10,
       sortBy = 'paymentDate',
       sortOrder = 'desc',
       invoiceId,
-      tenantId,
+      // tenantId, // override below
       landlordId,
       status,
       paymentMethod,
@@ -45,6 +45,19 @@ export class PaymentsService {
     } = filterDto;
 
     const where: any = {};
+    let tenantId = filterDto.tenantId;
+
+    // Security: If user is provided and is a TENANT, force tenantId filter
+    if (user && user.role === 'TENANT') {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { userId: user.id },
+      });
+      if (!tenant) {
+        // Should catch this, return empty or throw
+        return new PaginatedResponse([], 0, page, limit);
+      }
+      tenantId = tenant.userId;
+    }
 
     if (invoiceId) where.invoiceId = invoiceId;
     if (tenantId) where.tenantId = tenantId;
@@ -70,20 +83,20 @@ export class PaymentsService {
         where,
         include: landlordId
           ? {
-              invoice: {
-                include: {
-                  contract: {
-                    include: {
-                      room: {
-                        include: {
-                          property: true,
-                        },
+            invoice: {
+              include: {
+                contract: {
+                  include: {
+                    room: {
+                      include: {
+                        property: true,
                       },
                     },
                   },
                 },
               },
-            }
+            },
+          }
           : undefined,
         skip: filterDto.skip,
         take: limit,

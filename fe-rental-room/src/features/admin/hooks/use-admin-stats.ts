@@ -10,6 +10,28 @@ export const adminStatsKeys = {
 };
 
 // Types
+interface TopLandlord {
+    landlordId: string;
+    name: string;
+    properties: number;
+    revenue: number;
+    occupancyRate: number;
+}
+
+interface TopProperty {
+    propertyId: string;
+    name: string;
+    landlord: string;
+    occupancyRate: number;
+    revenue: number;
+}
+
+interface Trend {
+    date: string;
+    revenue: number;
+    contracts: number;
+}
+
 interface DashboardStats {
     totalRevenue: number;
     occupancyRate: number;
@@ -17,6 +39,29 @@ interface DashboardStats {
     activeUsers: number;
     totalRooms: number;
     totalProperties: number;
+    trends: Trend[];
+    topPerformers?: {
+        landlords: TopLandlord[];
+        properties: TopProperty[];
+    };
+}
+
+interface BackendResponse {
+    summary: {
+        totalUsers: number;
+        totalTenants: number;
+        totalLandlords: number;
+        totalProperties: number;
+        totalRooms: number;
+        activeContracts: number;
+        platformRevenue: number;
+        averageOccupancy: number;
+    };
+    trends: Trend[];
+    topPerformers: {
+        landlords: TopLandlord[];
+        properties: TopProperty[];
+    };
 }
 
 /**
@@ -27,14 +72,16 @@ export function useAdminDashboardStats() {
         queryKey: adminStatsKeys.dashboard(),
         queryFn: async () => {
             try {
-                const { data } = await api.get<DashboardStats>("/reports/admin/overview");
+                const { data } = await api.get<BackendResponse>("/reports/admin/overview");
                 return {
-                    totalRevenue: data.totalRevenue ?? 0,
-                    occupancyRate: data.occupancyRate ?? 0,
-                    expiringContracts: data.expiringContracts ?? 0,
-                    activeUsers: data.activeUsers ?? 0,
-                    totalRooms: data.totalRooms ?? 0,
-                    totalProperties: data.totalProperties ?? 0,
+                    totalRevenue: data.summary.platformRevenue ?? 0,
+                    occupancyRate: data.summary.averageOccupancy ?? 0,
+                    expiringContracts: data.summary.activeContracts ?? 0, // Backend sends active, map to this
+                    activeUsers: data.summary.totalUsers ?? 0,
+                    totalRooms: data.summary.totalRooms ?? 0,
+                    totalProperties: data.summary.totalProperties ?? 0,
+                    trends: data.trends ?? [],
+                    topPerformers: data.topPerformers
                 };
             } catch (error) {
                 console.error("[Admin] Failed to fetch dashboard stats:", error);
@@ -45,6 +92,11 @@ export function useAdminDashboardStats() {
                     activeUsers: 0,
                     totalRooms: 0,
                     totalProperties: 0,
+                    trends: [],
+                    topPerformers: {
+                        landlords: [],
+                        properties: []
+                    }
                 };
             }
         },
@@ -52,3 +104,4 @@ export function useAdminDashboardStats() {
         retry: 1,
     });
 }
+

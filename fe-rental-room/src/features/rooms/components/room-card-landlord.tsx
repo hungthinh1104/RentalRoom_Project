@@ -162,11 +162,20 @@ export const RoomCardLandlord = memo(function RoomCardLandlord({
           {/* Amenities */}
           {room.amenities && room.amenities.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1">
-              {room.amenities.filter(Boolean).slice(0, 3).map((amenity, index) => (
-                <Badge key={`${amenity}-${index}`} variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal">
-                  {amenity}
-                </Badge>
-              ))}
+              {room.amenities.filter(Boolean).slice(0, 3).map((amenity, index) => {
+                const amenityLabel = typeof amenity === 'object' && amenity !== null
+                  ? (amenity as any).amenityType
+                  : amenity;
+                const amenityKey = typeof amenity === 'object' && amenity !== null
+                  ? (amenity as any).id || index
+                  : `${amenity}-${index}`;
+
+                return (
+                  <Badge key={amenityKey} variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal">
+                    {amenityLabel}
+                  </Badge>
+                );
+              })}
               {room.amenities.length > 3 && (
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal">
                   +{room.amenities.length - 3}

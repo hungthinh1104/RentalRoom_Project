@@ -39,6 +39,13 @@ describe('ContractsService', () => {
     payment: {
       create: jest.fn(),
     },
+    invoice: {
+      create: jest.fn(),
+    },
+
+    paymentConfig: {
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn((callback) => callback(mockPrismaService)),
   };
 
@@ -93,7 +100,18 @@ describe('ContractsService', () => {
 
         mockPrismaService.rentalApplication.create.mockResolvedValue(mockApplication);
 
-        const result = await service.createApplication(createDto as any);
+        const mockUser = {
+          id: 'user-123',
+          email: 'test@example.com',
+          fullName: 'Test User',
+          role: 'TENANT',
+          isEmailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          phoneNumber: '0123456789',
+        };
+
+        const result = await service.createApplication(createDto as any, mockUser as any);
 
         expect(prisma.rentalApplication.create).toHaveBeenCalledWith({
           data: createDto,
@@ -176,7 +194,9 @@ describe('ContractsService', () => {
           residents: [],
         };
 
-        mockPrismaService.contract.findUnique = jest.fn().mockResolvedValue(mockPaymentConfig);
+
+
+        mockPrismaService.paymentConfig.findUnique.mockResolvedValue(mockPaymentConfig);
         mockPrismaService.room.findUnique.mockResolvedValue(mockRoom);
         mockPrismaService.contract.create.mockResolvedValue(mockContract);
         mockPrismaService.contract.count.mockResolvedValue(0);
@@ -198,7 +218,7 @@ describe('ContractsService', () => {
           deposit: 10000000,
         };
 
-        mockPrismaService.contract.findUnique = jest.fn().mockResolvedValue(null);
+        mockPrismaService.paymentConfig.findUnique.mockResolvedValue(null);
 
         await expect(service.create(createDto as any)).rejects.toThrow(BadRequestException);
       });
@@ -225,6 +245,7 @@ describe('ContractsService', () => {
         mockPrismaService.tenant.findUnique.mockResolvedValue({
           user: { email: 'tenant@test.com', fullName: 'Tenant Name' },
         });
+        mockPrismaService.invoice.create.mockResolvedValue({ id: 'inv-1' });
 
         const result = await service.verifyPaymentStatus(contractId);
 

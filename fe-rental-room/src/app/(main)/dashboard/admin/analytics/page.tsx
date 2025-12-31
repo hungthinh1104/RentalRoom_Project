@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { fetchLandlordRatings } from "@/features/admin/api";
+import { fetchLandlordRatings, fetchAdminMarketInsights } from "@/features/admin/api";
+import { Star } from "lucide-react";
 import { Suspense } from "react";
 import { TableSkeleton } from "@/components/skeletons/dashboard-skeleton";
 import {
@@ -11,7 +12,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Star } from "lucide-react";
+import { MarketInsightsClient } from "./market-insights-client";
+
+async function MarketInsights() {
+  const insights = await fetchAdminMarketInsights();
+
+  if (!insights) {
+    return null;
+  }
+
+  return <MarketInsightsClient insights={insights} />;
+}
 
 async function RatingsList() {
   const { data: ratings } = await fetchLandlordRatings();
@@ -74,8 +85,12 @@ export default function AdminAnalyticsPage() {
         <h1 className="text-3xl font-bold text-primary">
           Thống kê & Đánh giá
         </h1>
-        <p className="text-muted-foreground mt-1">Theo dõi đánh giá từ người thuê và phản hồi chủ nhà</p>
+        <p className="text-muted-foreground mt-1">Phân tích thị trường và đánh giá chất lượng</p>
       </div>
+
+      <Suspense fallback={<TableSkeleton rows={6} />}>
+        <MarketInsights />
+      </Suspense>
 
       <Suspense fallback={<TableSkeleton rows={6} />}>
         <RatingsList />

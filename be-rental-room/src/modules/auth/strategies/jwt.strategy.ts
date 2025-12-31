@@ -22,7 +22,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         ExtractJwt.fromAuthHeaderAsBearerToken(),
         (request: Request) => {
           // Try to extract from cookie (for NextAuth compatibility)
-          return request?.cookies?.['access_token'] || request?.cookies?.['next-auth.session-token'] || null;
+          if (request?.cookies) {
+            console.log('[JwtStrategy] Cookies:', Object.keys(request.cookies));
+          }
+          const token = request?.cookies?.['access_token'] || request?.cookies?.['next-auth.session-token'] || null;
+          if (token) console.log('[JwtStrategy] Found token in cookie');
+          return token;
         },
       ]),
       ignoreExpiration: false,

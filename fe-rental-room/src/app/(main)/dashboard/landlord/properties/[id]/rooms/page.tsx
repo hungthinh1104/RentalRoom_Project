@@ -190,8 +190,8 @@ export default function PropertyRoomsPage({
               maxOccupants: editingRoom.maxOccupants ?? undefined,
               status: editingRoom.status,
               description: editingRoom.description || "",
-              amenities: editingRoom.amenities,
-              images: editingRoom.images,
+              amenities: editingRoom.amenities?.filter(Boolean).map((a: any) => a?.type || a?.amenityType || a).filter(Boolean) || [],
+              images: editingRoom.images?.filter(Boolean).map((i: any) => i?.imageUrl || i).filter(Boolean) || [],
             } : undefined}
             onSubmit={handleRoomSubmit}
             onCancel={() => {

@@ -3,15 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { 
-  Facebook, 
-  Twitter, 
-  Instagram, 
-  Mail, 
-  Phone, 
+import {
+  Facebook,
+  Twitter,
+  Instagram,
+  Mail,
+  Phone,
   MapPin,
   Heart
 } from 'lucide-react';
+import { BrandLogo } from '@/components/brand-logo';
 
 const footerLinks = {
   product: [
@@ -68,20 +69,13 @@ export default function Footer() {
             variants={ANIMATION_VARIANTS.fadeInUp}
             className="lg:col-span-2 space-y-6"
           >
-            <Link href="/" className="inline-block">
-              <h3 
-                className="text-2xl font-bold"
-                style={{ color: 'var(--color-foreground)' }}
-              >
-                Rental<span style={{ color: 'var(--color-primary)' }}>Room</span>
-              </h3>
-            </Link>
-            
-            <p 
+            <BrandLogo href="/" size="lg" alwaysShowText />
+
+            <p
               className="text-sm leading-relaxed max-w-sm"
               style={{ color: 'var(--color-muted-foreground)' }}
             >
-              Nền tảng tìm kiếm và quản lý phòng trọ hàng đầu Việt Nam. 
+              Nền tảng tìm kiếm và quản lý phòng trọ hàng đầu Việt Nam.
               Kết nối người thuê và chủ trọ một cách nhanh chóng, an toàn và hiệu quả.
             </p>
 
@@ -145,7 +139,7 @@ export default function Footer() {
             variants={ANIMATION_VARIANTS.fadeInUp}
             transition={{ delay: 0.1 }}
           >
-            <h4 
+            <h4
               className="font-semibold mb-4"
               style={{ color: 'var(--color-foreground)' }}
             >
@@ -182,7 +176,7 @@ export default function Footer() {
             variants={ANIMATION_VARIANTS.fadeInUp}
             transition={{ delay: 0.2 }}
           >
-            <h4 
+            <h4
               className="font-semibold mb-4"
               style={{ color: 'var(--color-foreground)' }}
             >
@@ -219,7 +213,7 @@ export default function Footer() {
             variants={ANIMATION_VARIANTS.fadeInUp}
             transition={{ delay: 0.3 }}
           >
-            <h4 
+            <h4
               className="font-semibold mb-4"
               style={{ color: 'var(--color-foreground)' }}
             >
@@ -251,25 +245,25 @@ export default function Footer() {
       </div>
 
       {/* Bottom Bar */}
-      <div 
+      <div
         className="border-t"
         style={{ borderColor: 'var(--color-border)' }}
       >
         <div className="container mx-auto max-w-7xl px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-            <p 
+            <p
               className="text-sm text-center md:text-left"
               style={{ color: 'var(--color-muted-foreground)' }}
             >
               © {currentYear} RentalRoom. All rights reserved.
             </p>
-            
+
             <div className="flex items-center gap-2 text-sm">
               <span style={{ color: 'var(--color-muted-foreground)' }}>
                 Made with
               </span>
-              <Heart 
-                className="w-4 h-4 fill-current animate-pulse" 
+              <Heart
+                className="w-4 h-4 fill-current animate-pulse"
                 style={{ color: 'var(--color-primary)' }}
               />
               <span style={{ color: 'var(--color-muted-foreground)' }}>

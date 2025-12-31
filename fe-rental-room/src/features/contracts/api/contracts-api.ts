@@ -7,6 +7,27 @@ import type {
 	PaginationParams,
 } from '@/types';
 
+// PDF download
+export const getContractPdf = async (contractId: string) => {
+	const response = await fetch(`/api/v1/contracts/${contractId}/pdf`, {
+		method: 'GET',
+		headers: {
+			// Assuming auth token is handled globally via cookies
+		},
+	});
+	if (!response.ok) {
+		const error = await response.text();
+		throw new Error(`Failed to fetch PDF: ${error}`);
+	}
+	const blob = await response.blob();
+	const url = window.URL.createObjectURL(blob);
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = `contract-${contractId}.pdf`;
+	a.click();
+	window.URL.revokeObjectURL(url);
+};
+
 export const contractsApi = {
 	// Applications
 	async createApplication(dto: {
@@ -64,6 +85,26 @@ export const contractsApi = {
 		const { data } = await api.patch<Contract>(
 			`/contracts/${contractId}/tenant-approve`,
 		);
+		return data;
+	},
+
+	async sendContract(contractId: string) {
+		const { data } = await api.patch<Contract>(`/contracts/${contractId}/send`);
+		return data;
+	},
+
+	async verifyPaymentStatus(id: string) {
+		const { data } = await api.get<{ success: boolean; status: string }>(`/contracts/${id}/payment-status`);
+		return data;
+	},
+
+	async revokeContract(id: string) {
+		const { data } = await api.patch<Contract>(`/contracts/${id}/revoke`);
+		return data;
+	},
+
+	async requestChanges(id: string, reason: string) {
+		const { data } = await api.patch<Contract>(`/contracts/${id}/request-changes`, { reason });
 		return data;
 	},
 

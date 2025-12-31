@@ -6,6 +6,7 @@ import { ContractsService } from './contracts.service';
 import { ContractSchedulerService } from './contract-scheduler.service';
 import { ContractSigningService } from './services/contract-signing.service';
 import { PdfQueueService } from './services/pdf-queue.service';
+import { ContractPdfService } from './contract-pdf.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from 'src/common/common.module';
 
@@ -19,6 +20,7 @@ import { PaymentsModule } from '../payments/payments.module';
     ContractSchedulerService,
     ContractSigningService,
     PdfQueueService,
+    ContractPdfService,
     PrismaService,
   ],
   exports: [ContractsService, ContractSigningService],

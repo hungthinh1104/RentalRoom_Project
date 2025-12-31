@@ -3,7 +3,9 @@ import { NotFoundException } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { TestDataFactory } from '../../../test/utils/test-data.factory';
+
 import { PropertyType } from './entities/property.entity';
+import { CacheService } from '../../common/services/cache.service';
 
 describe('PropertiesService', () => {
   let service: PropertiesService;
@@ -20,6 +22,13 @@ describe('PropertiesService', () => {
     },
   };
 
+  const mockCacheService = {
+    invalidateRoomCache: jest.fn(),
+    invalidatePropertyCache: jest.fn(),
+    get: jest.fn(),
+    set: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -27,6 +36,10 @@ describe('PropertiesService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: CacheService,
+          useValue: mockCacheService,
         },
       ],
     }).compile();
@@ -128,6 +141,7 @@ describe('PropertiesService', () => {
           _count: {
             select: { rooms: true },
           },
+          rooms: true,
         },
       });
     });

@@ -55,13 +55,13 @@ const quickActions = [
 export default function TenantDashboardPage() {
   const { data: session } = useSession();
   const name = session?.user?.fullName || session?.user?.name || "bạn";
-  const { contractsQuery, paymentsQuery, recommendationsQuery, favoritesQuery } = useTenantDashboard();
+  const { contractsQuery, paymentsQuery, recommendationsQuery, favoritesQuery, maintenanceQuery, bookingsQuery } = useTenantDashboard();
 
   const stats = {
-    bookings: 2, // chưa có endpoint booking; giữ số tạm
+    bookings: bookingsQuery.data?.total ?? 0,
     contracts: contractsQuery.data?.total ?? 0,
     payments: paymentsQuery.data?.total ?? 0,
-    maintenance: 0, // chưa có endpoint maintenance; giữ số tạm
+    maintenance: maintenanceQuery.data?.total ?? 0,
   };
 
   return (

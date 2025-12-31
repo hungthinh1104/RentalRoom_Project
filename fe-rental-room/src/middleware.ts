@@ -4,6 +4,7 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(request: NextRequest) {
 	const { pathname } = request.nextUrl;
 	const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+	console.log(`[Middleware] Path: ${pathname}, Token found: ${!!token}, Role: ${token?.role}`); // DEBUG LOG
 
 	const authRoutes = ["/login", "/register"];
 	const protectedRoutes = ["/dashboard", "/profile", "/properties", "/rooms"];
@@ -11,44 +12,51 @@ export async function middleware(request: NextRequest) {
 	const isProtectedRoute = protectedRoutes.some((route) => pathname.startsWith(route));
 
 	// Role-based route checks
-	const isAdminRoute = pathname.startsWith("/dashboard/admin");
-	const isLandlordRoute = pathname.startsWith("/dashboard/landlord");
-	const isTenantRoute = pathname.startsWith("/dashboard/tenant");
+	// const isAdminRoute = pathname.startsWith("/dashboard/admin");
+	// const isLandlordRoute = pathname.startsWith("/dashboard/landlord");
+	// const isTenantRoute = pathname.startsWith("/dashboard/tenant");
+
+	let response = NextResponse.next();
 
 	// Redirect anonymous users away from protected areas
 	if (isProtectedRoute && !token) {
-		return NextResponse.redirect(new URL("/login", request.url));
+		response = NextResponse.redirect(new URL("/login", request.url));
 	}
-
 	// ======== ROLE-BASED ACCESS CONTROL ========
-
 	// Admin routes - ONLY for ADMIN role
-	if (isAdminRoute && token?.role !== "ADMIN") {
-		return NextResponse.redirect(new URL("/unauthorized", request.url));
-	}
-
-	// Landlord routes - ONLY for LANDLORD role
-	if (isLandlordRoute && token?.role !== "LANDLORD") {
-		return NextResponse.redirect(new URL("/unauthorized", request.url));
-	}
-
-	// Tenant routes - ONLY for TENANT role
-	if (isTenantRoute && token?.role !== "TENANT") {
-		return NextResponse.redirect(new URL("/unauthorized", request.url));
-	}
-
+	// else if (isAdminRoute && token?.role !== "ADMIN") {
+	// 	response = NextResponse.redirect(new URL("/unauthorized", request.url));
+	// }
+	// // Landlord routes - ONLY for LANDLORD role
+	// else if (isLandlordRoute && token?.role !== "LANDLORD") {
+	// 	response = NextResponse.redirect(new URL("/unauthorized", request.url));
+	// }
+	// // Tenant routes - ONLY for TENANT role
+	// else if (isTenantRoute && token?.role !== "TENANT") {
+	// 	response = NextResponse.redirect(new URL("/unauthorized", request.url));
+	// }
 	// Redirect signed-in users away from auth pages (to their appropriate dashboard)
-	if (isAuthRoute && token) {
+	else if (isAuthRoute && token) {
 		const redirectMap = {
 			ADMIN: "/dashboard/admin",
 			LANDLORD: "/dashboard/landlord",
 			TENANT: "/dashboard/tenant",
 		};
 		const dashboardUrl = redirectMap[token.role as keyof typeof redirectMap] || "/dashboard";
-		return NextResponse.redirect(new URL(dashboardUrl, request.url));
+		response = NextResponse.redirect(new URL(dashboardUrl, request.url));
 	}
 
-	return NextResponse.next();
+	// SYNC BACKEND TOKEN: Set access_token cookie for the browser to use in API calls
+	if (token?.accessToken) {
+		response.cookies.set('access_token', token.accessToken as string, {
+			httpOnly: true,
+			secure: process.env.NODE_ENV === 'production',
+			sameSite: 'lax',
+			path: '/',
+		});
+	}
+
+	return response;
 }
 
 export const config = {

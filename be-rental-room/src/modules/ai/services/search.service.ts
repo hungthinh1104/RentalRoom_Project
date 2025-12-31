@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
+import { AnalysisService } from './analysis.service';
 import { EmbeddingService } from './embedding.service';
 import { CacheService } from 'src/common/services/cache.service';
 
@@ -16,7 +17,8 @@ export class SearchService {
     private readonly prisma: PrismaService,
     private readonly embeddingService: EmbeddingService,
     private readonly cacheService: CacheService,
-  ) {}
+    private readonly analysisService: AnalysisService, // Injected
+  ) { }
 
   /**
    * Semantic search using vector similarity
@@ -28,9 +30,31 @@ export class SearchService {
    */
   async semanticSearch(query: string, limit: number = 12) {
     try {
-      // Skip embedding generation for now - would require Gemini API
-      // In production, you would generate embeddings and compare vectors
-      // const queryEmbedding = await this.embeddingService.generateEmbedding(query);
+      // Step 1: Analyze query to extract structured filters (Price, Area, Location)
+      // This fixes the issue where "dưới 3 triệu" is treated as keywords instead of a logical filter
+      const { filters, cleanedQuery } = await this.analysisService.analyzeSearchQuery(query);
+
+      // Step 2: If significant filters are found, use Hybrid Search for accuracy
+      const hasFilters =
+        filters.minPrice !== undefined ||
+        filters.maxPrice !== undefined ||
+        filters.minArea !== undefined ||
+        filters.maxArea !== undefined ||
+        filters.location !== undefined ||
+        (filters.amenities && filters.amenities.length > 0);
+
+      if (hasFilters) {
+        this.logger.log(`Smart routing to Hybrid Search: ${JSON.stringify(filters)}`);
+
+        // If location is detected, append it to the query for text matching valid rooms in that area
+        const effectiveQuery = filters.location
+          ? `${cleanedQuery} ${filters.location}`.trim()
+          : cleanedQuery || query; // Fallback to original query if cleaned is empty
+
+        return this.hybridSearch(effectiveQuery, filters, limit);
+      }
+
+      // Step 3: Fallback to existing keyword/vector search logic if no filters
 
       // Fetch all available rooms with relations
       const rooms = await this.prisma.room.findMany({
@@ -141,23 +165,23 @@ export class SearchService {
         status: 'AVAILABLE',
       };
 
-      if (filters?.minPrice !== undefined || filters?.maxPrice !== undefined) {
+      if (filters?.minPrice != null || filters?.maxPrice != null) {
         where.pricePerMonth = {};
-        if (filters?.minPrice !== undefined) {
-          where.pricePerMonth.gte = filters.minPrice;
+        if (filters?.minPrice != null) {
+          where.pricePerMonth.gte = Number(filters.minPrice);
         }
-        if (filters?.maxPrice !== undefined) {
-          where.pricePerMonth.lte = filters.maxPrice;
+        if (filters?.maxPrice != null) {
+          where.pricePerMonth.lte = Number(filters.maxPrice);
         }
       }
 
-      if (filters?.minArea !== undefined || filters?.maxArea !== undefined) {
+      if (filters?.minArea != null || filters?.maxArea != null) {
         where.area = {};
-        if (filters?.minArea !== undefined) {
-          where.area.gte = filters.minArea;
+        if (filters?.minArea != null) {
+          where.area.gte = Number(filters.minArea);
         }
-        if (filters?.maxArea !== undefined) {
-          where.area.lte = filters.maxArea;
+        if (filters?.maxArea != null) {
+          where.area.lte = Number(filters.maxArea);
         }
       }
 

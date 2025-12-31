@@ -45,6 +45,7 @@ export enum ContractStatus {
 	ACTIVE = 'ACTIVE',
 	TERMINATED = 'TERMINATED',
 	EXPIRED = 'EXPIRED',
+	CANCELLED = 'CANCELLED',
 }
 
 export enum InvoiceStatus {

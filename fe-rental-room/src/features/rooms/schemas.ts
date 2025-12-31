@@ -10,7 +10,7 @@ export const roomSchema = z.object({
   maxOccupants: z.number().int().positive("Max occupants must be positive").optional(),
   status: z.nativeEnum(RoomStatus).optional().default(RoomStatus.AVAILABLE),
   description: z.string().optional(),
-  images: z.array(z.string().url("URL không hợp lệ")).optional().default([]),
+  images: z.array(z.string()).optional().default([]),
   amenities: z.array(z.nativeEnum(AmenityType)).optional().default([]),
 });
 

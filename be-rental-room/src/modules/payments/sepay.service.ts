@@ -37,7 +37,7 @@ export class SepayService {
                 return false;
             }
 
-            // API: /transactions/list?contains=CONTENT&limit=20
+            // API: /transactions/list?limit=50
             const url = `${this.baseUrl}/transactions/list`;
             const response = await lastValueFrom(
                 this.httpService.get(url, {
@@ -46,8 +46,7 @@ export class SepayService {
                         'Content-Type': 'application/json',
                     },
                     params: {
-                        contains: paymentRef,
-                        limit: 20, // Check recent 20 transactions
+                        limit: 50, // Check recent 50 transactions
                     },
                 }),
             );
@@ -57,12 +56,24 @@ export class SepayService {
                 return false;
             }
 
-            // 3. Find matching transaction (amount >= expected)
-            // Note: SePay amount_in is a string or number, ensure parsing
+            // 3. Find matching transaction
+            const normalizedRef = paymentRef.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
             const validTransaction = transactions.find((trans: any) => {
                 const amountIn = parseFloat(trans.amount_in);
-                // Allow small margin of error or exact match? >= is safer
-                return amountIn >= expectedAmount;
+                const content = trans.transaction_content || "";
+
+                const normalizedContent = content.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+
+                // Check if content contains paymentRef (normalized)
+                const isContentMatch = normalizedContent.includes(normalizedRef);
+
+                // Check amount (allow small difference? No, precise match or greater)
+                const isAmountMatch = amountIn >= expectedAmount;
+
+                this.logger.debug(`Checking trans: ${content} (${amountIn}) vs Ref: ${paymentRef} (${expectedAmount}) -> Match: ${isContentMatch && isAmountMatch}`);
+
+                return isContentMatch && isAmountMatch;
             });
 
             if (validTransaction) {

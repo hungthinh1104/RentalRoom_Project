@@ -41,11 +41,21 @@ export interface Room {
     tenantName?: string;
 }
 
-interface PaginatedResponse<T> {
+export interface PaginatedResponse<T> {
     items: T[];
     total: number;
     page: number;
     limit: number;
+}
+
+interface BackendPaginatedResponse<T> {
+    data: T[];
+    meta: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
 }
 
 /**
@@ -60,7 +70,7 @@ export function useAdminProperties(params: { page?: number; search?: string } = 
             const queryParams: Record<string, unknown> = { page, limit: 10 };
             if (search) queryParams.search = search;
 
-            const { data } = await api.get<Property[] | PaginatedResponse<Property>>("/properties", { params: queryParams });
+            const { data } = await api.get<Property[] | BackendPaginatedResponse<Property>>("/properties", { params: queryParams });
 
             // Normalize response
             if (Array.isArray(data)) {
@@ -73,10 +83,10 @@ export function useAdminProperties(params: { page?: number; search?: string } = 
             }
 
             return {
-                items: (data.items || []).map(normalizeProperty),
-                total: data.total || 0,
-                page: data.page || 1,
-                limit: data.limit || 10,
+                items: (data.data || []).map(normalizeProperty),
+                total: data.meta?.total || 0,
+                page: data.meta?.page || 1,
+                limit: data.meta?.limit || 10,
             };
         },
         staleTime: 30 * 1000,
@@ -98,7 +108,7 @@ export function useAdminRooms(params: { page?: number; search?: string; status?:
             if (status) queryParams.status = status;
             if (propertyId) queryParams.propertyId = propertyId;
 
-            const { data } = await api.get<Room[] | PaginatedResponse<Room>>("/rooms", { params: queryParams });
+            const { data } = await api.get<Room[] | BackendPaginatedResponse<Room>>("/rooms", { params: queryParams });
 
             if (Array.isArray(data)) {
                 return {
@@ -110,10 +120,10 @@ export function useAdminRooms(params: { page?: number; search?: string; status?:
             }
 
             return {
-                items: (data.items || []).map(normalizeRoom),
-                total: data.total || 0,
-                page: data.page || 1,
-                limit: data.limit || 10,
+                items: (data.data || []).map(normalizeRoom),
+                total: data.meta?.total || 0,
+                page: data.meta?.page || 1,
+                limit: data.meta?.limit || 10,
             };
         },
         staleTime: 30 * 1000,

@@ -1,65 +1,115 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { favoritesApi } from '../api/favorites-api';
+import { useSession } from 'next-auth/react';
+
+// Global cache for favorite IDs to avoid multiple API calls
+let favoritesCache: Set<string> | null = null;
+let cachePromise: Promise<void> | null = null;
+
+async function loadFavoritesCache(): Promise<Set<string>> {
+  if (favoritesCache !== null) return favoritesCache;
+
+  if (cachePromise) {
+    await cachePromise;
+    return favoritesCache ?? new Set();
+  }
+
+  cachePromise = (async () => {
+    try {
+      const favorites = await favoritesApi.getFavorites();
+      favoritesCache = new Set(favorites.map((f) => f.id));
+    } catch {
+      favoritesCache = new Set();
+    }
+  })();
+
+  await cachePromise;
+  cachePromise = null;
+  return favoritesCache ?? new Set();
+}
+
+// Invalidate cache when toggling
+function invalidateFavoritesCache() {
+  favoritesCache = null;
+}
 
 export function useFavorite(roomId: string) {
   const [isFavorite, setIsFavorite] = useState<boolean>(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { status } = useSession();
 
   useEffect(() => {
     let mounted = true;
-    try {
-      const raw = localStorage.getItem('favorites') || '[]';
-      const favs: string[] = JSON.parse(raw);
-      const isFav = favs.includes(roomId);
-      // Defer state update to avoid synchronous setState in effect
-      setTimeout(() => {
-        if (mounted) setIsFavorite(isFav);
-      }, 0);
-    } catch {
-      setTimeout(() => {
-        if (mounted) setIsFavorite(false);
-      }, 0);
+
+    // Only fetch if user is authenticated
+    if (status !== 'authenticated') {
+      setLoading(false);
+      return;
     }
+
+    loadFavoritesCache().then((cache) => {
+      if (mounted) {
+        setIsFavorite(cache.has(roomId));
+        setLoading(false);
+      }
+    });
+
     return () => {
       mounted = false;
     };
-  }, [roomId]);
-
-  const updateLocal = useCallback((id: string, add: boolean) => {
-    try {
-      const raw = localStorage.getItem('favorites') || '[]';
-      const favs: string[] = JSON.parse(raw);
-      let next = favs.slice();
-      if (add) {
-        if (!next.includes(id)) next.push(id);
-      } else {
-        next = next.filter((x) => x !== id);
-      }
-      localStorage.setItem('favorites', JSON.stringify(next));
-    } catch {
-      // ignore localStorage errors
-    }
-  }, []);
+  }, [roomId, status]);
 
   const toggle = useCallback(async () => {
     const prev = isFavorite;
-    // optimistic
+    // Optimistic update
     setIsFavorite(!prev);
-    updateLocal(roomId, !prev);
-    setLoading(true);
+
     try {
-      await favoritesApi.toggleFavorite(roomId);
-      setLoading(false);
+      const result = await favoritesApi.toggleFavorite(roomId);
+      setIsFavorite(result.favorited);
+
+      // Invalidate cache after successful toggle
+      invalidateFavoritesCache();
     } catch {
-      // rollback
+      // Rollback on error
       setIsFavorite(prev);
-      updateLocal(roomId, prev);
-      setLoading(false);
       toast({ title: 'Lỗi', description: 'Không thể cập nhật yêu thích', variant: 'destructive' });
     }
-  }, [isFavorite, roomId, updateLocal, toast]);
+  }, [isFavorite, roomId, toast]);
 
   return { isFavorite, toggle, loading } as const;
+}
+
+// Hook to get all favorites (for favorites page)
+export function useFavorites() {
+  const [favorites, setFavorites] = useState<Awaited<ReturnType<typeof favoritesApi.getFavorites>>>([]);
+  const [loading, setLoading] = useState(true);
+  const { status } = useSession();
+
+  const refresh = useCallback(async () => {
+    if (status !== 'authenticated') {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await favoritesApi.getFavorites();
+      setFavorites(data);
+      // Update cache
+      favoritesCache = new Set(data.map((f) => f.id));
+    } catch {
+      setFavorites([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { favorites, loading, refresh } as const;
 }

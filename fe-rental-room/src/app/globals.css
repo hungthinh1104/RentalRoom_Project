@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
@@ -9,22 +8,30 @@
 :root {
   /* Typography */
   --font-size: 16px;
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family: var(--font-inter), 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-weight-light: 300;
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
 
   /* Primary Brand Colors */
-  --primary: #FF385C;           /* Rausch (Airbnb Pink) */
-  --primary-hover: #E31C5F;     /* Darker pink for hover states */
-  --primary-light: #FFE7EB;     /* Light pink for backgrounds */
+  --primary: #FF385C;
+  /* Rausch (Airbnb Pink) */
+  --primary-hover: #E31C5F;
+  /* Darker pink for hover states */
+  --primary-light: #FFE7EB;
+  /* Light pink for backgrounds */
   --primary-foreground: #FFFFFF;
 
-  /* Neutral Grays */        /* White */        /* Almost Black */
-  --muted: oklch(0.97 0 0);            /* Light Gray */
-  --muted-foreground: oklch(0.556 0 0);  /* Medium Gray */
-  --border: oklch(0.922 0 0);           /* Border Gray */
+  /* Neutral Grays */
+  /* White */
+  /* Almost Black */
+  --muted: oklch(0.97 0 0);
+  /* Light Gray */
+  --muted-foreground: oklch(0.556 0 0);
+  /* Medium Gray */
+  --border: oklch(0.922 0 0);
+  /* Border Gray */
 
   /* UI Surfaces */
   --card: oklch(1 0 0);
@@ -39,19 +46,23 @@
   --accent-foreground: oklch(0.205 0 0);
 
   /* Status Colors */
-  --success: #00A699;          /* Teal - successful actions */
+  --success: #00A699;
+  /* Teal - successful actions */
   --success-light: #E0F7F5;
   --success-foreground: #ffffff;
 
-  --warning: #FC642D;          /* Orange - warnings */
+  --warning: #FC642D;
+  /* Orange - warnings */
   --warning-light: #FFF0E6;
   --warning-foreground: #ffffff;
 
-  --destructive: oklch(0.577 0.245 27.325);      /* Red - errors/destructive actions */
+  --destructive: oklch(0.577 0.245 27.325);
+  /* Red - errors/destructive actions */
   --destructive-light: #FFE8E8;
   --destructive-foreground: #ffffff;
 
-  --info: #1E90FF;             /* Blue - information */
+  --info: #1E90FF;
+  /* Blue - information */
   --info-light: #E6F2FF;
   --info-foreground: #ffffff;
 
@@ -67,26 +78,39 @@
   --selection: #FFE7EB;
 
   /* Charts */
-  --chart-1: oklch(0.646 0.222 41.116);          /* Primary Pink */
-  --chart-2: oklch(0.6 0.118 184.704);          /* Teal */
-  --chart-3: oklch(0.398 0.07 227.392);          /* Orange */
-  --chart-4: oklch(0.828 0.189 84.429);          /* Dark Gray */
-  --chart-5: oklch(0.769 0.188 70.08);          /* Medium Gray */
+  --chart-1: oklch(0.646 0.222 41.116);
+  /* Primary Pink */
+  --chart-2: oklch(0.6 0.118 184.704);
+  /* Teal */
+  --chart-3: oklch(0.398 0.07 227.392);
+  /* Orange */
+  --chart-4: oklch(0.828 0.189 84.429);
+  /* Dark Gray */
+  --chart-5: oklch(0.769 0.188 70.08);
+  /* Medium Gray */
 
   /* Border Radius */
   --radius: 0.625rem;
 
   /* Spacing System - Consistent Padding & Margins */
-  --spacing-page: 2rem;              /* 32px - Main page container padding */
-  --spacing-section: 1.5rem;         /* 24px - Section spacing */
-  --spacing-card: 1.5rem;            /* 24px - Card internal padding */
-  --spacing-card-compact: 1rem;      /* 16px - Compact card padding */
-  --spacing-element: 0.75rem;        /* 12px - Element spacing */
-  --spacing-tight: 0.5rem;           /* 8px - Tight spacing */
+  --spacing-page: 2rem;
+  /* 32px - Main page container padding */
+  --spacing-section: 1.5rem;
+  /* 24px - Section spacing */
+  --spacing-card: 1.5rem;
+  /* 24px - Card internal padding */
+  --spacing-card-compact: 1rem;
+  /* 16px - Compact card padding */
+  --spacing-element: 0.75rem;
+  /* 12px - Element spacing */
+  --spacing-tight: 0.5rem;
+  /* 8px - Tight spacing */
 
   /* Layout Heights */
-  --height-header: 4rem;             /* 64px - Header height */
-  --height-sidebar-item: 2.5rem;     /* 40px - Sidebar menu item height */
+  --height-header: 4rem;
+  /* 64px - Header height */
+  --height-sidebar-item: 2.5rem;
+  /* 40px - Sidebar menu item height */
 
   /* Z-Index Scale */
   --z-base: 1;
@@ -108,8 +132,10 @@
   --sidebar-ring: oklch(0.708 0 0);
 
   /* Gradient Page Background */
-  --page-gradient-from: #FFF0F5; /* pink-50 equivalent */
-  --page-gradient-to: #FFE4E6;   /* rose-100 equivalent */
+  --page-gradient-from: #FFF0F5;
+  /* pink-50 equivalent */
+  --page-gradient-to: #FFE4E6;
+  /* rose-100 equivalent */
 
   /* Glassmorphism */
   --glass-bg: rgba(255, 255, 255, 0.8);
@@ -124,17 +150,25 @@
    ============================================ */
 .dark {
   /* Primary Brand Colors */
-  --primary: #FF385C;           /* Keep brand color consistent */
-  --primary-hover: #FF5A7A;     /* Lighter pink for dark mode hover */
-  --primary-light: #3D1B25;     /* Dark pink background */
+  --primary: #FF385C;
+  /* Keep brand color consistent */
+  --primary-hover: #FF5A7A;
+  /* Lighter pink for dark mode hover */
+  --primary-light: #3D1B25;
+  /* Dark pink background */
   --primary-foreground: #FFFFFF;
 
   /* Neutral Grays */
-  --background: oklch(0.145 0 0);        /* True Dark */
-  --foreground: oklch(0.985 0 0);        /* Light Gray Text */
-  --muted: oklch(0.269 0 0);            /* Dark Surface */
-  --muted-foreground: oklch(0.708 0 0);  /* Medium Gray Text */
-  --border: oklch(1 0 0 / 10%);           /* Dark Border */
+  --background: oklch(0.145 0 0);
+  /* True Dark */
+  --foreground: oklch(0.985 0 0);
+  /* Light Gray Text */
+  --muted: oklch(0.269 0 0);
+  /* Dark Surface */
+  --muted-foreground: oklch(0.708 0 0);
+  /* Medium Gray Text */
+  --border: oklch(1 0 0 / 10%);
+  /* Dark Border */
 
   /* UI Surfaces */
   --card: oklch(0.205 0 0);
@@ -149,19 +183,23 @@
   --accent-foreground: oklch(0.985 0 0);
 
   /* Status Colors */
-  --success: #00C8B8;          /* Brighter Teal for dark mode */
+  --success: #00C8B8;
+  /* Brighter Teal for dark mode */
   --success-light: #1A3A37;
   --success-foreground: #000000;
 
-  --warning: #FF7A47;          /* Brighter Orange for dark mode */
+  --warning: #FF7A47;
+  /* Brighter Orange for dark mode */
   --warning-light: #3D2617;
   --warning-foreground: #000000;
 
-  --destructive: oklch(0.704 0.191 22.216);      /* Brighter Red for dark mode */
+  --destructive: oklch(0.704 0.191 22.216);
+  /* Brighter Red for dark mode */
   --destructive-light: #3D1A1A;
   --destructive-foreground: #000000;
 
-  --info: #4DA6FF;             /* Brighter Blue for dark mode */
+  --info: #4DA6FF;
+  /* Brighter Blue for dark mode */
   --info-light: #1A2E3D;
   --info-foreground: #000000;
 
@@ -177,11 +215,16 @@
   --selection: #3D1B25;
 
   /* Charts */
-  --chart-1: oklch(0.488 0.243 264.376);          /* Primary Pink */
-  --chart-2: oklch(0.696 0.17 162.48);          /* Brighter Teal */
-  --chart-3: oklch(0.769 0.188 70.08);          /* Brighter Orange */
-  --chart-4: oklch(0.627 0.265 303.9);          /* Light Gray */
-  --chart-5: oklch(0.645 0.246 16.439);          /* Medium Gray */
+  --chart-1: oklch(0.488 0.243 264.376);
+  /* Primary Pink */
+  --chart-2: oklch(0.696 0.17 162.48);
+  /* Brighter Teal */
+  --chart-3: oklch(0.769 0.188 70.08);
+  /* Brighter Orange */
+  --chart-4: oklch(0.627 0.265 303.9);
+  /* Light Gray */
+  --chart-5: oklch(0.645 0.246 16.439);
+  /* Medium Gray */
 
   /* Sidebar */
   --sidebar: oklch(0.205 0 0);
@@ -194,8 +237,9 @@
   --sidebar-ring: oklch(0.556 0 0);
 
   /* Gradient Page Background */
-  --page-gradient-from: #121212; 
-  --page-gradient-to: #2A0A12;   /* Dark red tone */
+  --page-gradient-from: #121212;
+  --page-gradient-to: #2A0A12;
+  /* Dark red tone */
 
   /* Glassmorphism */
   --glass-bg: rgba(30, 30, 30, 0.7);
@@ -293,8 +337,6 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-family);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
     letter-spacing: -0.011em;
   }
 }
@@ -353,7 +395,9 @@
       letter-spacing: -0.011em;
     }
 
-    input, textarea, select {
+    input,
+    textarea,
+    select {
       font-size: var(--text-base);
       font-weight: var(--font-weight-normal);
       line-height: 1.5;

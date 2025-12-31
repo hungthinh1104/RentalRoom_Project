@@ -99,9 +99,41 @@ export function PaymentStatusPoller({
         toast.success(`Đã sao chép ${label}`);
     };
 
-    // QR Code URL (using SePay or VietQR generic format)
-    // Format: https://img.vietqr.io/image/<BANK>-<ACCOUNT>-<TEMPLATE>.png?amount=<AMOUNT>&addInfo=<CONTENT>
-    const qrUrl = `https://img.vietqr.io/image/${bankName}-${accountNumber}-compact.png?amount=${amount}&addInfo=${paymentRef}`;
+    // Helper to map bank names to SePay supported codes/names
+    const getBankCode = (bankName: string | undefined | null): string => {
+        if (!bankName) return "";
+        const name = bankName.toLowerCase().trim();
+        const map: Record<string, string> = {
+            "vietinbank": "ICB",
+            "vietcombank": "VCB",
+            "bidv": "BIDV",
+            "agribank": "VBA",
+            "ocb": "OCB",
+            "mbbank": "MB",
+            "mb": "MB",
+            "techcombank": "TCB",
+            "acb": "ACB",
+            "vpbank": "VPB",
+            "tpbank": "TPB",
+            "sacombank": "STB",
+            "hdbank": "HDB",
+            "vib": "VIB",
+            "shb": "SHB",
+            "eximbank": "EIB",
+            "msb": "MSB",
+            "seabank": "SEAB",
+            "lienvietpostbank": "LPB",
+            "lpb": "LPB",
+        };
+        // Return mapped code or original if not found (fallback)
+        return map[name] || bankName.split(' ')[0].toUpperCase();
+    };
+
+    // QR Code URL (using SePay)
+    // Structure: https://qr.sepay.vn/img?acc=ACCOUNT&bank=BANK&amount=AMOUNT&des=CONTENT&template=compact
+    const bankCode = getBankCode(bankName);
+    const qrDescription = paymentRef; // Noi dung chuyen khoan
+    const qrUrl = `https://qr.sepay.vn/img?bank=${encodeURIComponent(bankCode)}&acc=${encodeURIComponent(accountNumber)}&template=compact&amount=${amount}&des=${encodeURIComponent(qrDescription)}`;
 
     if (data?.status === "ACTIVE") {
         return (
@@ -144,7 +176,7 @@ export function PaymentStatusPoller({
                         <div className="relative w-48 h-48">
                             <Image
                                 src={qrUrl}
-                                alt="VietQR Code"
+                                alt="SePay QR Code"
                                 fill
                                 className="object-contain"
                                 unoptimized
@@ -159,7 +191,7 @@ export function PaymentStatusPoller({
                     <div className="space-y-4">
                         <div className="space-y-1">
                             <label className="text-xs font-semibold uppercase text-muted-foreground">Ngân hàng</label>
-                            <div className="text-lg font-medium">{bankName}</div>
+                            <div className="text-lg font-medium">{bankName} ({bankCode})</div>
                         </div>
 
                         <div className="space-y-1">

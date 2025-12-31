@@ -149,6 +149,7 @@ describe('TenantsService', () => {
       expect(result).toBeDefined();
       expect(prismaService.tenant.findUnique).toHaveBeenCalledWith({
         where: { userId: mockTenant.userId },
+        include: { user: true },
       });
     });
 

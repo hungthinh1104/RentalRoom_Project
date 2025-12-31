@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3005';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -41,6 +41,7 @@ export const authOptions: NextAuthOptions = {
             email: user.email,
             name: user.name,
             role: user.role,
+            accessToken: user.access_token, // Capture token from backend
           };
         } catch (error) {
           console.error("[NextAuth] Auth error:", error);
@@ -53,16 +54,20 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       // On initial sign-in, store user data in JWT
       if (user) {
+        console.log('[NextAuth] JWT Callback - User:', user);
         token.id = user.id;
         token.role = user.role;
+        token.accessToken = (user as any).accessToken; // Store backend token
       }
       return token;
     },
     async session({ session, token }) {
       // Pass user data to client session
+      console.log('[NextAuth] Session Callback - Token:', token);
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        (session as any).accessToken = token.accessToken; // Pass to client
       }
       return session;
     },

@@ -125,7 +125,7 @@ export function RoomForm({
         </div>
       )}
 
-      <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-6">
+      <form onSubmit={handleSubmit(handleSubmitForm, (errors) => console.error("Form validation errors:", errors))} className="space-y-6">
         {/* Hidden Fields */}
         <input type="hidden" {...form.register("propertyId")} />
 

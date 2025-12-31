@@ -48,6 +48,12 @@ const getStatusConfig = (status: ContractStatus) => {
                 className: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-800",
                 icon: CalendarX,
             };
+        case ContractStatus.CANCELLED:
+            return {
+                label: "Đã hủy",
+                className: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700",
+                icon: XCircle,
+            };
         default:
             return {
                 label: "Không rõ",

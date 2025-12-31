@@ -51,11 +51,13 @@ export class RoomsService {
     // Invalidate cache
     await this.cacheService.invalidateRoomCache();
 
-    // Convert Prisma Decimal objects to numbers before transformation
+    // Convert Prisma Decimal objects to numbers and map relations
     const roomData = {
       ...room,
       pricePerMonth: room.pricePerMonth ? Number(room.pricePerMonth) : null,
       deposit: room.deposit ? Number(room.deposit) : null,
+      images: room.images?.map((img) => img.imageUrl) || [],
+      amenities: room.amenities?.map((amenity) => amenity.amenityType) || [],
     };
 
     return plainToClass(RoomResponseDto, roomData, {
@@ -219,8 +221,8 @@ export class RoomsService {
         reviewCount: reviewStats.reviewCount,
         isFavorited: favoriteRoomIds.has(room.id),
         // Transform images and amenities to arrays
-        images: room.images?.map((img) => img.imageUrl) || [],
-        amenities: room.amenities?.map((amenity) => amenity.amenityType) || [],
+        images: room.images || [],
+        amenities: room.amenities || [],
         _count: undefined, // Remove internal field
       };
 
@@ -282,6 +284,8 @@ export class RoomsService {
       deposit: room.deposit ? Number(room.deposit) : undefined,
       area: room.area ? Number(room.area) : undefined,
       isFavorited,
+      images: room.images?.map((img) => img.imageUrl) || [],
+      amenities: room.amenities?.map((amenity) => amenity.amenityType) || [],
     };
 
     return plainToClass(RoomResponseDto, plainRoom, {
@@ -388,6 +392,8 @@ export class RoomsService {
         : undefined,
       deposit: room.deposit ? Number(room.deposit) : undefined,
       area: room.area ? Number(room.area) : undefined,
+      images: room.images?.map((img) => img.imageUrl) || [],
+      amenities: room.amenities?.map((amenity) => amenity.amenityType) || [],
     };
 
     return plainToClass(RoomResponseDto, plainRoom, {
@@ -423,5 +429,48 @@ export class RoomsService {
         repliedAt: new Date(),
       },
     });
+  }
+
+  async getReviewsByLandlord(landlordId: string) {
+    const properties = await this.prisma.property.findMany({
+      where: { landlordId },
+      include: {
+        rooms: {
+          include: {
+            reviews: {
+              include: {
+                tenant: {
+                  include: {
+                    user: {
+                      select: {
+                        fullName: true,
+                      },
+                    },
+                  },
+                },
+                room: {
+                  select: {
+                    roomNumber: true,
+                    images: {
+                      take: 1,
+                      orderBy: { displayOrder: 'asc' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const reviews = (properties as any).flatMap((p: any) =>
+      p.rooms.flatMap((r: any) => r.reviews),
+    );
+
+    return {
+      data: reviews,
+      total: reviews.length,
+    };
   }
 }

@@ -19,7 +19,8 @@ import {
 	User,
 	Home,
 	Calendar,
-	Banknote
+	Banknote,
+	AlertCircle
 } from "lucide-react";
 import { Contract, ContractStatus } from "@/types";
 import { format } from "date-fns";
@@ -59,6 +60,10 @@ export function LandlordContractsList() {
 			ACTIVE: { variant: "default" as const, icon: CheckCircle2, label: "Đang hoạt động" },
 			TERMINATED: { variant: "destructive" as const, icon: XCircle, label: "Đã kết thúc" },
 			EXPIRED: { variant: "secondary" as const, icon: Clock, label: "Hết hạn" },
+			DRAFT: { variant: "outline" as const, icon: FileText, label: "Nháp" },
+			PENDING_SIGNATURE: { variant: "secondary" as const, icon: AlertCircle, label: "Chờ ký" },
+			DEPOSIT_PENDING: { variant: "secondary" as const, icon: AlertCircle, label: "Chờ cọc" },
+			CANCELLED: { variant: "destructive" as const, icon: XCircle, label: "Đã hủy" },
 		};
 		const config = variants[status];
 		const Icon = config.icon;

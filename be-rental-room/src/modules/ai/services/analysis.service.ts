@@ -5,7 +5,7 @@ import { AiModelFactory } from './ai-model.factory';
 export class AnalysisService {
   private readonly logger = new Logger(AnalysisService.name);
 
-  constructor(private readonly modelFactory: AiModelFactory) {}
+  constructor(private readonly modelFactory: AiModelFactory) { }
 
   async analyzeRoomDescription(text: string): Promise<{
     amenities: string[];
@@ -46,10 +46,73 @@ Notes:
       },
     ] as any);
 
-    const responseContent = response.content as
-      | string
-      | Array<{ text: string }>;
+    const result = this.parseJsonResponse(response);
+    this.logger.debug('Room description analyzed successfully');
+    return result;
+  }
+
+  /**
+   * Analyze natural language search query to extract filters
+   *
+   * @param query - User's search query (e.g., "phòng dưới 3 triệu quận 1")
+   * @returns Structured filters and cleaned query
+   */
+  async analyzeSearchQuery(query: string): Promise<{
+    filters: {
+      minPrice?: number;
+      maxPrice?: number;
+      minArea?: number;
+      maxArea?: number;
+      amenities?: string[];
+      location?: string;
+    };
+    cleanedQuery: string; // Query with filter terms removed (for keyword search)
+  }> {
+    if (!query || !query.trim()) return { filters: {}, cleanedQuery: query };
+
+    const chatModel = this.modelFactory.getChatModel();
+    const prompt = `Analyze this Vietnamese rental search query: "${query}"
+
+Extract structured filters and the remaining keyword essence.
+Return ONLY valid JSON:
+{
+  "filters": {
+    "minPrice": number | null,       // extracted price floor (VND)
+    "maxPrice": number | null,       // extracted price ceiling (VND) - e.g., "dưới 3 triệu" -> 3000000
+    "minArea": number | null,        // extracted area floor (m2)
+    "maxArea": number | null,        // extracted area ceiling (m2)
+    "amenities": string[],           // e.g., ["wifi", "ac", "parking"]
+    "location": string | null        // district or city mentioned
+  },
+  "cleanedQuery": string             // The query WITHOUT the extracted price/area/location terms (kept for fuzzy matching)
+}
+
+Example: "phòng trọ sạch sẽ dưới 3 triệu quận 1 có máy lạnh"
+Output:
+{
+  "filters": { "maxPrice": 3000000, "location": "Quận 1", "amenities": ["ac"] },
+  "cleanedQuery": "phòng trọ sạch sẽ"
+}`;
+
+    try {
+      const response = await chatModel.invoke([
+        { role: 'user', content: prompt }
+      ] as any);
+
+      const result = this.parseJsonResponse(response);
+      this.logger.debug(`Analyzed query: "${query}" -> ${JSON.stringify(result)}`);
+      return result;
+    } catch (error) {
+      this.logger.warn(`Failed to analyze query: ${query}`, error);
+      return { filters: {}, cleanedQuery: query };
+    }
+  }
+
+  // Helper to parse JSON from AI response
+  private parseJsonResponse(response: any): any {
+    const responseContent = response.content as string | Array<{ text: string }>;
     let responseText: string;
+
     if (typeof responseContent === 'string') {
       responseText = responseContent;
     } else if (Array.isArray(responseContent) && responseContent.length > 0) {
@@ -65,8 +128,6 @@ Notes:
       jsonStr = jsonStr.replace(/^```\n?/, '').replace(/\n?```$/, '');
     }
 
-    const result = JSON.parse(jsonStr);
-    this.logger.debug('Room description analyzed successfully');
-    return result;
+    return JSON.parse(jsonStr);
   }
 }

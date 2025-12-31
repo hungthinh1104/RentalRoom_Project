@@ -5,8 +5,8 @@
 
 const baseUrl =
 	typeof window === 'undefined'
-		? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
-		: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3001';
+		? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005'
+		: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3005';
 const apiPrefix = '/api/v1';
 
 // Custom error class
@@ -25,6 +25,7 @@ interface RequestOptions {
 	headers?: Record<string, string>;
 	body?: unknown;
 	params?: Record<string, unknown>;
+	responseType?: 'json' | 'blob' | 'text';
 }
 
 async function request<T>(
@@ -85,10 +86,22 @@ async function request<T>(
 	if (res.status === 401 && !url.includes('/auth/')) {
 		if (typeof window !== 'undefined') {
 			console.warn('[API Client] 401 Unauthorized - Session expired');
-			// Use NextAuth signOut to clear session properly
-			window.location.href = '/api/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname);
+
+			// Dynamically import signOut to avoid server-side import issues or circular deps
+			import('next-auth/react').then(({ signOut }) => {
+				signOut({ callbackUrl: '/api/auth/signin', redirect: true });
+			});
 		}
 		throw new ApiError(401, 'Session expired. Please log in again.');
+	}
+
+	// Handle specific response types
+	if (options?.responseType === 'blob') {
+		if (!res.ok) {
+			throw new ApiError(res.status, `Request failed (${res.status})`);
+		}
+		const blob = await res.blob();
+		return { data: blob as unknown as T };
 	}
 
 	// Handle response

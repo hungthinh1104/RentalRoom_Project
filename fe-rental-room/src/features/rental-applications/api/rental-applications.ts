@@ -6,7 +6,7 @@ const BASE_URL = "/contracts/applications";
 export const rentalApplicationsApi = {
     getAll: async (params?: PaginationParams & { tenantId?: string; landlordId?: string; status?: string }) => {
         // api.get returns { data: T }
-        const { data } = await api.get<PaginatedResponse<RentalApplication>>(BASE_URL, { params });
+        const { data } = await api.get<PaginatedResponse<RentalApplication>>(BASE_URL, { params: params as Record<string, unknown> });
         return data;
     },
 

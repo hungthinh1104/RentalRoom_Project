@@ -27,6 +27,20 @@ interface Props {
 const categories: MaintenanceCategory[] = ['PLUMBING', 'ELECTRICAL', 'APPLIANCE', 'OTHER'];
 const priorities: MaintenancePriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
+const categoryLabels: Record<MaintenanceCategory, string> = {
+  PLUMBING: 'Ống nước',
+  ELECTRICAL: 'Điện',
+  APPLIANCE: 'Thiết bị',
+  OTHER: 'Khác',
+};
+
+const priorityLabels: Record<MaintenancePriority, string> = {
+  LOW: 'Thấp',
+  MEDIUM: 'Trung bình',
+  HIGH: 'Cao',
+  URGENT: '🔴 Khẩn cấp',
+};
+
 export function NewTenantMaintenanceForm({ roomId, onSuccess }: Props) {
   const mutation = useCreateMaintenance();
   const { data: session } = useSession();
@@ -153,7 +167,7 @@ export function NewTenantMaintenanceForm({ roomId, onSuccess }: Props) {
             <SelectTrigger className="w-full h-10"><SelectValue /></SelectTrigger>
             <SelectContent>
               {categories.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
+                <SelectItem key={c} value={c}>{categoryLabels[c]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -165,7 +179,7 @@ export function NewTenantMaintenanceForm({ roomId, onSuccess }: Props) {
             <SelectTrigger className="w-full h-10"><SelectValue /></SelectTrigger>
             <SelectContent>
               {priorities.map((p) => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
+                <SelectItem key={p} value={p}>{priorityLabels[p]}</SelectItem>
               ))}
             </SelectContent>
           </Select>

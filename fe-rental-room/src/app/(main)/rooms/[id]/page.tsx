@@ -24,7 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RoomAmenities } from "@/features/rooms/components/room-amenities";
 import { RoomStatus } from "@/types/enums";
-import type { RoomReview } from '@/types';
+import type { RoomReview, RoomImage } from '@/types';
 import { useRequireAuth } from "@/features/auth/hooks/use-require-auth";
 import { ContactLandlordModal } from "@/features/contracts/components/contact-landlord-modal";
 
@@ -76,7 +76,7 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
   }
 
   const displayImage = mainImage ||
-    room.images?.[0] ||
+    room.images?.[0]?.imageUrl ||
     "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop";
 
   const isAvailable = room.status === RoomStatus.AVAILABLE;
@@ -141,23 +141,25 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
         <div className="space-y-3">
           <h3 className="font-semibold">Thư viện ảnh</h3>
           <div className="grid grid-cols-4 gap-3">
-            {room.images.map((imageUrl: string) => (
-              <button
-                key={imageUrl}
-                onClick={() => setMainImage(imageUrl)}
-                className={`relative h-24 rounded-lg overflow-hidden border-2 transition-all ${mainImage === imageUrl
-                  ? "border-primary"
-                  : "border-muted hover:border-muted-foreground"
-                  }`}
-              >
-                <Image
-                  src={imageUrl}
-                  alt="Phòng - thư viện ảnh"
-                  fill
-                  className="object-cover"
-                />
-              </button>
-            ))}
+            {room.images
+              .filter((img: RoomImage) => !!img.imageUrl)
+              .map((img: RoomImage, index: number) => (
+                <button
+                  key={img.id || index}
+                  onClick={() => setMainImage(img.imageUrl)}
+                  className={`relative h-24 rounded-lg overflow-hidden border-2 transition-all ${mainImage === img.imageUrl
+                    ? "border-primary"
+                    : "border-muted hover:border-muted-foreground"
+                    }`}
+                >
+                  <Image
+                    src={img.imageUrl}
+                    alt="Phòng - thư viện ảnh"
+                    fill
+                    className="object-cover"
+                  />
+                </button>
+              ))}
           </div>
         </div>
       )}

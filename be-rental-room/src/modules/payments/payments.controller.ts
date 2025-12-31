@@ -12,10 +12,12 @@ import { PaymentsService } from './payments.service';
 import { CreatePaymentDto, UpdatePaymentDto, FilterPaymentsDto } from './dto';
 import { UserRole } from '../users/entities';
 import { Auth } from 'src/common/decorators/auth.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { User } from '../users/entities';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) {}
+  constructor(private readonly paymentsService: PaymentsService) { }
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -24,9 +26,9 @@ export class PaymentsController {
   }
 
   @Get()
-  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  findAll(@Query() filterDto: FilterPaymentsDto) {
-    return this.paymentsService.findAll(filterDto);
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  findAll(@Query() filterDto: FilterPaymentsDto, @CurrentUser() user: User) {
+    return this.paymentsService.findAll(filterDto, user);
   }
 
   @Get(':id')

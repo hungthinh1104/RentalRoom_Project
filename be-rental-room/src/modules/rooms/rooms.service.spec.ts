@@ -3,6 +3,8 @@ import { NotFoundException } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { CacheService } from '../../common/services/cache.service';
+
+import { UploadService } from '../upload/upload.service';
 import { TestDataFactory } from '../../../test/utils/test-data.factory';
 import { RoomStatus } from './entities/room.entity';
 
@@ -20,6 +22,9 @@ describe('RoomsService', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    roomReview: {
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
   };
 
   const mockCacheService = {
@@ -27,6 +32,10 @@ describe('RoomsService', () => {
     get: jest.fn(),
     set: jest.fn(),
     del: jest.fn(),
+  };
+
+  const mockUploadService = {
+    deleteFileByUrl: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -40,6 +49,10 @@ describe('RoomsService', () => {
         {
           provide: CacheService,
           useValue: mockCacheService,
+        },
+        {
+          provide: UploadService,
+          useValue: mockUploadService,
         },
       ],
     }).compile();
@@ -312,7 +325,11 @@ describe('RoomsService', () => {
           },
           images: true,
           amenities: true,
-          reviews: true,
+          reviews: {
+            select: {
+              rating: true,
+            },
+          },
         },
       });
     });

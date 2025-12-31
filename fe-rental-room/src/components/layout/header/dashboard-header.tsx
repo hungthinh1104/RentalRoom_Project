@@ -1,13 +1,19 @@
 'use client';
 
-import Link from 'next/link';
-import { Building2, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import {
+  Sheet, SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { NavMenu } from './nav-menu';
 import { UserMenu } from './user-menu';
 import { NotificationBell } from '@/features/notifications/components/notification-bell';
 import { useSession } from 'next-auth/react';
+import { BrandLogo } from '@/components/brand-logo';
 
 export function DashboardHeader() {
   const { data: session } = useSession();
@@ -15,14 +21,9 @@ export function DashboardHeader() {
 
   return (
     <header style={{ height: 'var(--height-header)' }} className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between h-full gap-4">
-        {/* Logo - Flex shrink 0 to prevent crushing */}
-        <Link href="/" className="flex-shrink-0 flex items-center space-x-2 py-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          <span className="hidden font-bold sm:inline-block text-lg bg-gradient-to-r from-primary to-primary-hover bg-clip-text text-transparent">
-            RentalRoom
-          </span>
-        </Link>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between h-full gap-2 sm:gap-4">
+        {/* Logo */}
+        <BrandLogo href="/" className="py-2" />
 
         {/* Desktop Navigation (centered) - Flex grow to take space, but centered */}
         <div className="hidden md:flex flex-1 items-center justify-center px-4">
@@ -30,7 +31,7 @@ export function DashboardHeader() {
         </div>
 
         {/* Right side - Flex shrink 0 */}
-        <div className="flex-shrink-0 flex items-center justify-end gap-3 sm:gap-4">
+        <div className="flex-shrink-0 flex items-center justify-end gap-2 sm:gap-4">
           {name && (
             <div className="hidden lg:flex flex-col items-end mr-2">
               <span className="text-sm font-medium leading-none">Xin chào,</span>
@@ -52,9 +53,9 @@ export function DashboardHeader() {
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-80">
+              <SheetContent side="right" className="w-80 pt-10">
                 <NavMenu
-                  className="flex flex-col space-y-3 mt-8"
+                  className="flex flex-col space-y-3 mt-4"
                   role={session?.user?.role}
                   mobile
                 />

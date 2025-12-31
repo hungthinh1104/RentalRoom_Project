@@ -61,7 +61,7 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
         <div className="relative aspect-video w-full overflow-hidden rounded-t-[28px]">
           {/* Carousel */}
           <Image
-            src={room.images?.[currentImageIndex] || "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop"}
+            src={room.images?.[currentImageIndex]?.imageUrl || "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop"}
             alt={`Phòng ${room.roomNumber} - Ảnh ${currentImageIndex + 1}`}
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-105"

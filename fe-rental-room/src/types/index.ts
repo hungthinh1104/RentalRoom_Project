@@ -98,7 +98,7 @@ export interface Room {
 	averageRating?: number;
 	reviewCount?: number;
 	amenities?: AmenityType[];
-	images?: string[];
+	images?: RoomImage[];
 	reviews?: RoomReview[];
 }
 
@@ -177,6 +177,9 @@ export interface Contract {
 	maxOccupants?: number;
 	terms: string | null;
 	status: ContractStatus;
+	paymentRef?: string;
+	depositDeadline?: string;
+	lastNegotiationNote?: string;
 	createdAt: string;
 	updatedAt: string;
 }

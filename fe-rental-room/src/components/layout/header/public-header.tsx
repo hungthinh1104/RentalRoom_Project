@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { saveCallbackUrl } from '@/lib/redirect-after-login';
-import { Building2, Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useSession, signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/brand-logo';
 
 export function PublicHeader() {
   const { data: session } = useSession();
@@ -32,14 +33,9 @@ export function PublicHeader() {
 
   return (
     <header style={{ height: 'var(--height-header)' }} className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-3 items-center gap-4 h-full">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-2 md:grid-cols-3 items-center gap-4 h-full">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2 flex-shrink-0 py-2 pl-2">
-          <Building2 className="h-6 w-6" />
-          <span className="hidden font-bold sm:inline-block">
-            RentalRoom
-          </span>
-        </Link>
+        <BrandLogo href="/" className="py-2 pl-2" />
 
         {/* Desktop Navigation (centered) */}
         <nav className="hidden md:flex justify-center items-center gap-1">
@@ -60,13 +56,13 @@ export function PublicHeader() {
         </nav>
 
         {/* Right side actions */}
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-2 sm:gap-3">
           {session?.user ? (
             <>
-              <span className="hidden sm:inline text-sm text-muted-foreground max-w-[150px] truncate min-w-0 mr-3">
+              <span className="hidden lg:inline text-sm text-muted-foreground max-w-[150px] truncate min-w-0 mr-3">
                 Xin chào, {name}
               </span>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <Button
                   variant="outline"
                   size="sm"
@@ -88,7 +84,7 @@ export function PublicHeader() {
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <Button variant="outline" size="sm" asChild>
                   <Link href="/login" onClick={() => saveCallbackUrl(pathname)}>Đăng nhập</Link>
                 </Button>
@@ -106,8 +102,8 @@ export function PublicHeader() {
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-72">
-              <div className="flex flex-col space-y-4 mt-8">
+            <SheetContent side="right" className="w-72 pt-10">
+              <div className="flex flex-col space-y-4 mt-4">
                 <nav className="flex flex-col gap-2">
                   {navLinks.map((link) => (
                     <Link
@@ -128,7 +124,7 @@ export function PublicHeader() {
                 <div className="border-t pt-4 space-y-2">
                   {session?.user ? (
                     <>
-                      <p className="text-sm text-muted-foreground px-3">
+                      <p className="text-sm text-muted-foreground px-3 mb-2">
                         {session.user.fullName}
                       </p>
                       <Button

@@ -46,6 +46,13 @@ export class RoomsController {
     return this.roomsService.findAll(filterDto, user?.id);
   }
 
+
+  @Get('reviews/landlord/:landlordId')
+  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  getLandlordReviews(@Param('landlordId') landlordId: string) {
+    return this.roomsService.getReviewsByLandlord(landlordId);
+  }
+
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
   // @UseInterceptors(CacheInterceptor)

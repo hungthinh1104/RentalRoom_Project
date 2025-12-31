@@ -383,6 +383,9 @@ model Contract {
   // Payment & Deposit (Strict Flow)
   depositDeadline DateTime?      @map("deposit_deadline")
   paymentRef      String?        @map("payment_ref") @db.VarChar(50)
+  
+  // Negotiation Logic
+  lastNegotiationNote String?    @map("last_negotiation_note") @db.Text
 
   // Termination tracking
   terminationReason           String?  @map("termination_reason") @db.Text

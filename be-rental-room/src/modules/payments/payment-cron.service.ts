@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { SepayService } from './sepay.service';
-import { ContractStatus, RoomStatus } from '@prisma/client';
+import { ContractStatus, RoomStatus, InvoiceStatus, ItemType } from '@prisma/client';
 
 @Injectable()
 export class PaymentCronService {
@@ -24,12 +24,7 @@ export class PaymentCronService {
             // 1. Find contracts in DEPOSIT_PENDING
             const pendingContracts = await this.prisma.contract.findMany({
                 where: {
-                    // @ts-ignore
-                    status: 'DEPOSIT_PENDING',
-                    // @ts-ignore
-                    depositDeadline: {
-                        gt: new Date(), // Deadline in future
-                    },
+                    status: ContractStatus.DEPOSIT_PENDING,
                 },
                 include: {
                     room: true,
@@ -65,41 +60,59 @@ export class PaymentCronService {
         try {
             this.logger.log(`Activating contract ${contract.contractNumber}...`);
 
-            await this.prisma.$transaction([
+            await this.prisma.$transaction(async (tx) => {
                 // Update Contract
-                this.prisma.contract.update({
+                await tx.contract.update({
                     where: { id: contract.id },
                     data: {
                         status: ContractStatus.ACTIVE,
                         // Clear deadline as it's paid
                         depositDeadline: null,
                     },
-                }),
+                });
+
                 // Update Room
-                this.prisma.room.update({
+                await tx.room.update({
                     where: { id: contract.roomId },
                     data: {
                         status: RoomStatus.OCCUPIED,
                     },
-                }),
+                });
+
+                // Create Invoice for Deposit (Required for Payment FK)
+                const invoice = await tx.invoice.create({
+                    data: {
+                        contractId: contract.id,
+                        tenantId: contract.tenantId,
+                        invoiceNumber: `INV-${contract.contractNumber}-DEP`,
+                        issueDate: new Date(),
+                        dueDate: new Date(),
+                        totalAmount: contract.deposit,
+                        status: InvoiceStatus.PAID,
+                        paidAt: new Date(),
+                        lineItems: {
+                            create: {
+                                itemType: ItemType.OTHER,
+                                description: 'Tiền cọc hợp đồng (Deposit)',
+                                quantity: 1,
+                                unitPrice: contract.deposit,
+                                amount: contract.deposit,
+                            }
+                        }
+                    }
+                });
+
                 // Create Payment Record
-                this.prisma.payment.create({
+                await tx.payment.create({
                     data: {
                         amount: contract.deposit,
                         paymentMethod: 'BANK_TRANSFER',
                         status: 'COMPLETED',
                         tenantId: contract.tenantId,
-                        invoiceId: contract.id, // Ideally link to an invoice, but schema requires UUID? 
-                        // Note: If InvoiceId is required, we might need a dummy or create Invoice first.
-                        // Let's check Schema: Payment -> invoiceId is REQUIRED.
-                        // So we must have an invoice. Phase 7 plan didn't specify Invoice creation.
-                        // We will skip Payment creation here if invoiceId is missing to avoid error, 
-                        // OR assuming an invoice was created at Contract Draft.
-                        // For now, I'll log and skip Payment record creation to be safe, 
-                        // as creating a full invoice is complex logic.
-                    } as any // Bypassing strict check to avoid compilation error if logic is incomplete
-                }),
-            ]);
+                        invoiceId: invoice.id,
+                    }
+                });
+            });
 
             this.logger.log(`Contract ${contract.contractNumber} ACTIVATED successfully.`);
         } catch (error) {

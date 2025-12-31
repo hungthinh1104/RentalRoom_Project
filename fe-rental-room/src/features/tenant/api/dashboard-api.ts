@@ -64,13 +64,51 @@ export const tenantDashboardApi = {
   },
 
   async getRecommendations() {
-    // Placeholder: use rooms listing as a simple recommendation proxy
-    const { data } = await api.get<PaginatedResponse<RoomSummary>>('/rooms', {
-      params: { status: 'AVAILABLE', limit: 3 },
-    });
+    const { data } = await api.get<RoomSummary[]>('/recommendations');
+    // Map backend response to the expected format if necessary,
+    // but the backend returns Room objects which matches generic structure.
+    // The frontend hook might expect { data: [] } or just [].
+    // Let's check backend return type: `recommendedRooms` is Room[].
+    // Frontend likely uses GenericResponse or similar.
+    // Let's wrap it in { data: ... } to match other APIs if needed or just return data.
+    // However, usually `api.get` returns AxiosResponse. `data` is the payload.
+    // If backend returns Array, `data` is Array.
+    // Let's assume standard response format.
     return {
-      items: data?.data ?? [],
-      total: data?.meta?.total ?? data?.meta?.itemCount ?? (data?.data?.length ?? 0),
+      items: data ?? [],
+      total: data?.length ?? 0,
+    };
+  },
+
+  async getOpenMaintenance(tenantId: string) {
+    const { data } = await api.get<{ data: unknown[]; total?: number } | unknown[]>('/maintenance/requests', {
+      params: { tenantId, limit: 100 },
+    });
+    // Handle both array and object responses
+    const items = Array.isArray(data) ? data : data?.data ?? [];
+    // Filter out completed/cancelled ones
+    const openItems = items.filter((item: any) =>
+      item.status !== 'COMPLETED' && item.status !== 'CANCELLED'
+    );
+    return {
+      items: openItems,
+      total: openItems.length,
+    };
+  },
+
+  async getActiveBookings(tenantId: string) {
+    const { data } = await api.get<PaginatedResponse<unknown> | unknown[]>('/rental-applications', {
+      params: { tenantId, limit: 100 },
+    });
+    // Handle both array and object responses
+    const items = Array.isArray(data) ? data : data?.data ?? [];
+    // Filter active bookings (PENDING or APPROVED)
+    const activeItems = items.filter((item: any) =>
+      item.status === 'PENDING' || item.status === 'APPROVED'
+    );
+    return {
+      items: activeItems,
+      total: activeItems.length,
     };
   },
 };

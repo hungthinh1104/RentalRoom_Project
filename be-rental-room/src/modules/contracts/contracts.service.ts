@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
+import { InvoiceStatus } from '@prisma/client';
 import {
   CreateRentalApplicationDto,
   CreateContractDto,
@@ -23,6 +24,7 @@ import { EmailService } from 'src/common/services/email.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
 import { SepayService } from '../payments/sepay.service';
 import { RoomStatus } from '@prisma/client';
+import { User } from '../users/entities';
 
 @Injectable()
 export class ContractsService {
@@ -95,7 +97,20 @@ export class ContractsService {
   }
 
   // Rental Applications
-  async createApplication(createDto: CreateRentalApplicationDto) {
+  async createApplication(createDto: CreateRentalApplicationDto, user: User) {
+    // 1. Ensure Tenant Profile Exists (Auto-create if missing)
+    // This allows Landlords/Admins to apply for rooms without manual setup
+    let tenant = await this.prisma.tenant.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!tenant) {
+      this.logger.log(`Auto-creating Tenant profile for user ${user.id}`);
+      tenant = await this.prisma.tenant.create({
+        data: { userId: user.id },
+      });
+    }
+
     // Workaround: If landlordId not provided, fetch from room's property
     let landlordId = createDto.landlordId;
 
@@ -122,6 +137,7 @@ export class ContractsService {
     const application = await this.prisma.rentalApplication.create({
       data: {
         ...createDto,
+        tenantId: tenant.userId, // Force tenantId to be the authenticated user
         landlordId, // Use fetched or provided landlordId
       },
     });
@@ -129,7 +145,7 @@ export class ContractsService {
     // Trigger notification + email to landlord (best effort)
     try {
       // Fetch related data
-      const [tenant, room] = await Promise.all([
+      const [tenantRef, room] = await Promise.all([
         this.prisma.tenant.findUnique({
           where: { userId: application.tenantId },
           include: { user: true },
@@ -146,12 +162,12 @@ export class ContractsService {
         }),
       ]);
 
-      if (!tenant || !room) {
+      if (!tenantRef || !room) {
         throw new Error('Failed to fetch tenant or room data');
       }
 
       const landlord = room.property.landlord.user;
-      const tenantUser = tenant.user;
+      const tenantUser = tenantRef.user;
 
       // Create in-app notification for landlord
       await this.notificationsService.create({
@@ -332,8 +348,24 @@ export class ContractsService {
           endDate,
           monthlyRent: app.room.pricePerMonth,
           deposit: app.room.deposit,
-          status: ContractStatus.DRAFT, // ✅ DRAFT - waiting for tenant approval
-          signedAt: new Date(), // Landlord signed by approving
+          status: ContractStatus.DRAFT,
+          signedAt: new Date(),
+          terms: `1. TRÁCH NHIỆM BÊN A (CHỦ NHÀ):
+- Bàn giao phòng và trang thiết bị cho Bên B đúng thời hạn.
+- Đảm bảo quyền sử dụng riêng rẽ và trọn vẹn của Bên B đối với phòng thuê.
+- Sửa chữa kịp thời các hư hỏng do lỗi kết cấu xây dựng hoặc hao mòn tự nhiên.
+
+2. TRÁCH NHIỆM BÊN B (NGƯỜI THUÊ):
+- Thanh toán tiền thuê và tiền điện, nước đúng hạn quy định.
+- Sử dụng phòng đúng mục đích, không chứa chất cấm, chất gây nổ.
+- Giữ gìn vệ sinh chung, trật tự an ninh trong khu vực.
+- Tự bảo quản tài sản cá nhân.
+- Không được tự ý sửa chữa, cải tạo phòng khi chưa có sự đồng ý của Bên A.
+
+3. ĐIỀU KHOẢN CHUNG:
+- Hai bên cam kết thực hiện đúng các điều khoản đã ghi trong hợp đồng.
+- Mọi thay đổi phải được thỏa thuận và lập thành văn bản.
+- Hợp đồng có giá trị kể từ ngày ký đến ngày kết thúc thời hạn thuê.`,
         },
       });
 
@@ -437,6 +469,189 @@ export class ContractsService {
   }
 
   /**
+   * Landlord sends contract to tenant for approval (With Transaction & Lock)
+   */
+  async sendContract(contractId: string, landlordUserId: string) {
+    // 1. Fetch Contract first (outside transaction to check ownership)
+    const contract = await this.findOne(contractId);
+
+    if (contract.landlord.userId !== landlordUserId) {
+      throw new UnauthorizedException('You are not authorized to send this contract');
+    }
+
+    if (contract.status !== ContractStatus.DRAFT) {
+      throw new BadRequestException(
+        `Contract must be in DRAFT status to send. Current status: ${contract.status}`,
+      );
+    }
+
+    if (!contract.terms || contract.terms.trim().length === 0) {
+      throw new BadRequestException('Contract must have terms before sending.');
+    }
+
+    // 2. Start Transaction
+    return this.prisma.$transaction(async (tx) => {
+      // 3. Check Room Status (Locking)
+      const room = await tx.room.findUnique({
+        where: { id: contract.roomId },
+      });
+
+      if (!room) throw new NotFoundException('Room not found');
+
+      // Allow if Room is AVAILABLE or RESERVED (for this contract)
+      if (room.status !== RoomStatus.AVAILABLE && room.status !== RoomStatus.RESERVED) {
+        throw new BadRequestException(
+          `Room is currently ${room.status}. Cannot send contract.`,
+        );
+      }
+
+      // 4. Update Room -> RESERVED
+      await tx.room.update({
+        where: { id: contract.roomId },
+        data: { status: RoomStatus.RESERVED },
+      });
+
+      // 5. Update Contract -> PENDING_SIGNATURE
+      const updatedContract = await tx.contract.update({
+        where: { id: contractId },
+        data: {
+          status: ContractStatus.PENDING_SIGNATURE,
+        },
+        include: {
+          tenant: { include: { user: true } },
+          landlord: { include: { user: true } },
+          room: true,
+        },
+      });
+
+      // 6. Notify Tenant (Side effect - can be outside tx, but inside is fine for now)
+      try {
+        await this.notificationsService.create({
+          userId: updatedContract.tenant.userId,
+          title: `Hợp đồng cần ký - ${updatedContract.contractNumber}`,
+          content: `Chủ nhà ${updatedContract.landlord.user.fullName} đã gửi hợp đồng. Vui lòng xem và phê duyệt.`,
+          notificationType: NotificationType.CONTRACT,
+          relatedEntityId: contractId,
+          isRead: false,
+        });
+      } catch (error) {
+        this.logger.warn(`Failed to notify tenant for contract send ${contractId}`, error);
+      }
+
+      return updatedContract;
+    });
+  }
+
+  /**
+   * Landlord revokes OR Tenant rejects a pending contract
+   * - Landlord -> DRAFT (Revoke to edit)
+   * - Tenant -> CANCELLED (Reject terms)
+   */
+  async revokeContract(contractId: string, userId: string) {
+    const contract = await this.findOne(contractId);
+
+    const isLandlord = contract.landlord.userId === userId;
+    const isTenant = contract.tenant.userId === userId;
+
+    if (!isLandlord && !isTenant) {
+      throw new UnauthorizedException('Not authorized');
+    }
+
+    if (contract.status !== ContractStatus.PENDING_SIGNATURE && contract.status !== ContractStatus.DEPOSIT_PENDING) {
+      throw new BadRequestException('Can only revoke/reject contracts pending signature or deposit');
+    }
+
+    const targetStatus = isLandlord ? ContractStatus.DRAFT : ContractStatus.CANCELLED;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Unlock Room
+      await tx.room.update({
+        where: { id: contract.roomId },
+        data: { status: RoomStatus.AVAILABLE },
+      });
+
+      // Update Contract Status
+      const updated = await tx.contract.update({
+        where: { id: contractId },
+        data: { status: targetStatus },
+        include: {
+          landlord: { include: { user: true } },
+          tenant: { include: { user: true } },
+        },
+      });
+
+      // Notifications
+      if (isTenant) {
+        // Notify Landlord about rejection
+        await this.notificationsService.create({
+          userId: contract.landlordId,
+          title: `Hợp đồng bị từ chối - ${contract.contractNumber}`,
+          content: `Khách thuê ${contract.tenant?.user?.fullName} đã từ chối ký hợp đồng. Phòng đã được mở lại.`,
+          notificationType: NotificationType.CONTRACT,
+          relatedEntityId: contractId,
+          isRead: false,
+        });
+      }
+
+      return updated;
+    });
+  }
+
+  /**
+   * Tenant requests changes (Negotiation)
+   */
+  async requestChanges(contractId: string, tenantId: string, reason: string) {
+    const contract = await this.findOne(contractId);
+
+    if (contract.tenantId !== tenantId) { // Check tenantId (Profile ID or User ID? findOne returns relations, tenantId is UserID in schema relation logic usually... wait, schema says tenantId references Tenant.userId. So this comparison depends on what tenantId param is passed. Usually UserID.)
+      // Let's verify: application passes User ID. findOne joins tenant.
+      // Contract.tenantId => Tenant Profile ID (actually Tenant.userId is the relation key in schema).
+      // In schema: tenant Tenant @relation(fields: [tenantId], references: [userId])
+      // So contract.tenantId IS the UserID of the tenant.
+      // My comparison: if (contract.tenantId !== tenantId) is correct if tenantId param is UserID.
+      if (contract.tenantId !== tenantId) {
+        throw new UnauthorizedException('Not authorized');
+      }
+    }
+
+    if (contract.status !== ContractStatus.PENDING_SIGNATURE) {
+      throw new BadRequestException('Can only request changes for pending contracts');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Unlock Room
+      await tx.room.update({
+        where: { id: contract.roomId },
+        data: { status: RoomStatus.AVAILABLE },
+      });
+
+      // Revert Contract & Save Note
+      const updated = await tx.contract.update({
+        where: { id: contractId },
+        data: {
+          status: ContractStatus.DRAFT,
+          lastNegotiationNote: reason,
+        },
+        include: { landlord: { include: { user: true } } },
+      });
+
+      // Notify Landlord
+      try {
+        await this.notificationsService.create({
+          userId: updated.landlord.userId,
+          title: `Khách thuê yêu cầu sửa hợp đồng - ${updated.contractNumber}`,
+          content: `Lý do: ${reason}`,
+          notificationType: NotificationType.CONTRACT,
+          relatedEntityId: contractId,
+          isRead: false,
+        });
+      } catch (e) { }
+
+      return updated;
+    });
+  }
+
+  /**
    * Tenant approves contract - Two-party agreement flow
    */
   async tenantApproveContract(contractId: string, tenantId: string) {
@@ -448,18 +663,24 @@ export class ContractsService {
     }
 
     // Verify contract status
-    if (contract.status !== ContractStatus.DRAFT) {
+    if (contract.status !== ContractStatus.PENDING_SIGNATURE) {
       throw new BadRequestException(
-        `Contract must be in DRAFT status to approve. Current status: ${contract.status}`,
+        `Contract must be in PENDING_SIGNATURE status to approve. Current status: ${contract.status}`,
       );
     }
 
-    // Update contract to PENDING_SIGNATURE
+    // Generate Payment Ref & Deadline
+    const paymentRef = `HD${contract.contractNumber}`.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
+    // Update contract to DEPOSIT_PENDING
     const updated = await this.prisma.contract.update({
       where: { id: contractId },
       data: {
-        status: ContractStatus.PENDING_SIGNATURE,
-        // tenantSignedAt: new Date(), // Will be enabled after migration
+        status: ContractStatus.DEPOSIT_PENDING,
+        paymentRef,
+        depositDeadline,
+        // tenantSignedAt: new Date(),
       },
       include: {
         tenant: { include: { user: true } },
@@ -582,7 +803,7 @@ export class ContractsService {
     const contractNumber = contractData.contractNumber ||
       await this.generateContractNumber(createContractDto.landlordId);
 
-    const paymentRef = `HD${contractNumber}`.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); // Sanitize
+    const paymentRef = contractNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); // Sanitize
     const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
     // 3. Create Contract + Soft Lock Room (Transaction)
@@ -737,15 +958,42 @@ export class ContractsService {
           });
         }
 
-        // 5. Record payment
+        // 5. Create Invoice for Deposit (Required for Payment FK)
+        const invoice = await tx.invoice.create({
+          data: {
+            contractId: contract.id,
+            tenantId: contract.tenantId,
+            invoiceNumber: `INV-${contract.contractNumber}-DEP`,
+            issueDate: new Date(),
+            dueDate: new Date(), // Same day payment
+            totalAmount: contract.deposit,
+            status: InvoiceStatus.PAID,
+            paidAt: new Date(),
+            // Optional: Create Line Item for detail
+            lineItems: {
+              create: {
+                itemType: 'OTHER',
+                description: 'Tiền cọc hợp đồng (Deposit)',
+                quantity: 1,
+                unitPrice: contract.deposit,
+                amount: contract.deposit,
+              }
+            }
+          }
+        });
+
+        // 6. Record payment linked to Invoice
         await tx.payment.create({
           data: {
             amount: contract.deposit,
             paymentMethod: 'BANK_TRANSFER',
             paymentDate: new Date(),
             status: 'COMPLETED',
-            invoiceId: contract.id, // Payment links to invoice, not contract directly
+            invoiceId: invoice.id, // Link to the newly created invoice
             tenantId: contract.tenantId,
+            paidAt: new Date(),
+            // transactionId? Maybe from SePay but we don't have it here easily unless passed.
+            // But this function is just 'verifyPaymentStatus', generic.
           },
         });
       });
@@ -800,7 +1048,7 @@ export class ContractsService {
     if (roomId) where.roomId = roomId;
     if (status) where.status = status;
     if (search) {
-      where.contractNumber = { contains: search, mode: 'insensitive' };
+      where.contractNumber = { contains: search };
     }
 
     const [contracts, total] = await Promise.all([
@@ -812,28 +1060,35 @@ export class ContractsService {
         include: {
           tenant: { include: { user: true } },
           landlord: { include: { user: true } },
-          room: { include: { property: true } },
+          room: true,
           residents: true,
         },
       }),
       this.prisma.contract.count({ where }),
     ]);
 
-    // Convert Decimal to Number
-    const cleaned = contracts.map((c) => ({
-      ...c,
-      deposit: c.deposit ? Number(c.deposit) : 0,
-      monthlyRent: c.monthlyRent ? Number(c.monthlyRent) : 0,
-      residents: c.residents || [],
+    const transformed = contracts.map((contract) => ({
+      ...contract,
+      deposit: Number(contract.deposit),
+      monthlyRent: Number(contract.monthlyRent),
+      earlyTerminationPenalty: contract.earlyTerminationPenalty
+        ? Number(contract.earlyTerminationPenalty)
+        : 0,
+      tenantName: contract.tenant.user.fullName,
+      tenantEmail: contract.tenant.user.email,
+      landlordName: contract.landlord.user.fullName,
+      roomNumber: contract.room.roomNumber,
+      residents: contract.residents || [],
     }));
 
-    const transformed = cleaned.map((contract) =>
-      plainToClass(ContractResponseDto, contract, {
+    return new PaginatedResponse(
+      plainToClass(ContractResponseDto, transformed, {
         excludeExtraneousValues: true,
       }),
+      total,
+      page,
+      limit,
     );
-
-    return new PaginatedResponse(transformed, total, page, limit);
   }
 
   async findOne(id: string) {
@@ -844,24 +1099,48 @@ export class ContractsService {
         landlord: { include: { user: true } },
         room: { include: { property: true } },
         residents: true,
+        invoices: true,
       },
     });
+
+    // Debug log
+    if (contract) {
+      console.log('[ContractsService] findOne raw:', JSON.stringify({
+        id: contract.id,
+        hasRoom: !!contract.room,
+        hasProperty: !!contract.room?.property,
+        deposit: contract.deposit,
+        depositType: typeof contract.deposit
+      }, null, 2));
+    }
 
     if (!contract) {
       throw new NotFoundException(`Contract with ID ${id} not found`);
     }
 
-    // Convert Decimal to Number
     const cleaned = {
+      ...contract,
       ...contract,
       deposit: contract.deposit ? Number(contract.deposit) : 0,
       monthlyRent: contract.monthlyRent ? Number(contract.monthlyRent) : 0,
+      earlyTerminationPenalty: contract.earlyTerminationPenalty
+        ? Number(contract.earlyTerminationPenalty)
+        : 0,
+      tenantName: contract.tenant?.user?.fullName || 'Unknown',
+      tenantEmail: contract.tenant?.user?.email || 'Unknown',
+      landlordName: contract.landlord?.user?.fullName || 'Unknown',
+      roomNumber: contract.room?.roomNumber || 'Unknown',
       residents: contract.residents || [],
+      invoices: contract.invoices?.map(inv => ({
+        ...inv,
+        totalAmount: Number(inv.totalAmount)
+      })) || [],
     };
 
     return plainToClass(ContractResponseDto, cleaned, {
       excludeExtraneousValues: true,
     });
+    // return { DEBUG: true, ...cleaned } as any;
   }
 
   async update(id: string, updateContractDto: UpdateContractDto) {
@@ -881,6 +1160,9 @@ export class ContractsService {
         ? Number(contract.deposit)
         : 0,
       monthlyRent: contract.monthlyRent ? Number(contract.monthlyRent) : 0,
+      earlyTerminationPenalty: contract.earlyTerminationPenalty
+        ? Number(contract.earlyTerminationPenalty)
+        : 0,
     };
 
     return plainToClass(ContractResponseDto, cleaned, {
@@ -959,23 +1241,34 @@ export class ContractsService {
         'Hợp đồng kết thúc đúng hạn hoặc đã hết hạn. Không có phạt.';
     }
 
-    // Update contract
-    const updated = await this.prisma.contract.update({
-      where: { id },
-      data: {
-        status: ContractStatus.TERMINATED,
-        terminatedAt: new Date(),
-        terminationReason: terminateDto.reason,
-        terminatedByUserId: userId,
-        earlyTerminationPenalty: penalty,
-        noticeDays: noticeDays,
-        terminationApproved: true,
-      },
-      include: {
-        tenant: { include: { user: true } },
-        landlord: { include: { user: true } },
-        room: { include: { property: true } },
-      },
+    // Transactional Update
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // 1. Update Contract
+      const contractUpdated = await tx.contract.update({
+        where: { id },
+        data: {
+          status: ContractStatus.TERMINATED,
+          terminatedAt: new Date(),
+          terminationReason: terminateDto.reason,
+          terminatedByUserId: userId,
+          earlyTerminationPenalty: penalty,
+          noticeDays: noticeDays,
+          terminationApproved: true,
+        },
+        include: {
+          tenant: { include: { user: true } },
+          landlord: { include: { user: true } },
+          room: { include: { property: true } },
+        },
+      });
+
+      // 2. Unlock Room
+      await tx.room.update({
+        where: { id: contractUpdated.roomId },
+        data: { status: RoomStatus.AVAILABLE },
+      });
+
+      return contractUpdated;
     });
 
     const tenantUser = updated.tenant.user;
@@ -1010,17 +1303,17 @@ export class ContractsService {
           tenantUser.email,
           '⚠️ Xác nhận chấm dứt hợp đồng thuê',
           `<h2>Hợp đồng ${updated.contractNumber} đã được chấm dứt</h2>
-           <p><strong>Phòng:</strong> ${roomInfo}</p>
-           <p><strong>Lý do:</strong> ${terminateDto.reason}</p>
-           <p><strong>Ngày chấm dứt:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
-           <hr>
-           <h3>💰 Xử lý tiền cọc:</h3>
-           <p>${penaltyReason}</p>
-           <p><strong>Số tiền:</strong> ${penalty.toLocaleString('vi-VN')} VNĐ</p>
-           <hr>
-           <p>Vui lòng liên hệ chủ nhà để hoàn tất thủ tục bàn giao phòng.</p>
-           <p><strong>Chủ nhà:</strong> ${landlordUser.fullName}</p>
-           <p><strong>Điện thoại:</strong> ${landlordUser.phoneNumber}</p>`,
+             <p><strong>Phòng:</strong> ${roomInfo}</p>
+             <p><strong>Lý do:</strong> ${terminateDto.reason}</p>
+             <p><strong>Ngày chấm dứt:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
+             <hr>
+             <h3>💰 Xử lý tiền cọc:</h3>
+             <p>${penaltyReason}</p>
+             <p><strong>Số tiền:</strong> ${penalty.toLocaleString('vi-VN')} VNĐ</p>
+             <hr>
+             <p>Vui lòng liên hệ chủ nhà để hoàn tất thủ tục bàn giao phòng.</p>
+             <p><strong>Chủ nhà:</strong> ${landlordUser.fullName}</p>
+             <p><strong>Điện thoại:</strong> ${landlordUser.phoneNumber}</p>`,
         );
       } else {
         // Landlord terminated
@@ -1046,17 +1339,17 @@ export class ContractsService {
           tenantUser.email,
           '📢 Thông báo chấm dứt hợp đồng thuê',
           `<h2>Hợp đồng ${updated.contractNumber} đã được chủ nhà chấm dứt</h2>
-           <p><strong>Phòng:</strong> ${roomInfo}</p>
-           <p><strong>Lý do:</strong> ${terminateDto.reason}</p>
-           <p><strong>Ngày chấm dứt:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
-           <hr>
-           <h3>💰 Bồi thường:</h3>
-           <p>${penaltyReason}</p>
-           <p><strong>Số tiền bạn nhận được:</strong> ${penalty.toLocaleString('vi-VN')} VNĐ</p>
-           <hr>
-           <p>Vui lòng liên hệ chủ nhà để hoàn tất thủ tục.</p>
-           <p><strong>Chủ nhà:</strong> ${landlordUser.fullName}</p>
-           <p><strong>Điện thoại:</strong> ${landlordUser.phoneNumber}</p>`,
+             <p><strong>Phòng:</strong> ${roomInfo}</p>
+             <p><strong>Lý do:</strong> ${terminateDto.reason}</p>
+             <p><strong>Ngày chấm dứt:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
+             <hr>
+             <h3>💰 Bồi thường:</h3>
+             <p>${penaltyReason}</p>
+             <p><strong>Số tiền bạn nhận được:</strong> ${penalty.toLocaleString('vi-VN')} VNĐ</p>
+             <hr>
+             <p>Vui lòng liên hệ chủ nhà để hoàn tất thủ tục.</p>
+             <p><strong>Chủ nhà:</strong> ${landlordUser.fullName}</p>
+             <p><strong>Điện thoại:</strong> ${landlordUser.phoneNumber}</p>`,
         );
       }
     } catch (error) {
