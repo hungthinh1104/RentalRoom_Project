@@ -1,10 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { FavoritesService } from './favorites.service';
 import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';

@@ -150,7 +150,11 @@ describe('LandlordsController', () => {
       const result = await controller.update(landlordId, updateDto, mockUser);
 
       expect(result).toEqual(mockUpdatedLandlord);
-      expect(service.update).toHaveBeenCalledWith(landlordId, updateDto, mockUser);
+      expect(service.update).toHaveBeenCalledWith(
+        landlordId,
+        updateDto,
+        mockUser,
+      );
     });
   });
 

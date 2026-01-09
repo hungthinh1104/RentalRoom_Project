@@ -12,12 +12,15 @@ export class SepayService {
   constructor(
     private readonly httpService: HttpService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   /**
    * Verify payment for a specific contract
    */
-  async verifyPayment(contract: any, expectedAmount: number): Promise<PaymentVerificationResult> {
+  async verifyPayment(
+    contract: any,
+    expectedAmount: number,
+  ): Promise<PaymentVerificationResult> {
     try {
       // Get API token from environment
       const apiToken = process.env.SEPAY_API_TOKEN;
@@ -102,7 +105,10 @@ export class SepayService {
         };
       }
 
-      return { success: false, error: 'Payment not found in recent transactions' };
+      return {
+        success: false,
+        error: 'Payment not found in recent transactions',
+      };
     } catch (error) {
       this.logger.error(
         `SePay verify error for contract ${contract.id}`,
@@ -116,7 +122,12 @@ export class SepayService {
    * Generate QR code for invoice payment
    * Returns URL to SePay QR code image
    */
-  async generateQR(landlordId: string, amount: number, paymentRef: string, description?: string): Promise<{ success: boolean; qrUrl?: string; error?: string }> {
+  async generateQR(
+    landlordId: string,
+    amount: number,
+    paymentRef: string,
+    description?: string,
+  ): Promise<{ success: boolean; qrUrl?: string; error?: string }> {
     try {
       // Get landlord's payment config for bank details
       // @ts-ignore
@@ -137,7 +148,9 @@ export class SepayService {
 
       const qrUrl = `https://qr.sepay.vn/img?bank=${encodeURIComponent(bankCode)}&acc=${encodeURIComponent(accountNumber)}&amount=${Math.round(amount)}&des=${encodeURIComponent(desc)}`;
 
-      this.logger.log(`Generated QR for landlord ${landlordId}, ref: ${paymentRef}`);
+      this.logger.log(
+        `Generated QR for landlord ${landlordId}, ref: ${paymentRef}`,
+      );
 
       return {
         success: true,

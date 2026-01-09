@@ -31,7 +31,7 @@ import { JwtService } from '@nestjs/jwt';
       const allowedOrigins = [
         process.env.FRONTEND_URL,
         'http://localhost:3000',
-        'http://localhost:3001'
+        'http://localhost:3001',
       ].filter(Boolean);
 
       if (!origin || allowedOrigins.includes(origin)) {
@@ -45,14 +45,15 @@ import { JwtService } from '@nestjs/jwt';
   transports: ['websocket', 'polling'],
 })
 export class NotificationsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(NotificationsGateway.name);
   private userConnections = new Map<string, Set<string>>();
 
-  constructor(private jwtService: JwtService) { }
+  constructor(private jwtService: JwtService) {}
 
   /**
    * Handle client connection

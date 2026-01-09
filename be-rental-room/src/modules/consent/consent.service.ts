@@ -21,7 +21,7 @@ export class ConsentService {
   constructor(
     private prisma: PrismaService,
     private snapshotService: SnapshotService,
-  ) { }
+  ) {}
 
   /**
    * Record consent action (Grant/Revoke/Update)
@@ -37,20 +37,23 @@ export class ConsentService {
     // Use transaction to ensure snapshot + consent log created atomically
     return await this.prisma.$transaction(async (tx) => {
       // Create legal snapshot first (pass transaction)
-      const snapshotId = await this.snapshotService.create({
-        actorId: dto.userId,
-        actorRole: dto.userRole,
-        actionType: 'consent_updated',
-        entityType: 'CONSENT',
-        entityId: dto.userId,
-        ipAddress: dto.ipAddress,
-        userAgent: dto.userAgent,
-        metadata: {
-          documentType: dto.documentType,
-          documentVersion: dto.documentVersion,
-          action: dto.action,
+      const snapshotId = await this.snapshotService.create(
+        {
+          actorId: dto.userId,
+          actorRole: dto.userRole,
+          actionType: 'consent_updated',
+          entityType: 'CONSENT',
+          entityId: dto.userId,
+          ipAddress: dto.ipAddress,
+          userAgent: dto.userAgent,
+          metadata: {
+            documentType: dto.documentType,
+            documentVersion: dto.documentVersion,
+            action: dto.action,
+          },
         },
-      }, tx);
+        tx,
+      );
 
       // Create consent log (in same transaction)
       const consentLog = await tx.consentLog.create({

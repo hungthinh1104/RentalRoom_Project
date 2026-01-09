@@ -28,12 +28,18 @@ export class BillingController {
   constructor(
     private readonly billingService: BillingService,
     private readonly pdfService: PdfService,
-  ) { }
+  ) {}
 
   @Post('invoices')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  createInvoice(@Body() createInvoiceDto: CreateInvoiceDto, @CurrentUser() user: any) {
-    return this.billingService.createInvoice(createInvoiceDto, { id: user.id, role: user.role });
+  createInvoice(
+    @Body() createInvoiceDto: CreateInvoiceDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.billingService.createInvoice(createInvoiceDto, {
+      id: user.id,
+      role: user.role,
+    });
   }
 
   @Post('invoices/:invoiceId/items')
@@ -62,10 +68,7 @@ export class BillingController {
 
   @Get('invoices/:id')
   @Auth()
-  findOneInvoice(
-    @Param('id') id: string,
-    @CurrentUser() user: any,
-  ) {
+  findOneInvoice(@Param('id') id: string, @CurrentUser() user: any) {
     return this.billingService.findOneInvoice(id, user);
   }
 
@@ -115,7 +118,12 @@ export class BillingController {
   @Post('meter-readings')
   @Auth(UserRole.LANDLORD)
   async submitMeterReadings(
-    @Body() dto: { contractId: string; month: string; readings: Array<{ serviceId: string; currentReading: number }> },
+    @Body()
+    dto: {
+      contractId: string;
+      month: string;
+      readings: Array<{ serviceId: string; currentReading: number }>;
+    },
   ) {
     return this.billingService.submitMeterReadingsForLandlord(dto);
   }

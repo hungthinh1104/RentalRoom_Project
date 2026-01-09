@@ -1,21 +1,26 @@
 import {
-    Controller,
-    Get,
-    Post,
-    Body,
-    Patch,
-    Param,
-    Delete,
-    Query,
-    Req,
-    UseGuards,
-    UseInterceptors,
-    UploadedFile,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  Req,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { LegalDocumentsService } from './legal-documents.service';
 import { PdfUploadService } from './pdf-upload.service';
-import { CreateDocumentDto, CreateVersionDto, UpdateDocumentDto, PublishVersionDto } from './dto';
+import {
+  CreateDocumentDto,
+  CreateVersionDto,
+  UpdateDocumentDto,
+  PublishVersionDto,
+} from './dto';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { UserRole } from '../users/entities';
@@ -23,285 +28,288 @@ import type { Request } from 'express';
 
 @Controller('legal-documents')
 export class LegalDocumentsController {
-    constructor(
-        private readonly legalDocumentsService: LegalDocumentsService,
-        private readonly pdfUploadService: PdfUploadService,
-    ) { }
+  constructor(
+    private readonly legalDocumentsService: LegalDocumentsService,
+    private readonly pdfUploadService: PdfUploadService,
+  ) {}
 
-    /**
-     * Get client IP from request
-     */
-    private getClientIp(req: Request): string {
-        return (
-            (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
-            req.socket.remoteAddress ||
-            'unknown'
-        );
+  /**
+   * Get client IP from request
+   */
+  private getClientIp(req: Request): string {
+    return (
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
+      req.socket.remoteAddress ||
+      'unknown'
+    );
+  }
+
+  /**
+   * Create legal document
+   * SECURITY: ADMIN ONLY
+   */
+  @Post()
+  @Auth(UserRole.ADMIN)
+  create(
+    @Body() dto: CreateDocumentDto,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+  ) {
+    const ipAddress = this.getClientIp(req);
+    const userAgent = req.headers['user-agent'];
+
+    return this.legalDocumentsService.createDocument(
+      dto,
+      user.id,
+      ipAddress,
+      userAgent,
+    );
+  }
+
+  /**
+   * Get all documents
+   * SECURITY: ADMIN can see all, others see published only
+   */
+  @Get()
+  findAll(
+    @Query('type') type?: string,
+    @Query('isActive') isActive?: string,
+    @CurrentUser() user?: any,
+  ) {
+    const filters: any = {};
+
+    if (type) filters.type = type;
+    if (isActive !== undefined) filters.isActive = isActive === 'true';
+
+    // Non-admin users can only see published documents
+    if (!user || user.role !== UserRole.ADMIN) {
+      filters.isPublished = true;
     }
 
-    /**
-     * Create legal document
-     * SECURITY: ADMIN ONLY
-     */
-    @Post()
-    @Auth(UserRole.ADMIN)
-    create(
-        @Body() dto: CreateDocumentDto,
-        @CurrentUser() user: any,
-        @Req() req: Request,
-    ) {
-        const ipAddress = this.getClientIp(req);
-        const userAgent = req.headers['user-agent'];
+    return this.legalDocumentsService.findAll(filters);
+  }
 
-        return this.legalDocumentsService.createDocument(
-            dto,
-            user.id,
-            ipAddress,
-            userAgent,
-        );
-    }
+  /**
+   * Get document by ID
+   * SECURITY: ADMIN can see all, others only published
+   */
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentUser() user?: any) {
+    return this.legalDocumentsService.findOne(id);
+  }
 
-    /**
-     * Get all documents
-     * SECURITY: ADMIN can see all, others see published only
-     */
-    @Get()
-    findAll(
-        @Query('type') type?: string,
-        @Query('isActive') isActive?: string,
-        @CurrentUser() user?: any,
-    ) {
-        const filters: any = {};
+  /**
+   * Get document by slug (for public access)
+   * NO AUTH REQUIRED
+   */
+  @Get('slug/:slug')
+  findBySlug(@Param('slug') slug: string) {
+    return this.legalDocumentsService.findBySlug(slug);
+  }
 
-        if (type) filters.type = type;
-        if (isActive !== undefined) filters.isActive = isActive === 'true';
+  /**
+   * Update document metadata
+   * SECURITY: ADMIN ONLY
+   */
+  @Patch(':id')
+  @Auth(UserRole.ADMIN)
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateDocumentDto,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+  ) {
+    const ipAddress = this.getClientIp(req);
+    const userAgent = req.headers['user-agent'];
 
-        // Non-admin users can only see published documents
-        if (!user || user.role !== UserRole.ADMIN) {
-            filters.isPublished = true;
-        }
+    return this.legalDocumentsService.updateDocument(
+      id,
+      dto,
+      user.id,
+      ipAddress,
+      userAgent,
+    );
+  }
 
-        return this.legalDocumentsService.findAll(filters);
-    }
+  /**
+   * Soft delete document
+   * SECURITY: ADMIN ONLY
+   * WARNING: This does NOT permanently delete (legal compliance)
+   */
+  @Delete(':id')
+  @Auth(UserRole.ADMIN)
+  softDelete(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+  ) {
+    const ipAddress = this.getClientIp(req);
+    const userAgent = req.headers['user-agent'];
 
-    /**
-     * Get document by ID
-     * SECURITY: ADMIN can see all, others only published
-     */
-    @Get(':id')
-    findOne(@Param('id') id: string, @CurrentUser() user?: any) {
-        return this.legalDocumentsService.findOne(id);
-    }
+    return this.legalDocumentsService.softDeleteDocument(
+      id,
+      user.id,
+      reason,
+      ipAddress,
+      userAgent,
+    );
+  }
 
-    /**
-     * Get document by slug (for public access)
-     * NO AUTH REQUIRED
-     */
-    @Get('slug/:slug')
-    findBySlug(@Param('slug') slug: string) {
-        return this.legalDocumentsService.findBySlug(slug);
-    }
+  // ============================================================================
+  // VERSION MANAGEMENT
+  // ============================================================================
 
-    /**
-     * Update document metadata
-     * SECURITY: ADMIN ONLY
-     */
-    @Patch(':id')
-    @Auth(UserRole.ADMIN)
-    update(
-        @Param('id') id: string,
-        @Body() dto: UpdateDocumentDto,
-        @CurrentUser() user: any,
-        @Req() req: Request,
-    ) {
-        const ipAddress = this.getClientIp(req);
-        const userAgent = req.headers['user-agent'];
+  /**
+   * Create new version
+   * SECURITY: ADMIN ONLY
+   */
+  @Post(':id/versions')
+  @Auth(UserRole.ADMIN)
+  createVersion(
+    @Param('id') documentId: string,
+    @Body() dto: CreateVersionDto,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+  ) {
+    const ipAddress = this.getClientIp(req);
+    const userAgent = req.headers['user-agent'];
 
-        return this.legalDocumentsService.updateDocument(
-            id,
-            dto,
-            user.id,
-            ipAddress,
-            userAgent,
-        );
-    }
+    return this.legalDocumentsService.createVersion(
+      documentId,
+      dto,
+      user.id,
+      ipAddress,
+      userAgent,
+    );
+  }
 
-    /**
-     * Soft delete document
-     * SECURITY: ADMIN ONLY
-     * WARNING: This does NOT permanently delete (legal compliance)
-     */
-    @Delete(':id')
-    @Auth(UserRole.ADMIN)
-    softDelete(
-        @Param('id') id: string,
-        @Body('reason') reason: string,
-        @CurrentUser() user: any,
-        @Req() req: Request,
-    ) {
-        const ipAddress = this.getClientIp(req);
-        const userAgent = req.headers['user-agent'];
+  /**
+   * Publish version
+   * SECURITY: ADMIN ONLY
+   * CRITICAL: This locks the version permanently
+   */
+  @Post(':id/versions/:versionId/publish')
+  @Auth(UserRole.ADMIN)
+  publishVersion(
+    @Param('id') documentId: string,
+    @Param('versionId') versionId: string,
+    @Body() dto: PublishVersionDto,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+  ) {
+    const ipAddress = this.getClientIp(req);
+    const userAgent = req.headers['user-agent'];
 
-        return this.legalDocumentsService.softDeleteDocument(
-            id,
-            user.id,
-            reason,
-            ipAddress,
-            userAgent,
-        );
-    }
+    return this.legalDocumentsService.publishVersion(
+      documentId,
+      versionId,
+      dto,
+      user.id,
+      ipAddress,
+      userAgent,
+    );
+  }
 
-    // ============================================================================
-    // VERSION MANAGEMENT
-    // ============================================================================
+  // ============================================================================
+  // AUDIT & COMPLIANCE
+  // ============================================================================
 
-    /**
-     * Create new version
-     * SECURITY: ADMIN ONLY
-     */
-    @Post(':id/versions')
-    @Auth(UserRole.ADMIN)
-    createVersion(
-        @Param('id') documentId: string,
-        @Body() dto: CreateVersionDto,
-        @CurrentUser() user: any,
-        @Req() req: Request,
-    ) {
-        const ipAddress = this.getClientIp(req);
-        const userAgent = req.headers['user-agent'];
+  /**
+   * Get audit history
+   * SECURITY: ADMIN ONLY
+   */
+  @Get(':id/audit')
+  @Auth(UserRole.ADMIN)
+  getAuditHistory(@Param('id') documentId: string) {
+    return this.legalDocumentsService.getAuditHistory(documentId);
+  }
 
-        return this.legalDocumentsService.createVersion(
-            documentId,
-            dto,
-            user.id,
-            ipAddress,
-            userAgent,
-        );
-    }
+  /**
+   * Verify content integrity
+   * Checks if content matches SHA-256 hash
+   * SECURITY: ADMIN ONLY
+   */
+  @Get(':id/versions/:versionId/verify')
+  @Auth(UserRole.ADMIN)
+  async verifyIntegrity(
+    @Param('id') documentId: string,
+    @Param('versionId') versionId: string,
+  ) {
+    const isValid =
+      await this.legalDocumentsService.verifyContentIntegrity(versionId);
 
-    /**
-     * Publish version
-     * SECURITY: ADMIN ONLY
-     * CRITICAL: This locks the version permanently
-     */
-    @Post(':id/versions/:versionId/publish')
-    @Auth(UserRole.ADMIN)
-    publishVersion(
-        @Param('id') documentId: string,
-        @Param('versionId') versionId: string,
-        @Body() dto: PublishVersionDto,
-        @CurrentUser() user: any,
-        @Req() req: Request,
-    ) {
-        const ipAddress = this.getClientIp(req);
-        const userAgent = req.headers['user-agent'];
+    return {
+      versionId,
+      isValid,
+      message: isValid
+        ? 'Content integrity verified - no tampering detected'
+        : 'WARNING: Content has been tampered with!',
+    };
+  }
 
-        return this.legalDocumentsService.publishVersion(
-            documentId,
-            versionId,
-            dto,
-            user.id,
-            ipAddress,
-            userAgent,
-        );
-    }
+  // ============================================================================
+  // PDF ATTACHMENTS
+  // ============================================================================
 
-    // ============================================================================
-    // AUDIT & COMPLIANCE
-    // ============================================================================
+  /**
+   * Upload PDF attachment to version
+   * SECURITY: ADMIN ONLY, max 10MB
+   */
+  @Post(':id/versions/:versionId/upload-pdf')
+  @Auth(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadPdf(
+    @Param('id') documentId: string,
+    @Param('versionId') versionId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('description') description: string,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+  ) {
+    const ipAddress = this.getClientIp(req);
+    return this.pdfUploadService.uploadPdf(
+      versionId,
+      file,
+      user.id,
+      description,
+      ipAddress,
+    );
+  }
 
-    /**
-     * Get audit history
-     * SECURITY: ADMIN ONLY
-     */
-    @Get(':id/audit')
-    @Auth(UserRole.ADMIN)
-    getAuditHistory(@Param('id') documentId: string) {
-        return this.legalDocumentsService.getAuditHistory(documentId);
-    }
+  /**
+   * Download PDF attachment
+   * SECURITY: ADMIN can download all, others only from published versions
+   */
+  @Get('attachments/:attachmentId/download')
+  async downloadPdf(@Param('attachmentId') attachmentId: string) {
+    const { buffer, fileName, mimeType } =
+      await this.pdfUploadService.getPdf(attachmentId);
 
-    /**
-     * Verify content integrity
-     * Checks if content matches SHA-256 hash
-     * SECURITY: ADMIN ONLY
-     */
-    @Get(':id/versions/:versionId/verify')
-    @Auth(UserRole.ADMIN)
-    async verifyIntegrity(
-        @Param('id') documentId: string,
-        @Param('versionId') versionId: string,
-    ) {
-        const isValid = await this.legalDocumentsService.verifyContentIntegrity(versionId);
+    // Return file as response (NestJS will handle this)
+    return {
+      buffer,
+      fileName,
+      mimeType,
+    };
+  }
 
-        return {
-            versionId,
-            isValid,
-            message: isValid
-                ? 'Content integrity verified - no tampering detected'
-                : 'WARNING: Content has been tampered with!',
-        };
-    }
+  /**
+   * Verify PDF integrity
+   * SECURITY: ADMIN ONLY
+   */
+  @Get('attachments/:attachmentId/verify')
+  @Auth(UserRole.ADMIN)
+  async verifyPdfIntegrity(@Param('attachmentId') attachmentId: string) {
+    const isValid =
+      await this.pdfUploadService.verifyPdfIntegrity(attachmentId);
 
-    // ============================================================================
-    // PDF ATTACHMENTS
-    // ============================================================================
-
-    /**
-     * Upload PDF attachment to version
-     * SECURITY: ADMIN ONLY, max 10MB
-     */
-    @Post(':id/versions/:versionId/upload-pdf')
-    @Auth(UserRole.ADMIN)
-    @UseInterceptors(FileInterceptor('file'))
-    async uploadPdf(
-        @Param('id') documentId: string,
-        @Param('versionId') versionId: string,
-        @UploadedFile() file: Express.Multer.File,
-        @Body('description') description: string,
-        @CurrentUser() user: any,
-        @Req() req: Request,
-    ) {
-        const ipAddress = this.getClientIp(req);
-        return this.pdfUploadService.uploadPdf(
-            versionId,
-            file,
-            user.id,
-            description,
-            ipAddress,
-        );
-    }
-
-    /**
-     * Download PDF attachment
-     * SECURITY: ADMIN can download all, others only from published versions
-     */
-    @Get('attachments/:attachmentId/download')
-    async downloadPdf(@Param('attachmentId') attachmentId: string) {
-        const { buffer, fileName, mimeType } = await this.pdfUploadService.getPdf(attachmentId);
-
-        // Return file as response (NestJS will handle this)
-        return {
-            buffer,
-            fileName,
-            mimeType,
-        };
-    }
-
-    /**
-     * Verify PDF integrity
-     * SECURITY: ADMIN ONLY
-     */
-    @Get('attachments/:attachmentId/verify')
-    @Auth(UserRole.ADMIN)
-    async verifyPdfIntegrity(@Param('attachmentId') attachmentId: string) {
-        const isValid = await this.pdfUploadService.verifyPdfIntegrity(attachmentId);
-
-        return {
-            attachmentId,
-            isValid,
-            message: isValid
-                ? 'PDF integrity verified - no tampering detected'
-                : 'WARNING: PDF file has been tampered with!',
-        };
-    }
+    return {
+      attachmentId,
+      isValid,
+      message: isValid
+        ? 'PDF integrity verified - no tampering detected'
+        : 'WARNING: PDF file has been tampered with!',
+    };
+  }
 }

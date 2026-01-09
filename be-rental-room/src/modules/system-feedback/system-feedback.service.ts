@@ -14,7 +14,7 @@ export class SystemFeedbackService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
-  ) { }
+  ) {}
 
   async create(userId: string, dto: CreateSystemFeedbackDto) {
     const feedback = await this.prisma.systemFeedback.create({
@@ -44,7 +44,9 @@ export class SystemFeedbackService {
       });
       this.logger.debug(`📬 Complaint notification sent to user ${userId}`);
     } catch (error) {
-      this.logger.warn(`Failed to send complaint notification: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(
+        `Failed to send complaint notification: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return feedback;
@@ -132,9 +134,13 @@ export class SystemFeedbackService {
         notificationType: 'COMPLAINT_RESPONDED',
         relatedEntityId: id,
       });
-      this.logger.debug(`📬 Response notification sent to tenant ${feedback.user.id}`);
+      this.logger.debug(
+        `📬 Response notification sent to tenant ${feedback.user.id}`,
+      );
     } catch (error) {
-      this.logger.warn(`Failed to send response notification: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(
+        `Failed to send response notification: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return updated;

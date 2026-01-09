@@ -37,7 +37,7 @@ export class ContractsService {
     private readonly emailService: EmailService,
     private readonly paymentService: PaymentService,
     private readonly snapshotService: SnapshotService,
-  ) { }
+  ) {}
 
   /**
    * Validate contract status transitions to prevent invalid state changes
@@ -75,7 +75,7 @@ export class ContractsService {
     if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
       throw new BadRequestException(
         `Invalid status transition: ${oldStatus} → ${newStatus}. ` +
-        `Allowed transitions from ${oldStatus}: ${allowedTransitions?.join(', ') || 'none'}`,
+          `Allowed transitions from ${oldStatus}: ${allowedTransitions?.join(', ') || 'none'}`,
       );
     }
   }
@@ -210,8 +210,8 @@ export class ContractsService {
         tenantUser.phoneNumber || 'N/A',
         application.requestedMoveInDate
           ? new Date(application.requestedMoveInDate).toLocaleDateString(
-            'vi-VN',
-          )
+              'vi-VN',
+            )
           : undefined,
         application.message || undefined,
       );
@@ -640,15 +640,7 @@ export class ContractsService {
     const contract = await this.findOne(contractId);
 
     if (contract.tenantId !== tenantId) {
-      // Check tenantId (Profile ID or User ID? findOne returns relations, tenantId is UserID in schema relation logic usually... wait, schema says tenantId references Tenant.userId. So this comparison depends on what tenantId param is passed. Usually UserID.)
-      // Let's verify: application passes User ID. findOne joins tenant.
-      // Contract.tenantId => Tenant Profile ID (actually Tenant.userId is the relation key in schema).
-      // In schema: tenant Tenant @relation(fields: [tenantId], references: [userId])
-      // So contract.tenantId IS the UserID of the tenant.
-      // My comparison: if (contract.tenantId !== tenantId) is correct if tenantId param is UserID.
-      if (contract.tenantId !== tenantId) {
-        throw new UnauthorizedException('Not authorized');
-      }
+      throw new UnauthorizedException('Not authorized');
     }
 
     if (contract.status !== ContractStatus.PENDING_SIGNATURE) {
@@ -684,7 +676,10 @@ export class ContractsService {
           relatedEntityId: contractId,
           isRead: false,
         });
-      } catch (e) { }
+      } catch (e) {
+        // Notification failure is non-critical, log and continue
+        this.logger.warn(`Failed to send notification: ${e}`);
+      }
 
       return updated;
     });
@@ -1057,20 +1052,23 @@ export class ContractsService {
         // 7. Create Legal Snapshot for contract_signed (MVP Week 2)
         // FIX: Pass transaction for atomic operation
         try {
-          const snapshotId = await this.snapshotService.create({
-            actorId: contract.tenantId,
-            actorRole: UserRole.TENANT,
-            actionType: 'contract_signed',
-            entityType: 'CONTRACT',
-            entityId: contract.id,
-            metadata: {
-              contractNumber: contract.contractNumber,
-              monthlyRent: contract.monthlyRent.toString(),
-              deposit: contract.deposit.toString(),
-              startDate: contract.startDate.toISOString(),
-              endDate: contract.endDate.toISOString(),
+          const snapshotId = await this.snapshotService.create(
+            {
+              actorId: contract.tenantId,
+              actorRole: UserRole.TENANT,
+              actionType: 'contract_signed',
+              entityType: 'CONTRACT',
+              entityId: contract.id,
+              metadata: {
+                contractNumber: contract.contractNumber,
+                monthlyRent: contract.monthlyRent.toString(),
+                deposit: contract.deposit.toString(),
+                startDate: contract.startDate.toISOString(),
+                endDate: contract.endDate.toISOString(),
+              },
             },
-          }, tx);  // ← Pass transaction for atomicity
+            tx,
+          ); // ← Pass transaction for atomicity
 
           // Link snapshot to contract (already in transaction)
           await tx.contract.update({
@@ -1092,20 +1090,23 @@ export class ContractsService {
         // 8. Create Legal Snapshot for payment_succeeded (MVP Week 2)
         // FIX: Pass transaction for atomic operation
         try {
-          const paymentSnapshotId = await this.snapshotService.create({
-            actorId: contract.tenantId,
-            actorRole: UserRole.TENANT,
-            actionType: 'payment_succeeded',
-            entityType: 'PAYMENT',
-            entityId: paymentRecord.id,
-            metadata: {
-              amount: paymentRecord.amount.toString(),
-              invoiceId: invoice.id,
-              invoiceNumber: invoice.invoiceNumber,
-              paymentMethod: paymentRecord.paymentMethod,
-              contractId: contract.id,
+          const paymentSnapshotId = await this.snapshotService.create(
+            {
+              actorId: contract.tenantId,
+              actorRole: UserRole.TENANT,
+              actionType: 'payment_succeeded',
+              entityType: 'PAYMENT',
+              entityId: paymentRecord.id,
+              metadata: {
+                amount: paymentRecord.amount.toString(),
+                invoiceId: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                paymentMethod: paymentRecord.paymentMethod,
+                contractId: contract.id,
+              },
             },
-          }, tx);  // ← Pass transaction for atomicity
+            tx,
+          ); // ← Pass transaction for atomicity
 
           // Link snapshot to payment (already in transaction)
           await tx.payment.update({
@@ -1196,7 +1197,8 @@ export class ContractsService {
 
       // Apply additional filters (only if user is admin or filter matches ownership)
       if (tenantId) where.tenantId = tenantId;
-      if (landlordId && user.role === UserRole.ADMIN) where.landlordId = landlordId;
+      if (landlordId && user.role === UserRole.ADMIN)
+        where.landlordId = landlordId;
       if (roomId) where.roomId = roomId;
       if (status) where.status = status;
       if (search) {
@@ -1247,10 +1249,11 @@ export class ContractsService {
         // 2. Sanitize Nested Services (CRITICAL)
         if (contract.room?.property?.services) {
           // @ts-ignore
-          safeContract.room.property.services = contract.room.property.services.map(s => ({
-            ...s,
-            unitPrice: s.unitPrice ? Number(s.unitPrice) : 0,
-          }));
+          safeContract.room.property.services =
+            contract.room.property.services.map((s) => ({
+              ...s,
+              unitPrice: s.unitPrice ? Number(s.unitPrice) : 0,
+            }));
         }
 
         return safeContract;
@@ -1265,7 +1268,10 @@ export class ContractsService {
         limit,
       );
     } catch (error) {
-      this.logger.error(`Error in findAll contracts: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error in findAll contracts: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -1286,17 +1292,17 @@ export class ContractsService {
     if (contract) {
       this.logger.debug(
         '[ContractsService] findOne raw: ' +
-        JSON.stringify(
-          {
-            id: contract.id,
-            hasRoom: !!contract.room,
-            hasProperty: !!contract.room?.property,
-            deposit: contract.deposit,
-            depositType: typeof contract.deposit,
-          },
-          null,
-          2,
-        ),
+          JSON.stringify(
+            {
+              id: contract.id,
+              hasRoom: !!contract.room,
+              hasProperty: !!contract.room?.property,
+              deposit: contract.deposit,
+              depositType: typeof contract.deposit,
+            },
+            null,
+            2,
+          ),
       );
     }
 
@@ -1343,7 +1349,9 @@ export class ContractsService {
 
     // Landlords can only update their own contracts
     if (user.role === UserRole.LANDLORD && existing.landlordId !== user.id) {
-      throw new BadRequestException('Landlords can only update their own contracts');
+      throw new BadRequestException(
+        'Landlords can only update their own contracts',
+      );
     }
 
     // Exclude immutable fields and relations that need special handling

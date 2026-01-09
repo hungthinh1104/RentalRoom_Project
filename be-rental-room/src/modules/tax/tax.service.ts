@@ -9,7 +9,7 @@ export class TaxService {
   private readonly logger = new Logger(TaxService.name);
   private readonly TAX_THRESHOLD = 500_000_000; // 500M VND/year
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Generate monthly revenue snapshot for a landlord
@@ -138,7 +138,7 @@ export class TaxService {
         landlordId_year_month: {
           landlordId,
           year,
-          month: undefined as any,  // Annual snapshot (month omitted)
+          month: undefined as any, // Annual snapshot (month omitted)
         },
       },
       update: {
@@ -181,7 +181,9 @@ export class TaxService {
       });
 
       if (!landlord || landlord.userId !== landlordId) {
-        throw new ForbiddenException('Access denied - can only access own data');
+        throw new ForbiddenException(
+          'Access denied - can only access own data',
+        );
       }
     }
     const snapshots = await this.prisma.landlordRevenueSnapshot.findMany({
@@ -197,7 +199,7 @@ export class TaxService {
 
     // FIX: Use Decimal arithmetic for precise calculation (no float errors)
     const totalRevenue = snapshots.reduce(
-      (sum, s) => sum.plus(s.totalRevenue),  // ← Decimal.plus() instead of + Number()
+      (sum, s) => sum.plus(s.totalRevenue), // ← Decimal.plus() instead of + Number()
       new Decimal(0),
     );
 
@@ -210,7 +212,7 @@ export class TaxService {
 
     return {
       csv,
-      totalRevenue: totalAsNumber,  //← Convert for JSON response
+      totalRevenue: totalAsNumber, //← Convert for JSON response
       threshold: this.TAX_THRESHOLD,
       exceedsThreshold,
       disclaimer: `

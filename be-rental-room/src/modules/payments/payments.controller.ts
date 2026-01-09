@@ -12,7 +12,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
-import { CreatePaymentDto, UpdatePaymentDto, FilterPaymentsDto, GenerateQrDto } from './dto';
+import {
+  CreatePaymentDto,
+  UpdatePaymentDto,
+  FilterPaymentsDto,
+  GenerateQrDto,
+} from './dto';
 import { UserRole } from '../users/entities';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -30,7 +35,7 @@ export class PaymentsController {
     private readonly sepayService: SepayService,
     private readonly paymentService: PaymentService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -186,7 +191,9 @@ export class PaymentsController {
 
     // If generation failed, throw error so frontend gets proper error response
     if (!result.success) {
-      throw new BadRequestException(result.error || 'Failed to generate QR code');
+      throw new BadRequestException(
+        result.error || 'Failed to generate QR code',
+      );
     }
 
     return result;
@@ -255,7 +262,9 @@ export class PaymentsController {
     if (!verificationResult.success) {
       return {
         success: false,
-        message: verificationResult.error || 'Payment not found in recent transactions',
+        message:
+          verificationResult.error ||
+          'Payment not found in recent transactions',
       };
     }
 

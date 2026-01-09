@@ -29,7 +29,7 @@ export class SepayAdapter implements IPaymentGateway {
   constructor(
     private readonly httpService: HttpService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
   /**
    * Verify payment for a contract
@@ -75,7 +75,10 @@ export class SepayAdapter implements IPaymentGateway {
       }
 
       // 3. Fetch transactions from Sepay
-      const transactions = await this.fetchTransactions({ ...config, apiToken });
+      const transactions = await this.fetchTransactions({
+        ...config,
+        apiToken,
+      });
       if (!transactions || transactions.length === 0) {
         return {
           success: false,

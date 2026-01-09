@@ -22,7 +22,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 @Controller('maintenance')
 export class MaintenanceController {
-  constructor(private readonly maintenanceService: MaintenanceService) { }
+  constructor(private readonly maintenanceService: MaintenanceService) {}
 
   @Post('requests')
   @Auth()

@@ -143,7 +143,11 @@ describe('ServicesController', () => {
       const result = await controller.update(serviceId, updateDto, mockUser);
 
       expect(result).toEqual(mockUpdatedService);
-      expect(service.update).toHaveBeenCalledWith(serviceId, updateDto, mockUser);
+      expect(service.update).toHaveBeenCalledWith(
+        serviceId,
+        updateDto,
+        mockUser,
+      );
     });
   });
 

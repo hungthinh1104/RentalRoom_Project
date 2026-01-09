@@ -12,7 +12,7 @@ export class BillingCronService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
-  ) { }
+  ) {}
 
   /**
    * Run at 00:05 on the 1st of every month to generate invoices

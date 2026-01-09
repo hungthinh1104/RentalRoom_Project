@@ -8,9 +8,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { SnapshotsModule } from '../snapshots/snapshots.module';
 
 @Module({
-    imports: [PrismaModule, NotificationsModule, SnapshotsModule],
-    controllers: [IncomeController],
-    providers: [IncomeService, ExpenseService, TaxYearSummaryService],
-    exports: [IncomeService, ExpenseService, TaxYearSummaryService],
+  imports: [PrismaModule, NotificationsModule, SnapshotsModule],
+  controllers: [IncomeController],
+  providers: [IncomeService, ExpenseService, TaxYearSummaryService],
+  exports: [IncomeService, ExpenseService, TaxYearSummaryService],
 })
-export class IncomeModule { }
+export class IncomeModule {}

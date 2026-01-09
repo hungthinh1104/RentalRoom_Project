@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreateServiceDto,
@@ -12,7 +16,7 @@ import { User, UserRole } from '@prisma/client';
 
 @Injectable()
 export class ServicesService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createServiceDto: CreateServiceDto) {
     const service = await this.prisma.service.create({
@@ -111,8 +115,13 @@ export class ServicesService {
     }
 
     // 🔒 SECURITY: Landlord can only update services for their properties
-    if (user.role === UserRole.LANDLORD && existing.property.landlordId !== user.id) {
-      throw new BadRequestException('Landlords can only update services for their own properties');
+    if (
+      user.role === UserRole.LANDLORD &&
+      existing.property.landlordId !== user.id
+    ) {
+      throw new BadRequestException(
+        'Landlords can only update services for their own properties',
+      );
     }
 
     const service = await this.prisma.service.update({
@@ -142,8 +151,13 @@ export class ServicesService {
     }
 
     // 🔒 SECURITY: Landlord can only delete services for their properties
-    if (user.role === UserRole.LANDLORD && existing.property.landlordId !== user.id) {
-      throw new BadRequestException('Landlords can only delete services for their own properties');
+    if (
+      user.role === UserRole.LANDLORD &&
+      existing.property.landlordId !== user.id
+    ) {
+      throw new BadRequestException(
+        'Landlords can only delete services for their own properties',
+      );
     }
 
     await this.prisma.service.delete({

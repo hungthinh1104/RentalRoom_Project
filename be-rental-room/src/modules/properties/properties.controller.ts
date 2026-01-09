@@ -24,7 +24,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) { }
+  constructor(private readonly propertiesService: PropertiesService) {}
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -36,10 +36,7 @@ export class PropertiesController {
   @Auth()
   // @UseInterceptors(CacheInterceptor)
   // @CacheTTL(300) // Cache for 5 minutes
-  findAll(
-    @Query() filterDto: FilterPropertiesDto,
-    @CurrentUser() user: User,
-  ) {
+  findAll(@Query() filterDto: FilterPropertiesDto, @CurrentUser() user: User) {
     // 🔒 SECURITY: Landlords can only see their own properties
     if (user.role === UserRole.LANDLORD) {
       filterDto.landlordId = user.id;
@@ -67,10 +64,7 @@ export class PropertiesController {
 
   @Delete(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  remove(
-    @Param('id') id: string,
-    @CurrentUser() user: User,
-  ) {
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
     return this.propertiesService.remove(id, user);
   }
 }

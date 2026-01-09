@@ -5,9 +5,9 @@ import { PdfUploadService } from './pdf-upload.service';
 import { PrismaModule } from 'src/database/prisma/prisma.module';
 
 @Module({
-    imports: [PrismaModule],
-    controllers: [LegalDocumentsController],
-    providers: [LegalDocumentsService, PdfUploadService],
-    exports: [LegalDocumentsService],
+  imports: [PrismaModule],
+  controllers: [LegalDocumentsController],
+  providers: [LegalDocumentsService, PdfUploadService],
+  exports: [LegalDocumentsService],
 })
-export class LegalDocumentsModule { }
+export class LegalDocumentsModule {}

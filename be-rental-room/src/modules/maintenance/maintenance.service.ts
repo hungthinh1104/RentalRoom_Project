@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -20,7 +25,7 @@ export class MaintenanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
-  ) { }
+  ) {}
 
   async create(createDto: CreateMaintenanceRequestDto) {
     const request = await this.prisma.maintenanceRequest.create({
@@ -48,7 +53,9 @@ export class MaintenanceService {
         notificationType: 'MAINTENANCE' as any,
         relatedEntityId: request.id,
       });
-      this.logger.log(`📬 Maintenance notification sent to landlord ${request.room.property.landlordId}`);
+      this.logger.log(
+        `📬 Maintenance notification sent to landlord ${request.room.property.landlordId}`,
+      );
     } catch (error) {
       this.logger.error('Failed to send maintenance notification', error);
     }
@@ -105,12 +112,12 @@ export class MaintenanceService {
         where,
         include: landlordId
           ? {
-            room: {
-              include: {
-                property: true,
+              room: {
+                include: {
+                  property: true,
+                },
               },
-            },
-          }
+            }
           : undefined,
         skip: filterDto.skip,
         take: limit,
@@ -151,12 +158,19 @@ export class MaintenanceService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Maintenance request with ID ${id} not found`);
+      throw new NotFoundException(
+        `Maintenance request with ID ${id} not found`,
+      );
     }
 
     // 🔒 SECURITY: Landlord can only update requests for their properties
-    if (user.role === UserRole.LANDLORD && existing.room.property.landlordId !== user.id) {
-      throw new BadRequestException('Landlords can only update maintenance requests for their own properties');
+    if (
+      user.role === UserRole.LANDLORD &&
+      existing.room.property.landlordId !== user.id
+    ) {
+      throw new BadRequestException(
+        'Landlords can only update maintenance requests for their own properties',
+      );
     }
 
     const request = await this.prisma.maintenanceRequest.update({
@@ -193,7 +207,9 @@ export class MaintenanceService {
         notificationType: 'MAINTENANCE' as any,
         relatedEntityId: request.id,
       });
-      this.logger.log(`📬 Maintenance completion notification sent to tenant ${request.tenantId}`);
+      this.logger.log(
+        `📬 Maintenance completion notification sent to tenant ${request.tenantId}`,
+      );
     } catch (error) {
       this.logger.error('Failed to send completion notification', error);
     }

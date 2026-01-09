@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { UserRole } from '@prisma/client';
@@ -10,7 +22,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @Get()
   @Auth(UserRole.ADMIN)
@@ -19,7 +31,11 @@ export class UsersController {
     @Query('role') role?: UserRole,
     @Query('emailVerified') emailVerified?: string,
   ) {
-    return this.usersService.findAll({ search, role, emailVerified: emailVerified === 'true' });
+    return this.usersService.findAll({
+      search,
+      role,
+      emailVerified: emailVerified === 'true',
+    });
   }
 
   @Get(':id')
@@ -69,7 +85,9 @@ export class UsersController {
     // Validate file type
     const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowedMimes.includes(file.mimetype)) {
-      throw new BadRequestException('Only image files (JPEG, PNG, WebP) are allowed');
+      throw new BadRequestException(
+        'Only image files (JPEG, PNG, WebP) are allowed',
+      );
     }
 
     // Validate file size (max 5MB)

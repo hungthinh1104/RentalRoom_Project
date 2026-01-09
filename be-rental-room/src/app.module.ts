@@ -95,4 +95,4 @@ import { LegalDocumentsModule } from './modules/legal-documents/legal-documents.
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

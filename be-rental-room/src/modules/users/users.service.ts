@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -14,7 +19,7 @@ interface FindAllParams {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async findAll(params?: FindAllParams) {
     const { search, role, emailVerified } = params || {};
@@ -203,7 +208,7 @@ export class UsersService {
   async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, passwordHash: true }
+      select: { id: true, passwordHash: true },
     });
 
     if (!user) {
@@ -211,13 +216,19 @@ export class UsersService {
     }
 
     // Verify current password
-    const isPasswordValid = await bcrypt.compare(changePasswordDto.currentPassword, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new BadRequestException('Current password is incorrect');
     }
 
     // Hash new password
-    const newPasswordHash = await bcrypt.hash(changePasswordDto.newPassword, 10);
+    const newPasswordHash = await bcrypt.hash(
+      changePasswordDto.newPassword,
+      10,
+    );
 
     // Update password
     await this.prisma.user.update({
@@ -255,7 +266,11 @@ export class UsersService {
     };
   }
 
-  private async handleRoleChange(userId: string, oldRole: UserRole, newRole: UserRole) {
+  private async handleRoleChange(
+    userId: string,
+    oldRole: UserRole,
+    newRole: UserRole,
+  ) {
     // Delete old role-specific profile
     if (oldRole === UserRole.TENANT) {
       await this.prisma.tenant.deleteMany({ where: { userId } });

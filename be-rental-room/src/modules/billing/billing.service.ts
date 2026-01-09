@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/entities';
@@ -30,9 +35,12 @@ export class BillingService {
     private readonly notificationsService: NotificationsService,
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
-  ) { }
+  ) {}
 
-  async createInvoice(createInvoiceDto: CreateInvoiceDto, actor: { id: string; role: UserRole }) {
+  async createInvoice(
+    createInvoiceDto: CreateInvoiceDto,
+    actor: { id: string; role: UserRole },
+  ) {
     const invoice = await this.prisma.invoice.create({
       data: createInvoiceDto,
       include: {
@@ -57,7 +65,9 @@ export class BillingService {
         metadata: {
           invoiceNumber: invoice.invoiceNumber,
           totalAmount: Number(invoice.totalAmount),
-          items: await this.prisma.invoiceLineItem.findMany({ where: { invoiceId: invoice.id } }),
+          items: await this.prisma.invoiceLineItem.findMany({
+            where: { invoiceId: invoice.id },
+          }),
         },
       });
 
@@ -80,7 +90,9 @@ export class BillingService {
         notificationType: NotificationType.PAYMENT,
         relatedEntityId: invoice.id,
       });
-      this.logger.log(`📬 Invoice notification sent to tenant ${invoice.contract.tenantId}`);
+      this.logger.log(
+        `📬 Invoice notification sent to tenant ${invoice.contract.tenantId}`,
+      );
     } catch (error) {
       this.logger.error('Failed to send invoice notification', error);
     }
@@ -228,7 +240,10 @@ export class BillingService {
     // If user is TENANT, verify they own this invoice
     if (user && user.role === UserRole.TENANT) {
       const tenantId = user.id || user.tenantId;
-      if (invoice.tenantId !== tenantId && invoice.contract?.tenantId !== tenantId) {
+      if (
+        invoice.tenantId !== tenantId &&
+        invoice.contract?.tenantId !== tenantId
+      ) {
         throw new NotFoundException(
           `Invoice with ID ${id} not found or you don't have access to this invoice`,
         );
@@ -338,7 +353,9 @@ export class BillingService {
         },
         updatedInvoice.contract.landlordId,
       );
-      this.logger.log(`💰 Auto-created income for invoice ${updatedInvoice.invoiceNumber}`);
+      this.logger.log(
+        `💰 Auto-created income for invoice ${updatedInvoice.invoiceNumber}`,
+      );
     } catch (error) {
       this.logger.error('Failed to auto-create income', error);
       // Don't fail the invoice payment if income creation fails
@@ -691,7 +708,7 @@ export class BillingService {
     }
 
     // Check if invoice already exists for this month
-    // Updated check to be more specific or allow regeneration? 
+    // Updated check to be more specific or allow regeneration?
     // For now, strict check to prevent duplicates
     const existingInvoice = await this.prisma.invoice.findFirst({
       where: {
@@ -724,11 +741,18 @@ export class BillingService {
 
     // Note: If no metered services exist and no readings, that's fine IF we have rent/fixed services.
     // If we only have metered services and no readings, throw error.
-    const hasMeteredServices = contract.room.property.services.some(s => s.billingMethod === 'METERED');
-    if (hasMeteredServices && readings.length === 0 && !options?.includeRent && !options?.includeFixedServices) {
+    const hasMeteredServices = contract.room.property.services.some(
+      (s) => s.billingMethod === 'METERED',
+    );
+    if (
+      hasMeteredServices &&
+      readings.length === 0 &&
+      !options?.includeRent &&
+      !options?.includeFixedServices
+    ) {
       // Fallback to old behavior: if purely utility invoice and no readings, error.
       // But if we have rent, we allow it.
-      // For safety, warn if readings missing for metered services? 
+      // For safety, warn if readings missing for metered services?
       // We'll proceed.
     }
 
@@ -762,7 +786,9 @@ export class BillingService {
 
     // C. Fixed Services (if enabled) - Default true
     if (options?.includeFixedServices !== false) {
-      const fixedServices = contract.room.property.services.filter(s => s.billingMethod === 'FIXED');
+      const fixedServices = contract.room.property.services.filter(
+        (s) => s.billingMethod === 'FIXED',
+      );
       for (const s of fixedServices) {
         const sAmount = Number(s.unitPrice);
         totalAmount += sAmount;
@@ -811,14 +837,14 @@ export class BillingService {
         ...invoice,
         totalAmount: Number(invoice.totalAmount),
       },
-      readings: readings.map(r => ({
+      readings: readings.map((r) => ({
         ...r,
         amount: Number(r.amount),
         usage: Number(r.usage),
         service: {
           ...r.service,
           unitPrice: Number(r.service.unitPrice),
-        }
+        },
       })),
       totalAmount,
       lineItemCount: lineItemsToCreate.length,
@@ -969,7 +995,6 @@ export class BillingService {
     };
   }
 
-
   /**
    * Get all utility invoices for a landlord
    * Returns invoices for all properties owned by the landlord
@@ -1054,4 +1079,3 @@ export class BillingService {
     }));
   }
 }
-

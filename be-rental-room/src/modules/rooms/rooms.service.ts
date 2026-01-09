@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { PaginatedResponse } from 'src/shared/dtos';
@@ -16,6 +21,8 @@ import {
 
 @Injectable()
 export class RoomsService {
+  private readonly logger = new Logger(RoomsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,

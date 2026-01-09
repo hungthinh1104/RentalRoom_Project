@@ -161,7 +161,11 @@ describe('PropertiesController', () => {
       const result = await controller.update(propertyId, updateDto, mockUser);
 
       expect(result).toEqual(mockUpdatedProperty);
-      expect(service.update).toHaveBeenCalledWith(propertyId, updateDto, mockUser);
+      expect(service.update).toHaveBeenCalledWith(
+        propertyId,
+        updateDto,
+        mockUser,
+      );
     });
   });
 

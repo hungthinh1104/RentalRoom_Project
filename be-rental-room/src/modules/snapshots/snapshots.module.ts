@@ -8,15 +8,7 @@ import { PrismaModule } from '../../database/prisma/prisma.module';
 @Module({
   imports: [PrismaModule],
   controllers: [SnapshotsController],
-  providers: [
-    SnapshotService,
-    SnapshotCleanupService,
-    RegulationService,
-  ],
-  exports: [
-    SnapshotService,
-    SnapshotCleanupService,
-    RegulationService,
-  ],
+  providers: [SnapshotService, SnapshotCleanupService, RegulationService],
+  exports: [SnapshotService, SnapshotCleanupService, RegulationService],
 })
-export class SnapshotsModule { }
+export class SnapshotsModule {}

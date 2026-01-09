@@ -30,12 +30,12 @@ export interface DocumentRef {
 
 @Injectable()
 export class SnapshotService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Create immutable legal snapshot
    * Core principle: Capture what happened, when, and under what regulations
-   * 
+   *
    * @param dto Snapshot data
    * @param tx Optional Prisma transaction for atomic operations
    */
@@ -216,18 +216,21 @@ export class SnapshotService {
     startDate?: Date;
     endDate?: Date;
   }) {
-    const { skip, take, actionType, entityType, actorId, startDate, endDate } = params;
+    const { skip, take, actionType, entityType, actorId, startDate, endDate } =
+      params;
 
     const where: Prisma.LegalSnapshotWhereInput = {
       ...(actionType && { actionType }),
       ...(entityType && { entityType }),
       ...(actorId && { actorId }),
-      ...(startDate || endDate ? {
-        timestamp: {
-          ...(startDate && { gte: startDate }),
-          ...(endDate && { lte: endDate }),
-        },
-      } : {}),
+      ...(startDate || endDate
+        ? {
+            timestamp: {
+              ...(startDate && { gte: startDate }),
+              ...(endDate && { lte: endDate }),
+            },
+          }
+        : {}),
     };
 
     const [data, total] = await Promise.all([

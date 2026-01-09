@@ -1,34 +1,41 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsInt, Min } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  IsInt,
+  Min,
+} from 'class-validator';
 import { DocumentType } from '../entities/legal-document.entity';
 
 export class CreateDocumentDto {
-    @IsString()
-    title: string;
+  @IsString()
+  title: string;
 
-    @IsString()
-    slug: string; // URL-friendly identifier
+  @IsString()
+  slug: string; // URL-friendly identifier
 
-    @IsEnum(DocumentType)
-    type: DocumentType;
+  @IsEnum(DocumentType)
+  type: DocumentType;
 
-    @IsString()
-    @IsOptional()
-    category?: string;
+  @IsString()
+  @IsOptional()
+  category?: string;
 
-    @IsString()
-    @IsOptional()
-    description?: string;
+  @IsString()
+  @IsOptional()
+  description?: string;
 
-    @IsBoolean()
-    @IsOptional()
-    isActive?: boolean = true;
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean = true;
 
-    @IsBoolean()
-    @IsOptional()
-    isPublic?: boolean = false;
+  @IsBoolean()
+  @IsOptional()
+  isPublic?: boolean = false;
 
-    @IsInt()
-    @Min(1)
-    @IsOptional()
-    retentionYears?: number = 10; // Default 10 years (Vietnamese law)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  retentionYears?: number = 10; // Default 10 years (Vietnamese law)
 }

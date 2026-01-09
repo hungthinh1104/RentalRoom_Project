@@ -269,7 +269,9 @@ export class AuthService {
     }
 
     // Generate reset token (valid for 1 hour)
-    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const resetToken =
+      Math.random().toString(36).substring(2, 15) +
+      Math.random().toString(36).substring(2, 15);
     const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
     await this.prisma.user.update({
@@ -297,7 +299,10 @@ export class AuthService {
     return { message: 'If that email exists, a reset link has been sent.' };
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     const user = await this.prisma.user.findFirst({
       where: {
         verificationCode: token,

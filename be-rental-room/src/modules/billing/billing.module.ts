@@ -14,4 +14,4 @@ import { PdfService } from './pdf.service';
   providers: [BillingService, BillingCronService, PdfService],
   exports: [BillingService],
 })
-export class BillingModule { }
+export class BillingModule {}
