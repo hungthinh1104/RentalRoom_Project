@@ -1282,10 +1282,10 @@ export class ContractsService {
       },
     });
 
-    // Debug log
+    // Contract found successfully
     if (contract) {
-      console.log(
-        '[ContractsService] findOne raw:',
+      this.logger.debug(
+        '[ContractsService] findOne raw: ' +
         JSON.stringify(
           {
             id: contract.id,

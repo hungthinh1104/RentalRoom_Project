@@ -86,7 +86,7 @@ export class EmailService {
       await this.mailerService.sendMail({
         to: email,
         subject: 'Reset Your Password - Smart Room',
-        template: './reset-password', // TODO: Create template
+        template: './reset-password',
         context: {
           name,
           resetUrl,

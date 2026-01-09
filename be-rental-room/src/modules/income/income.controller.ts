@@ -7,6 +7,7 @@ import {
     Param,
     Query,
     Request,
+    UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { IncomeService } from './income.service';
@@ -47,7 +48,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
     })
     async getProjection(@Param('year') year: string, @CurrentUser() user: any) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.incomeService.getYearProjection(user.id, parseInt(year));
     }
@@ -67,7 +68,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         if (month || mode === 'list') {
             const m = month ? parseInt(month) : undefined;
@@ -85,7 +86,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.incomeService.delete(id, user.id, reason);
     }
@@ -110,7 +111,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.expenseService.findAll(user.id, parseInt(year));
     }
@@ -123,7 +124,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.expenseService.getYearSummary(user.id, parseInt(year));
     }
@@ -137,7 +138,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.expenseService.delete(id, user.id, reason || 'No reason provided');
     }
@@ -155,7 +156,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.taxYearSummaryService.closeYear(user.id, parseInt(year), user.id);
     }
@@ -168,7 +169,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.taxYearSummaryService.getSummary(user.id, parseInt(year));
     }
@@ -181,7 +182,7 @@ Landlord tự chịu trách nhiệm xác nhận tính chính xác.`,
         @CurrentUser() user: any,
     ) {
         if (!user || !user.id) {
-            throw new Error('User not authenticated');
+            throw new UnauthorizedException('User not authenticated');
         }
         return this.taxYearSummaryService.exportData(user.id, parseInt(year));
     }

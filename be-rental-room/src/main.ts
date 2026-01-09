@@ -28,6 +28,19 @@ async function bootstrap() {
   // Cookie parser middleware (must be before routes)
   app.use(cookieParser());
 
+  // Compression middleware for better performance
+  const compression = require('compression');
+  app.use(compression({
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+    threshold: 1024, // Only compress responses > 1KB
+    level: 6, // Compression level (0-9, 6 is good balance)
+  }));
+
   // Security - relaxed Content Security Policy for development to allow HMR and local API
   if (process.env.NODE_ENV === 'development') {
     app.use(

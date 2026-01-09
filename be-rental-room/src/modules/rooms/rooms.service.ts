@@ -384,12 +384,12 @@ export class RoomsService {
         ),
       )
         .then((results) =>
-          console.log(
+          this.logger.debug(
             `✓ Cloud cleanup completed: ${results.filter(Boolean).length}/${imagesToDeleteFromCloud.length} deleted`,
           ),
         )
         .catch((err) =>
-          console.error('⚠ Cloud cleanup error (non-critical):', err),
+          this.logger.warn('⚠ Cloud cleanup error (non-critical): ' + err),
         );
     }
 

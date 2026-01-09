@@ -10,6 +10,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: rental_room_db
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+      # Performance tuning
+      POSTGRES_MAX_CONNECTIONS: 100
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_WORK_MEM: 16MB
     ports:
       - "5432:5432"
     volumes:
@@ -19,12 +25,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: rental-room-redis
     restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save 60 1000
     ports:
       - "6379:6379"
     volumes:
@@ -34,20 +49,30 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
 
   # Backend API
   backend:
     build:
       context: ./be-rental-room
       dockerfile: Dockerfile
+      cache_from:
+        - node:20-alpine
     container_name: rental-room-api
     restart: unless-stopped
     ports:
-      - "3001:8080"
+      - "3001:3001"
     environment:
       - NODE_ENV=production
-      - PORT=8080
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/rental_room_db?schema=public
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/rental_room_db?schema=public&connection_limit=10&pool_timeout=20
       - REDIS_URL=redis://redis:6379
     depends_on:
       postgres:
@@ -56,7 +81,27 @@ services:
         condition: service_healthy
     env_file:
       - ./be-rental-room/.env.production
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
