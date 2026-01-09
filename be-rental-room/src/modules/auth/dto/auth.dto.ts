@@ -71,5 +71,7 @@ import { IsOptional } from 'class-validator';
 export class RefreshTokenDto {
   @ApiProperty({ required: false })
   @IsOptional()
+  @IsString()
+  @IsNotEmpty()
   refresh_token?: string;
 }

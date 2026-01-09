@@ -37,8 +37,8 @@ function getMethodLabel(method: PaymentMethod): string {
 
 export function PaymentCard({ payment }: PaymentCardProps) {
   return (
-    <Card className="flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.15)] transition-all duration-300">
-      <CardContent className="px-5 flex flex-col">
+    <Card className="flex flex-col group border-2 hover:border-primary/50 hover:shadow-lg transition-shadow">
+      <CardContent className="p-6 flex flex-col">
         <div className="flex justify-between items-start mb-4">
           <div>
             <p className="font-semibold">Thanh toán #{payment.id.slice(0, 8)}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import { OptimizedImage } from "@/components/common/optimized-image";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface RoomGalleryProps {
@@ -28,11 +28,13 @@ export function RoomGallery({ images, roomNumber }: RoomGalleryProps) {
     <div className="space-y-4">
       {/* Main Image */}
       <div className="w-full h-96 bg-muted rounded-lg overflow-hidden relative">
-        <Image
+        <OptimizedImage
           src={selectedImageUrl}
           alt={`Room ${roomNumber} - Image ${selectedIndex + 1}`}
           fill
           className="object-cover"
+          fallbackSrc="/placeholder-room.jpg"
+          showLoadingSpinner
         />
       </div>
 
@@ -46,7 +48,14 @@ export function RoomGallery({ images, roomNumber }: RoomGalleryProps) {
               className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${index === selectedIndex ? "border-primary" : "border-border hover:border-primary/50"
                 }`}
             >
-              <Image src={imageUrl} alt={`Thumbnail ${index + 1}`} width={80} height={80} className="w-full h-full object-cover" />
+              <OptimizedImage
+                src={imageUrl}
+                alt={`Thumbnail ${index + 1}`}
+                width={80}
+                height={80}
+                className="w-full h-full object-cover"
+                fallbackSrc="/placeholder-room.jpg"
+              />
             </button>
           ))}
         </div>

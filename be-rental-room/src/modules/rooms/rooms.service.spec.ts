@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { CacheService } from '../../common/services/cache.service';
+import { UserRole } from '@prisma/client';
 
 import { UploadService } from '../upload/upload.service';
 import { TestDataFactory } from '../../../test/utils/test-data.factory';
@@ -12,6 +13,11 @@ describe('RoomsService', () => {
   let service: RoomsService;
   let prisma: PrismaService;
   let cacheService: CacheService;
+
+  const mockAdminUser = {
+    id: 'admin-user-1',
+    role: UserRole.ADMIN,
+  };
 
   const mockPrismaService = {
     room: {
@@ -371,7 +377,7 @@ describe('RoomsService', () => {
       mockPrismaService.room.findUnique.mockResolvedValue(mockRoomBefore);
       mockPrismaService.room.update.mockResolvedValue(mockRoomAfter);
 
-      const result = await service.update(roomId, updateDto);
+      const result = await service.update(roomId, updateDto, mockAdminUser);
 
       expect(result).toHaveProperty('id', roomId);
       expect(mockPrismaService.room.update).toHaveBeenCalledWith({
@@ -423,7 +429,7 @@ describe('RoomsService', () => {
       mockPrismaService.room.findUnique.mockResolvedValue(mockRoom);
       mockPrismaService.room.delete.mockResolvedValue(mockRoom);
 
-      await service.remove(roomId);
+      await service.remove(roomId, mockAdminUser);
 
       expect(mockPrismaService.room.delete).toHaveBeenCalledWith({
         where: { id: roomId },

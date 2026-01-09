@@ -55,10 +55,10 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
   };
 
   return (
-    <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className="">
-      <Card className="overflow-hidden flex flex-col h-full group transition-transform duration-300 rounded-[28px] bg-card/80 backdrop-blur-xl shadow-xl p-0">
+    <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
+      <Card className="overflow-hidden flex flex-col h-full group hover:shadow-lg transition-shadow duration-300 border-2 hover:border-primary/50 p-0">
         {/* Image & Overlays Section - No padding */}
-        <div className="relative aspect-video w-full overflow-hidden rounded-t-[28px]">
+        <div className="relative aspect-video w-full overflow-hidden">
           {/* Carousel */}
           <Image
             src={room.images?.[currentImageIndex]?.imageUrl || "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&h=600&fit=crop"}
@@ -78,7 +78,7 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
                   e.stopPropagation();
                   setCurrentImageIndex((prev) => (prev === 0 ? (room.images?.length || 1) - 1 : prev - 1));
                 }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 z-30"
+                className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-30"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -88,7 +88,7 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
                   e.stopPropagation();
                   setCurrentImageIndex((prev) => (prev === (room.images?.length || 1) - 1 ? 0 : prev + 1));
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60 z-30"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 z-30"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -109,7 +109,7 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleFavoriteClick(); }}
-              className="p-2 rounded-full bg-white/90 shadow-lg hover:bg-white transition-colors"
+              className="p-2 rounded-lg bg-white shadow-md hover:shadow-lg transition-shadow"
               aria-label={isFavorite ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
             >
               <Heart className={isFavorite ? 'text-destructive fill-destructive' : 'text-muted-foreground'} size={18} />
@@ -118,7 +118,7 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
 
           {/* Status Badge */}
           <div className="absolute top-3 right-3 z-30">
-            <Badge variant={isAvailable ? "default" : "secondary"} className="shadow-md backdrop-blur-md">
+            <Badge variant={isAvailable ? "default" : "secondary"} className="shadow-sm">
               {room.status}
             </Badge>
           </div>
@@ -170,7 +170,7 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
           <div className="mt-auto pt-4 flex flex-col gap-3">
             <Button
               asChild
-              className="w-full font-bold h-11 rounded-xl shadow-lg shadow-primary/20"
+              className="w-full font-semibold h-10"
               disabled={!isAvailable}
             >
               <Link href={`/rooms/${room.id}`}>Xem chi tiết</Link>
@@ -178,7 +178,7 @@ export const RoomCard = memo(function RoomCard({ room }: RoomCardProps) {
             <Button
               onClick={handleContactClick}
               variant="outline"
-              className="w-full font-bold h-11 rounded-xl hover:bg-secondary/80 transition-all"
+              className="w-full font-semibold h-10"
               disabled={!isAvailable}
             >
               <MessageCircle className="size-5 mr-2" />

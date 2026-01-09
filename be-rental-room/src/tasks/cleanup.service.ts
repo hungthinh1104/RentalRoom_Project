@@ -6,7 +6,7 @@ import { PrismaService } from '../database/prisma/prisma.service';
 export class CleanupService {
   private readonly logger = new Logger(CleanupService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleCleanup() {
@@ -56,7 +56,9 @@ export class CleanupService {
       });
 
       if (expiredContracts.length > 0) {
-        this.logger.log(`Found ${expiredContracts.length} expired contracts. Processing...`);
+        this.logger.log(
+          `Found ${expiredContracts.length} expired contracts. Processing...`,
+        );
 
         for (const contract of expiredContracts) {
           try {
@@ -73,7 +75,9 @@ export class CleanupService {
                 data: { status: 'AVAILABLE' }, // RoomStatus.AVAILABLE
               });
             });
-            this.logger.log(`Expired contract ${contract.id} and unlocked room ${contract.roomId}`);
+            this.logger.log(
+              `Expired contract ${contract.id} and unlocked room ${contract.roomId}`,
+            );
           } catch (e) {
             this.logger.error(`Failed to expire contract ${contract.id}`, e);
           }
@@ -92,7 +96,9 @@ export class CleanupService {
       });
 
       if (overdueContracts.length > 0) {
-        this.logger.log(`Found ${overdueContracts.length} overdue deposit contracts. Cancelling...`);
+        this.logger.log(
+          `Found ${overdueContracts.length} overdue deposit contracts. Cancelling...`,
+        );
 
         for (const contract of overdueContracts) {
           try {
@@ -110,9 +116,14 @@ export class CleanupService {
                 data: { status: 'AVAILABLE' },
               });
             });
-            this.logger.log(`Cancelled overdue contract ${contract.id} and unlocked room ${contract.roomId}`);
+            this.logger.log(
+              `Cancelled overdue contract ${contract.id} and unlocked room ${contract.roomId}`,
+            );
           } catch (e) {
-            this.logger.error(`Failed to cancel overdue contract ${contract.id}`, e);
+            this.logger.error(
+              `Failed to cancel overdue contract ${contract.id}`,
+              e,
+            );
           }
         }
       }
@@ -131,7 +142,9 @@ export class CleanupService {
       });
 
       if (staleContracts.length > 0) {
-        this.logger.log(`Found ${staleContracts.length} stale negotiation contracts. Cancelling...`);
+        this.logger.log(
+          `Found ${staleContracts.length} stale negotiation contracts. Cancelling...`,
+        );
         for (const contract of staleContracts) {
           try {
             await this.prisma.$transaction(async (tx) => {
@@ -139,7 +152,8 @@ export class CleanupService {
                 where: { id: contract.id },
                 data: {
                   status: 'CANCELLED',
-                  terminationReason: 'Auto-cancelled due to inactivity (7 days)'
+                  terminationReason:
+                    'Auto-cancelled due to inactivity (7 days)',
                 },
               });
 
@@ -150,7 +164,10 @@ export class CleanupService {
             });
             this.logger.log(`Cancelled stale contract ${contract.id}`);
           } catch (e) {
-            this.logger.error(`Failed to cancel stale contract ${contract.id}`, e);
+            this.logger.error(
+              `Failed to cancel stale contract ${contract.id}`,
+              e,
+            );
           }
         }
       }

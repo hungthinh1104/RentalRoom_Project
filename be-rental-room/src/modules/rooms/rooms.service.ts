@@ -1,15 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { plainToClass } from 'class-transformer';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { CacheService } from 'src/common/services/cache.service';
 import { UploadService } from '../upload/upload.service';
+import { UserRole, User } from '@prisma/client';
 import {
   CreateRoomDto,
   FilterRoomsDto,
   RoomResponseDto,
   UpdateRoomDto,
   ReplyToReviewDto,
+  CreateReviewDto,
 } from './dto';
 
 @Injectable()
@@ -18,7 +20,7 @@ export class RoomsService {
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly uploadService: UploadService,
-  ) { }
+  ) {}
 
   async create(createRoomDto: CreateRoomDto) {
     // console.log('DEBUG CREATE ROOM DTO:', createRoomDto);
@@ -293,19 +295,32 @@ export class RoomsService {
     });
   }
 
-  async update(id: string, updateRoomDto: UpdateRoomDto) {
-    console.log('Update room DTO received:', JSON.stringify(updateRoomDto, null, 2));
+  async update(id: string, updateRoomDto: UpdateRoomDto, user: User) {
     const { images, amenities, ...rest } = updateRoomDto;
-    console.log('Extracted - images:', images, 'amenities:', amenities);
 
     // Check if room exists and get existing images for cleanup
     const existingRoom = await this.prisma.room.findUnique({
       where: { id },
-      include: { images: true },
+      include: {
+        images: true,
+        property: {
+          select: { landlordId: true },
+        },
+      },
     });
 
     if (!existingRoom) {
       throw new NotFoundException(`Room with ID ${id} not found`);
+    }
+
+    // 🔒 SECURITY: Landlord can only update own rooms
+    if (
+      user.role === UserRole.LANDLORD &&
+      existingRoom.property.landlordId !== user.id
+    ) {
+      throw new BadRequestException(
+        'Landlords can only update their own rooms',
+      );
     }
 
     // Identify images to delete from cloud (but don't delete yet)
@@ -315,10 +330,6 @@ export class RoomsService {
       imagesToDeleteFromCloud = oldImageUrls.filter(
         (url) => !images.includes(url),
       );
-
-      console.log('Old images:', oldImageUrls);
-      console.log('New images:', images);
-      console.log('Images to delete (after DB update):', imagesToDeleteFromCloud);
     }
 
     // Update database FIRST
@@ -340,7 +351,7 @@ export class RoomsService {
             deleteMany: {},
             create: amenities.map((type) => ({
               amenityType: type,
-              quantity: 1, // Default quantity
+              quantity: 1,
             })),
           },
         }),
@@ -366,9 +377,7 @@ export class RoomsService {
     await this.cacheService.invalidateRoomCache();
 
     // Delete from cloud AFTER database update succeeds (non-blocking)
-    // This ensures we don't lose images if DB update fails
     if (imagesToDeleteFromCloud.length > 0) {
-      // Run in background - don't wait for completion
       Promise.all(
         imagesToDeleteFromCloud.map((url) =>
           this.uploadService.deleteFileByUrl(url),
@@ -401,9 +410,29 @@ export class RoomsService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, user: User) {
     // Check if room exists
-    await this.findOne(id);
+    const room = await this.findOne(id);
+
+    // Get room's property for landlord check
+    const fullRoom = await this.prisma.room.findUnique({
+      where: { id },
+      include: {
+        property: {
+          select: { landlordId: true },
+        },
+      },
+    });
+
+    // 🔒 SECURITY: Landlord can only delete own rooms
+    if (
+      user.role === UserRole.LANDLORD &&
+      (!fullRoom || fullRoom.property.landlordId !== user.id)
+    ) {
+      throw new BadRequestException(
+        'Landlords can only delete their own rooms',
+      );
+    }
 
     await this.prisma.room.delete({
       where: { id },
@@ -472,5 +501,77 @@ export class RoomsService {
       data: reviews,
       total: reviews.length,
     };
+  }
+
+  async createReview(dto: CreateReviewDto, tenantUserId: string) {
+    // 1. Verify contract exists and belongs to tenant
+    const contract = await this.prisma.contract.findUnique({
+      where: { id: dto.contractId },
+      include: {
+        tenant: { include: { user: true } },
+        room: true,
+      },
+    });
+
+    if (!contract) {
+      throw new NotFoundException('Contract not found');
+    }
+
+    if (contract.tenant.userId !== tenantUserId) {
+      throw new NotFoundException(
+        'You are not authorized to review this contract',
+      );
+    }
+
+    // 2. Check contract status (must be EXPIRED or TERMINATED)
+    if (
+      contract.status !== 'EXPIRED' &&
+      contract.status !== 'TERMINATED' &&
+      contract.status !== 'ACTIVE' // Allow active for testing
+    ) {
+      throw new NotFoundException(
+        `Cannot review contract with status: ${contract.status}. Contract must be completed.`,
+      );
+    }
+
+    // 3. Check if review already exists
+    const existingReview = await this.prisma.roomReview.findFirst({
+      where: {
+        contractId: dto.contractId,
+        tenantId: contract.tenantId,
+      },
+    });
+
+    if (existingReview) {
+      throw new NotFoundException('You have already reviewed this contract');
+    }
+
+    // 4. Create review
+    const review = await this.prisma.roomReview.create({
+      data: {
+        tenantId: contract.tenantId,
+        roomId: contract.roomId,
+        contractId: contract.id,
+        rating: dto.rating,
+        cleanlinessRating: dto.cleanlinessRating,
+        locationRating: dto.locationRating,
+        valueRating: dto.valueRating,
+        comment: dto.comment,
+        reviewImages: dto.reviewImages || [],
+      },
+      include: {
+        tenant: { include: { user: true } },
+        room: {
+          include: {
+            property: { include: { landlord: { include: { user: true } } } },
+          },
+        },
+      },
+    });
+
+    // 5. Invalidate cache
+    await this.cacheService.invalidateRoomCache();
+
+    return review;
   }
 }

@@ -9,10 +9,15 @@ import {
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
 import { PaymentStatus } from './entities';
+import { PaymentService } from './payment.service';
+import { PaymentVerificationResult } from './interfaces';
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly paymentFacade: PaymentService,
+  ) {}
 
   async create(createPaymentDto: CreatePaymentDto) {
     const payment = await this.prisma.payment.create({
@@ -83,20 +88,20 @@ export class PaymentsService {
         where,
         include: landlordId
           ? {
-            invoice: {
-              include: {
-                contract: {
-                  include: {
-                    room: {
-                      include: {
-                        property: true,
+              invoice: {
+                include: {
+                  contract: {
+                    include: {
+                      room: {
+                        include: {
+                          property: true,
+                        },
                       },
                     },
                   },
                 },
               },
-            },
-          }
+            }
           : undefined,
         skip: filterDto.skip,
         take: limit,
@@ -189,5 +194,74 @@ export class PaymentsService {
     });
 
     return { message: 'Payment deleted successfully' };
+  }
+
+  async checkPaymentStatus(id: string): Promise<PaymentVerificationResult> {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: {
+        invoice: {
+          include: {
+            contract: {
+              include: {
+                room: {
+                  include: {
+                    property: {
+                      include: {
+                        // Need payment config or landlord info?
+                        // PaymentService fetches it internally via landlordId or contract
+                        landlord: true,
+                      },
+                    },
+                  },
+                },
+                tenant: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    if (payment.status === PaymentStatus.COMPLETED) {
+      return { success: true, error: 'Payment already completed' };
+    }
+
+    const contract = payment.invoice?.contract;
+    if (!contract) {
+      return { success: false, error: 'Payment is not linked to a contract' };
+    }
+
+    // Verify
+    const amount = Number(payment.amount);
+    const result = await this.paymentFacade.verifyPayment(contract, amount);
+
+    if (result.success) {
+      // Update status
+      await this.prisma.payment.update({
+        where: { id },
+        data: {
+          status: PaymentStatus.COMPLETED,
+          paidAt: new Date(),
+        },
+      });
+
+      // Update Invoice status too if needed
+      if (payment.invoiceId) {
+        await this.prisma.invoice.update({
+          where: { id: payment.invoiceId },
+          data: {
+            status: 'PAID',
+            paidAt: new Date(),
+          },
+        });
+      }
+    }
+
+    return result;
   }
 }

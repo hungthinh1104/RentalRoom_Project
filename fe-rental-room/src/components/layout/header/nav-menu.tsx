@@ -12,6 +12,10 @@ import {
   BarChart3,
   Heart,
   Star,
+  Coins,
+  User,
+  Zap,
+  Settings,
 } from 'lucide-react';
 import {
   NavigationMenu,
@@ -96,6 +100,11 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
             title: 'Thanh toán',
             href: '/dashboard/landlord/payments',
             icon: CreditCard,
+          },
+          {
+            title: 'Thu Chi',
+            href: '/dashboard/landlord/finance',
+            icon: Coins,
           },
           {
             title: 'Bảo trì',
@@ -215,17 +224,17 @@ export function NavMenu({ role, className, mobile = false }: NavMenuProps) {
                   {item.title}
                 </NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <ul className="w-48 p-2">
+                  <ul className="grid w-[240px] gap-1 p-2">
                     {item.children.map((child) => (
                       <li key={child.href}>
                         <Link
                           href={child.href}
                           className={cn(
-                            'block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground',
-                            pathname === child.href && 'bg-accent'
+                            'block select-none rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground',
+                            pathname === child.href && 'bg-accent font-medium'
                           )}
                         >
-                          <div className="text-sm font-medium leading-none">
+                          <div className="text-sm leading-tight">
                             {child.title}
                           </div>
                         </Link>

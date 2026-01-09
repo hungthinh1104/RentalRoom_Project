@@ -91,8 +91,10 @@ export function EditUserModal({ user, open, onOpenChange }: EditUserModalProps) 
             });
             toast.success("Đã cập nhật thông tin người dùng");
             onOpenChange(false);
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Không thể cập nhật người dùng");
+        } catch (error: unknown) {
+            const message = error && typeof error === 'object' && 'response' in error ? 
+                (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+            toast.error(message || "Không thể cập nhật người dùng");
         }
     };
 

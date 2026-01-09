@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as forge from 'node-forge';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -13,10 +14,10 @@ export class CertificateService {
   private readonly logger = new Logger(CertificateService.name);
   private readonly certDir = path.join(process.cwd(), 'certs');
   private readonly p12File = path.join(this.certDir, 'system-ca.p12');
-  private readonly p12Password =
-    process.env.P12_PASSWORD || 'rental-room-system-2024';
+  private readonly p12Password: string;
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
+    this.p12Password = this.configService.getOrThrow<string>('P12_PASSWORD');
     this.ensureCertDirectory();
     this.initializeSystemCertificate();
   }

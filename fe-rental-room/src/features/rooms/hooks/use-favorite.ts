@@ -45,9 +45,10 @@ export function useFavorite(roomId: string) {
 
     // Only fetch if user is authenticated
     if (status !== 'authenticated') {
-      setLoading(false);
       return;
     }
+    
+    setLoading(true);
 
     loadFavoritesCache().then((cache) => {
       if (mounted) {

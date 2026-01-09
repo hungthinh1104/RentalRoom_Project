@@ -15,7 +15,7 @@ import { UserRole } from '@prisma/client';
 
 @Controller('tenants')
 export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) { }
+  constructor(private readonly tenantsService: TenantsService) {}
 
   @Post()
   @Auth(UserRole.ADMIN)

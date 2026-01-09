@@ -38,6 +38,11 @@ export const paymentsApi = {
 	async delete(id: string) {
 		await api.delete(`/payments/${id}`);
 	},
+
+	async checkStatus(id: string) {
+		const { data } = await api.post<{ success: boolean; error?: string }>(`/payments/${id}/check`);
+		return data;
+	},
 };
 
 // Billing/Invoice API

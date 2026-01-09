@@ -68,8 +68,10 @@ export function AddUserModal({ open, onOpenChange }: AddUserModalProps) {
             toast.success("Đã tạo người dùng mới");
             form.reset();
             onOpenChange(false);
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Không thể tạo người dùng");
+        } catch (error: unknown) {
+            const message = error && typeof error === 'object' && 'response' in error ? 
+                (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+            toast.error(message || "Không thể tạo người dùng");
         }
     };
 

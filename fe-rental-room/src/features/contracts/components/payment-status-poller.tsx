@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import Image from "next/image";
+import api from "@/lib/api/client";
 
 interface PaymentStatusPollerProps {
     contractId: string;
@@ -41,16 +42,8 @@ export function PaymentStatusPoller({
     const { data } = useQuery({
         queryKey: ["contract-payment-status", contractId],
         queryFn: async (): Promise<PaymentStatusResponse> => {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/contracts/${contractId}/payment-status`, {
-                headers: {
-                    // Assuming token is handled by interceptor or next-auth in fetch wrapper
-                    // But for simple fetch we might need Authorization header if protected
-                    // Adapt based on project's fetcher
-                    "Authorization": `Bearer ${localStorage.getItem("accessToken") || ""}`
-                }
-            });
-            if (!res.ok) throw new Error("Failed to check status");
-            return res.json();
+            const res = await api.get<PaymentStatusResponse>(`/contracts/${contractId}/payment-status`);
+            return res.data;
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         refetchInterval: (query: any) => {

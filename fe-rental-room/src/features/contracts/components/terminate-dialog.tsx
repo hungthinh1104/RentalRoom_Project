@@ -13,6 +13,7 @@ interface TerminateDialogProps {
   onConfirm: (data: { reason: string; noticeDays: number }) => void;
   loading?: boolean;
   deposit?: number;
+  depositAmount?: number; // Alias for deposit
   daysRemaining?: number;
   isTenant?: boolean;
 }
@@ -23,11 +24,15 @@ export function TerminateDialog({
   onConfirm,
   loading,
   deposit = 0,
+  depositAmount, // Support both prop names
   daysRemaining = 0,
   isTenant = true,
 }: TerminateDialogProps) {
   const [reason, setReason] = useState('');
   const [noticeDays, setNoticeDays] = useState(30);
+  
+  // Use depositAmount if provided, otherwise fallback to deposit
+  const finalDeposit = depositAmount ?? deposit;
 
   const handleConfirm = () => {
     if (!reason.trim()) {
@@ -45,10 +50,10 @@ export function TerminateDialog({
 
   if (daysRemaining > 0) {
     if (isTenant) {
-      penaltyAmount = deposit;
+      penaltyAmount = finalDeposit;
       penaltyWarning = `⚠️ Chấm dứt trước hạn (còn ${daysRemaining} ngày): BẠN SẼ MẤT 100% TIỀN CỌC (${penaltyAmount.toLocaleString('vi-VN')} VNĐ). Mặc dù báo trước ${noticeDays} ngày, do vi phạm cam kết thời gian thuê, tiền cọc sẽ bị giữ lại.`;
     } else {
-      penaltyAmount = deposit * 2;
+      penaltyAmount = finalDeposit * 2;
       penaltyWarning = `⚠️ Chấm dứt trước hạn (còn ${daysRemaining} ngày): BẠN PHẢI TRẢ LẠI 100% TIỀN CỌC + ĐỀN BÙ THÊM 100% TIỀN CỌC = ${penaltyAmount.toLocaleString('vi-VN')} VNĐ cho người thuê.`;
       if (noticeDays < 30) {
         penaltyWarning += ` Bạn chỉ báo trước ${noticeDays} ngày (yêu cầu tối thiểu 30 ngày).`;

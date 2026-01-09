@@ -15,7 +15,9 @@ import {
   FilterLandlordsDto,
 } from './dto';
 import { Auth } from 'src/common/decorators/auth.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
+import type { User } from '@prisma/client';
 
 @Controller('landlords')
 export class LandlordsController {
@@ -44,8 +46,9 @@ export class LandlordsController {
   update(
     @Param('id') id: string,
     @Body() updateLandlordDto: UpdateLandlordDto,
+    @CurrentUser() user: User,
   ) {
-    return this.landlordsService.update(id, updateLandlordDto);
+    return this.landlordsService.update(id, updateLandlordDto, user);
   }
 
   @Delete(':id')

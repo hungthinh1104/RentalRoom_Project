@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
+import { UserRole, User } from '@prisma/client';
 import {
   CreateLandlordDto,
   UpdateLandlordDto,
@@ -78,8 +79,15 @@ export class LandlordsService {
     });
   }
 
-  async update(id: string, updateLandlordDto: UpdateLandlordDto) {
+  async update(id: string, updateLandlordDto: UpdateLandlordDto, user: User) {
     await this.findOne(id); // Check existence
+
+    // 🔒 SECURITY: Landlord can only update own profile
+    if (user.role === UserRole.LANDLORD && id !== user.id) {
+      throw new BadRequestException(
+        'Landlords can only update their own profile',
+      );
+    }
 
     const landlord = await this.prisma.landlord.update({
       where: { userId: id },

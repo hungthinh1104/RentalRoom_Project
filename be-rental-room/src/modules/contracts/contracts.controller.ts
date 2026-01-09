@@ -110,8 +110,8 @@ export class ContractsController {
 
   @Get()
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
-  findAll(@Query() filterDto: FilterContractsDto) {
-    return this.contractsService.findAll(filterDto);
+  findAll(@Query() filterDto: FilterContractsDto, @CurrentUser() user: User) {
+    return this.contractsService.findAll(filterDto, user);
   }
 
   @Get(':id')
@@ -125,8 +125,9 @@ export class ContractsController {
   update(
     @Param('id') id: string,
     @Body() updateContractDto: UpdateContractDto,
+    @CurrentUser() user: User,
   ) {
-    return this.contractsService.update(id, updateContractDto);
+    return this.contractsService.update(id, updateContractDto, user);
   }
 
   @Patch(':id/send')
@@ -289,7 +290,10 @@ export class ContractsController {
   ) {
     const pdfBuffer = await this.contractPdfService.generatePdf(id, user.id);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="contract-${id}.pdf"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="contract-${id}.pdf"`,
+    );
     res.send(pdfBuffer);
   }
 

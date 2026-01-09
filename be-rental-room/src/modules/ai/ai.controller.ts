@@ -31,7 +31,7 @@ export class AIController {
   constructor(
     private readonly aiService: AIService,
     private readonly searchService: SearchService,
-  ) { }
+  ) {}
 
   /**
    * Health check endpoint

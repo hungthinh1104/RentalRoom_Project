@@ -6,6 +6,8 @@ import {
   UpdateLandlordDto,
   FilterLandlordsDto,
 } from './dto';
+import { UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 
 describe('LandlordsController', () => {
   let controller: LandlordsController;
@@ -17,6 +19,16 @@ describe('LandlordsController', () => {
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
+  };
+
+  const mockUser = {
+    id: 'admin-user-1',
+    role: UserRole.ADMIN,
+  };
+
+  const mockUser = {
+    id: 'admin-user-1',
+    role: UserRole.ADMIN,
   };
 
   beforeEach(async () => {
@@ -135,10 +147,10 @@ describe('LandlordsController', () => {
 
       mockLandlordsService.update.mockResolvedValue(mockUpdatedLandlord);
 
-      const result = await controller.update(landlordId, updateDto);
+      const result = await controller.update(landlordId, updateDto, mockUser);
 
       expect(result).toEqual(mockUpdatedLandlord);
-      expect(service.update).toHaveBeenCalledWith(landlordId, updateDto);
+      expect(service.update).toHaveBeenCalledWith(landlordId, updateDto, mockUser);
     });
   });
 
@@ -148,10 +160,10 @@ describe('LandlordsController', () => {
 
       mockLandlordsService.remove.mockResolvedValue({ deleted: true });
 
-      const result = await controller.remove(landlordId);
+      const result = await controller.remove(landlordId, mockUser);
 
-      expect(result).toEqual({ deleted: true });
-      expect(service.remove).toHaveBeenCalledWith(landlordId);
+      expect(result).toEqual(mockDeletedResponse);
+      expect(service.remove).toHaveBeenCalledWith(landlordId, mockUser);
     });
   });
 });

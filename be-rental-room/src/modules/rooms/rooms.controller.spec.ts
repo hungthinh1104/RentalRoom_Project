@@ -124,7 +124,7 @@ describe('RoomsController', () => {
       const result = await controller.findAll(filterDto, null);
 
       expect(result).toEqual(mockRooms);
-      expect(service.findAll).toHaveBeenCalledWith(filterDto);
+      expect(service.findAll).toHaveBeenCalledWith(filterDto, undefined);
       expect(service.findAll).toHaveBeenCalledTimes(1);
     });
 
@@ -137,7 +137,7 @@ describe('RoomsController', () => {
 
       await controller.findAll(filterDto, null);
 
-      expect(service.findAll).toHaveBeenCalledWith(filterDto);
+      expect(service.findAll).toHaveBeenCalledWith(filterDto, undefined);
     });
 
     it('should return empty array when no rooms match', async () => {
@@ -170,7 +170,7 @@ describe('RoomsController', () => {
       const result = await controller.findOne(roomId, null);
 
       expect(result).toEqual(mockRoom);
-      expect(service.findOne).toHaveBeenCalledWith(roomId);
+      expect(service.findOne).toHaveBeenCalledWith(roomId, undefined);
       expect(service.findOne).toHaveBeenCalledTimes(1);
     });
 
@@ -181,7 +181,7 @@ describe('RoomsController', () => {
 
       await controller.findOne(roomId, null);
 
-      expect(service.findOne).toHaveBeenCalledWith(roomId);
+      expect(service.findOne).toHaveBeenCalledWith(roomId, undefined);
     });
   });
 

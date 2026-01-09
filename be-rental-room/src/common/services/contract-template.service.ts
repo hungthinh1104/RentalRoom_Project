@@ -28,7 +28,9 @@ export class ContractTemplateService {
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
     } catch (e) {
-      this.logger.warn('Puppeteer launch failed (PDF generation will not work): ' + e.message);
+      this.logger.warn(
+        'Puppeteer launch failed (PDF generation will not work): ' + e.message,
+      );
     }
   }
 

@@ -13,6 +13,18 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api/v1');
 
+  // Harden HTTP server + small perf wins
+  const server = app.getHttpAdapter().getInstance();
+  if (server?.disable) {
+    server.disable('x-powered-by');
+  }
+  if (server?.set) {
+    server.set('etag', 'strong');
+    if (process.env.NODE_ENV === 'production') {
+      server.set('trust proxy', 1);
+    }
+  }
+
   // Cookie parser middleware (must be before routes)
   app.use(cookieParser());
 
@@ -81,31 +93,39 @@ async function bootstrap() {
   // Global exception filter
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('Smart Room Rental API')
-    .setDescription('REST API for room rental management system')
-    .setVersion('1.0')
-    .addTag('auth', 'Authentication endpoints')
-    .addTag('users', 'User management')
-    .addTag('properties', 'Property management')
-    .addTag('rooms', 'Room management')
-    .addTag('contracts', 'Contract management')
-    .addTag('billing', 'Billing & invoices')
-    .addTag('payments', 'Payment processing')
-    .addTag('maintenance', 'Maintenance requests')
-    .addTag('services', 'Services & utilities')
-    .addTag('notifications', 'Notifications')
-    .addBearerAuth()
-    .build();
+  // Swagger documentation (disabled in production for security/perf)
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Smart Room Rental API')
+      .setDescription('REST API for room rental management system')
+      .setVersion('1.0')
+      .addTag('auth', 'Authentication endpoints')
+      .addTag('users', 'User management')
+      .addTag('properties', 'Property management')
+      .addTag('rooms', 'Room management')
+      .addTag('contracts', 'Contract management')
+      .addTag('billing', 'Billing & invoices')
+      .addTag('payments', 'Payment processing')
+      .addTag('maintenance', 'Maintenance requests')
+      .addTag('services', 'Services & utilities')
+      .addTag('notifications', 'Notifications')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  } else {
+    logger.log('Swagger disabled in production');
+  }
 
   // Redirect root to Swagger and ignore favicon requests
-  const server = app.getHttpAdapter().getInstance();
   server.use((req, res, next) => {
-    if (req.path === '/') return res.redirect('/api/docs');
+    if (req.path === '/') {
+      if (process.env.NODE_ENV !== 'production') {
+        return res.redirect('/api/docs');
+      }
+      return res.status(200).send('OK');
+    }
     if (req.path === '/favicon.ico') return res.status(204).end();
     next();
   });

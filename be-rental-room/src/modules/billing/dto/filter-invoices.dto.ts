@@ -20,6 +20,10 @@ export class FilterInvoicesDto extends PaginationDto {
   tenantId?: string;
 
   @IsOptional()
+  @IsString()
+  landlordId?: string; // 🔒 SECURITY: For filtering by landlord
+
+  @IsOptional()
   @IsEnum(InvoiceStatus)
   status?: InvoiceStatus;
 

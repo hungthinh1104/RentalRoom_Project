@@ -44,8 +44,46 @@ export class ContractRelatedLandlordDto {
   user: ContractUserDto;
 }
 
+export class ContractRelatedServiceDto {
+  @Expose()
+  id: string;
+
+  @Expose()
+  name: string; // Prisma model has 'name' or 'serviceName'? Need to check. serviceName usually.
+
+  @Expose()
+  serviceName: string;
+
+  @Expose()
+  type: string; // serviceType
+
+  @Expose()
+  serviceType: string;
+
+  @Expose()
+  @Transform(({ value }) => {
+    if (value === null || value === undefined) {
+      return 0; // Safe default for undefined/null
+    }
+    if (typeof value === 'object' && 'toNumber' in value) {
+      return value.toNumber();
+    }
+    return Number(value);
+  })
+  unitPrice: number;
+
+  @Expose()
+  unit: string;
+
+  @Expose()
+  billingMethod: string;
+}
+
 @Exclude()
 export class ContractRelatedPropertyDto {
+  @Expose()
+  id: string;
+
   @Expose()
   address: string;
 
@@ -54,6 +92,10 @@ export class ContractRelatedPropertyDto {
 
   @Expose()
   propertyType: string;
+
+  @Expose()
+  @Type(() => ContractRelatedServiceDto)
+  services: ContractRelatedServiceDto[];
 }
 
 @Exclude()

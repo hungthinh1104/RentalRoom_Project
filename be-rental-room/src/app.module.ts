@@ -32,6 +32,11 @@ import {
 import { ReportsModule } from './modules/reports/reports.module';
 import { AIModule } from './modules/ai/ai.module';
 import { SystemFeedbackModule } from './modules/system-feedback/system-feedback.module';
+import { SnapshotsModule } from './modules/snapshots/snapshots.module';
+import { ConsentModule } from './modules/consent/consent.module';
+import { TaxModule } from './modules/tax/tax.module';
+import { IncomeModule } from './modules/income/income.module';
+import { LegalDocumentsModule } from './modules/legal-documents/legal-documents.module';
 
 @Module({
   imports: [
@@ -68,8 +73,13 @@ import { SystemFeedbackModule } from './modules/system-feedback/system-feedback.
     ReportsModule,
     AIModule,
     SystemFeedbackModule,
+    SnapshotsModule,
+    ConsentModule,
+    TaxModule,
     UploadModule,
     FavoritesModule,
+    IncomeModule,
+    LegalDocumentsModule, // CRITICAL: Legal documents with version control
   ],
   providers: [
     PrismaService,

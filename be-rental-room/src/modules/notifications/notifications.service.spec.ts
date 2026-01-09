@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsService } from './notifications.service';
 import { PrismaService } from 'src/database/prisma/prisma.service';
+import { NotificationsGateway } from './gateways';
 import { NotFoundException } from '@nestjs/common';
 import { faker } from '@faker-js/faker';
 import { NotificationType } from './entities';
@@ -8,6 +9,7 @@ import { NotificationType } from './entities';
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let prismaService: PrismaService;
+  let notificationsGateway: NotificationsGateway;
 
   const mockNotification = {
     id: faker.string.uuid(),
@@ -33,6 +35,14 @@ describe('NotificationsService', () => {
     },
   };
 
+  const mockNotificationsGateway = {
+    notifyUser: jest.fn(),
+    notifyUsers: jest.fn(),
+    broadcastToAll: jest.fn(),
+    isUserConnected: jest.fn(),
+    getUserConnectionCount: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -41,11 +51,18 @@ describe('NotificationsService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: 'NOTIFICATIONS_GATEWAY',
+          useValue: mockNotificationsGateway,
+        },
       ],
     }).compile();
 
     service = module.get<NotificationsService>(NotificationsService);
     prismaService = module.get<PrismaService>(PrismaService);
+    notificationsGateway = module.get<NotificationsGateway>(
+      'NOTIFICATIONS_GATEWAY',
+    );
   });
 
   afterEach(() => {

@@ -21,12 +21,13 @@ import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, AuthResponseDto, LoginDto } from './dto/auth.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
 import { LocalAuthGuard } from 'src/common/guards/local-auth.guard';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
@@ -132,15 +133,26 @@ export class AuthController {
   }
 
   @Post('session')
-  @ApiOperation({ summary: 'Validate credentials and return user session (for NextAuth)' })
+  @ApiOperation({
+    summary: 'Validate credentials and return user session (for NextAuth)',
+  })
   @ApiResponse({ status: 200, description: 'Session data returned' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async session(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ id: string; email: string; name: string; role: string; access_token: string }> {
+  ): Promise<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    access_token: string;
+  }> {
     // Validate user credentials
-    const user = await this.authService.validateUser(loginDto.email, loginDto.password);
+    const user = await this.authService.validateUser(
+      loginDto.email,
+      loginDto.password,
+    );
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -172,5 +184,20 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('refresh_token', { path: '/' });
     return { message: 'Logged out' };
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset' })
+  @ApiResponse({ status: 200, description: 'Reset email sent if account exists' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
   }
 }

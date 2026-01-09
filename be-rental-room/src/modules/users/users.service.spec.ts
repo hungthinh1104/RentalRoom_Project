@@ -25,6 +25,7 @@ describe('UsersService', () => {
     email: mockUser.email,
     phoneNumber: mockUser.phoneNumber,
     role: mockUser.role,
+    emailVerified: mockUser.emailVerified,
     createdAt: mockUser.createdAt,
     updatedAt: mockUser.updatedAt,
   };
@@ -66,14 +67,19 @@ describe('UsersService', () => {
 
       expect(result).toEqual(users);
       expect(prismaService.user.findMany).toHaveBeenCalledWith({
+        where: {},
         select: {
           id: true,
           fullName: true,
           email: true,
           phoneNumber: true,
           role: true,
+          emailVerified: true,
           createdAt: true,
           updatedAt: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
         },
       });
     });
@@ -107,6 +113,7 @@ describe('UsersService', () => {
           email: true,
           phoneNumber: true,
           role: true,
+          emailVerified: true,
           createdAt: true,
           updatedAt: true,
           tenant: true,

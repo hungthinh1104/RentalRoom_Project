@@ -23,4 +23,4 @@ import { EncryptionService } from './services/encryption.service';
     ContractTemplateService,
   ],
 })
-export class CommonModule { }
+export class CommonModule {}

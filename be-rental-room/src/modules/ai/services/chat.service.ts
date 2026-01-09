@@ -23,7 +23,7 @@ export class ChatService {
   constructor(
     private readonly modelFactory: AiModelFactory,
     private readonly searchService: SearchService,
-  ) { }
+  ) {}
 
   async chatWithAI(message: string, context?: string): Promise<ChatResponse> {
     if (!message || !message.trim()) {
@@ -120,7 +120,8 @@ Ví dụ tốt:
           }));
 
           return {
-            response: aiResponse + '\n\nĐây là các phòng phù hợp với yêu cầu của bạn:',
+            response:
+              aiResponse + '\n\nĐây là các phòng phù hợp với yêu cầu của bạn:',
             rooms,
           };
         }

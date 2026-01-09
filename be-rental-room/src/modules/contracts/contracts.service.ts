@@ -22,9 +22,10 @@ import { ApplicationStatus, ContractStatus } from './entities';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from 'src/common/services/email.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
-import { SepayService } from '../payments/sepay.service';
-import { RoomStatus } from '@prisma/client';
+import { PaymentService } from '../payments/payment.service';
+import { RoomStatus, UserRole } from '@prisma/client';
 import { User } from '../users/entities';
+import { SnapshotService } from '../snapshots/snapshot.service';
 
 @Injectable()
 export class ContractsService {
@@ -34,7 +35,8 @@ export class ContractsService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
-    private readonly sepayService: SepayService,
+    private readonly paymentService: PaymentService,
+    private readonly snapshotService: SnapshotService,
   ) { }
 
   /**
@@ -46,10 +48,23 @@ export class ContractsService {
     newStatus: ContractStatus,
   ): void {
     const VALID_TRANSITIONS: Record<ContractStatus, ContractStatus[]> = {
-      [ContractStatus.DRAFT]: [ContractStatus.PENDING_SIGNATURE, ContractStatus.CANCELLED],
-      [ContractStatus.PENDING_SIGNATURE]: [ContractStatus.DEPOSIT_PENDING, ContractStatus.CANCELLED],
-      [ContractStatus.DEPOSIT_PENDING]: [ContractStatus.ACTIVE, ContractStatus.CANCELLED, ContractStatus.EXPIRED],
-      [ContractStatus.ACTIVE]: [ContractStatus.TERMINATED, ContractStatus.EXPIRED],
+      [ContractStatus.DRAFT]: [
+        ContractStatus.PENDING_SIGNATURE,
+        ContractStatus.CANCELLED,
+      ],
+      [ContractStatus.PENDING_SIGNATURE]: [
+        ContractStatus.DEPOSIT_PENDING,
+        ContractStatus.CANCELLED,
+      ],
+      [ContractStatus.DEPOSIT_PENDING]: [
+        ContractStatus.ACTIVE,
+        ContractStatus.CANCELLED,
+        ContractStatus.EXPIRED,
+      ],
+      [ContractStatus.ACTIVE]: [
+        ContractStatus.TERMINATED,
+        ContractStatus.EXPIRED,
+      ],
       [ContractStatus.TERMINATED]: [], // Terminal state
       [ContractStatus.EXPIRED]: [], // Terminal state
       [ContractStatus.CANCELLED]: [], // Terminal state
@@ -121,7 +136,9 @@ export class ContractsService {
       });
 
       if (!room) {
-        throw new NotFoundException(`Room with ID ${createDto.roomId} not found`);
+        throw new NotFoundException(
+          `Room with ID ${createDto.roomId} not found`,
+        );
       }
 
       if (!room.property?.landlordId) {
@@ -131,7 +148,9 @@ export class ContractsService {
       }
 
       landlordId = room.property.landlordId;
-      this.logger.log(`Auto-fetched landlordId ${landlordId} for room ${createDto.roomId}`);
+      this.logger.log(
+        `Auto-fetched landlordId ${landlordId} for room ${createDto.roomId}`,
+      );
     }
 
     const application = await this.prisma.rentalApplication.create({
@@ -330,7 +349,9 @@ export class ContractsService {
       });
 
       // 3. ✅ AUTO-CREATE CONTRACT (DRAFT status)
-      const contractNumber = await this.generateContractNumber(application.landlordId);
+      const contractNumber = await this.generateContractNumber(
+        application.landlordId,
+      );
       const startDate = app.requestedMoveInDate
         ? new Date(app.requestedMoveInDate)
         : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
@@ -476,7 +497,9 @@ export class ContractsService {
     const contract = await this.findOne(contractId);
 
     if (contract.landlord.userId !== landlordUserId) {
-      throw new UnauthorizedException('You are not authorized to send this contract');
+      throw new UnauthorizedException(
+        'You are not authorized to send this contract',
+      );
     }
 
     if (contract.status !== ContractStatus.DRAFT) {
@@ -499,7 +522,10 @@ export class ContractsService {
       if (!room) throw new NotFoundException('Room not found');
 
       // Allow if Room is AVAILABLE or RESERVED (for this contract)
-      if (room.status !== RoomStatus.AVAILABLE && room.status !== RoomStatus.RESERVED) {
+      if (
+        room.status !== RoomStatus.AVAILABLE &&
+        room.status !== RoomStatus.RESERVED
+      ) {
         throw new BadRequestException(
           `Room is currently ${room.status}. Cannot send contract.`,
         );
@@ -535,7 +561,10 @@ export class ContractsService {
           isRead: false,
         });
       } catch (error) {
-        this.logger.warn(`Failed to notify tenant for contract send ${contractId}`, error);
+        this.logger.warn(
+          `Failed to notify tenant for contract send ${contractId}`,
+          error,
+        );
       }
 
       return updatedContract;
@@ -557,11 +586,18 @@ export class ContractsService {
       throw new UnauthorizedException('Not authorized');
     }
 
-    if (contract.status !== ContractStatus.PENDING_SIGNATURE && contract.status !== ContractStatus.DEPOSIT_PENDING) {
-      throw new BadRequestException('Can only revoke/reject contracts pending signature or deposit');
+    if (
+      contract.status !== ContractStatus.PENDING_SIGNATURE &&
+      contract.status !== ContractStatus.DEPOSIT_PENDING
+    ) {
+      throw new BadRequestException(
+        'Can only revoke/reject contracts pending signature or deposit',
+      );
     }
 
-    const targetStatus = isLandlord ? ContractStatus.DRAFT : ContractStatus.CANCELLED;
+    const targetStatus = isLandlord
+      ? ContractStatus.DRAFT
+      : ContractStatus.CANCELLED;
 
     return this.prisma.$transaction(async (tx) => {
       // Unlock Room
@@ -603,7 +639,8 @@ export class ContractsService {
   async requestChanges(contractId: string, tenantId: string, reason: string) {
     const contract = await this.findOne(contractId);
 
-    if (contract.tenantId !== tenantId) { // Check tenantId (Profile ID or User ID? findOne returns relations, tenantId is UserID in schema relation logic usually... wait, schema says tenantId references Tenant.userId. So this comparison depends on what tenantId param is passed. Usually UserID.)
+    if (contract.tenantId !== tenantId) {
+      // Check tenantId (Profile ID or User ID? findOne returns relations, tenantId is UserID in schema relation logic usually... wait, schema says tenantId references Tenant.userId. So this comparison depends on what tenantId param is passed. Usually UserID.)
       // Let's verify: application passes User ID. findOne joins tenant.
       // Contract.tenantId => Tenant Profile ID (actually Tenant.userId is the relation key in schema).
       // In schema: tenant Tenant @relation(fields: [tenantId], references: [userId])
@@ -615,7 +652,9 @@ export class ContractsService {
     }
 
     if (contract.status !== ContractStatus.PENDING_SIGNATURE) {
-      throw new BadRequestException('Can only request changes for pending contracts');
+      throw new BadRequestException(
+        'Can only request changes for pending contracts',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -659,7 +698,9 @@ export class ContractsService {
 
     // Verify tenant owns this contract
     if (contract.tenantId !== tenantId) {
-      throw new UnauthorizedException('You are not authorized to approve this contract');
+      throw new UnauthorizedException(
+        'You are not authorized to approve this contract',
+      );
     }
 
     // Verify contract status
@@ -670,7 +711,9 @@ export class ContractsService {
     }
 
     // Generate Payment Ref & Deadline
-    const paymentRef = `HD${contract.contractNumber}`.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const paymentRef = `HD${contract.contractNumber}`
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase();
     const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
     // Update contract to DEPOSIT_PENDING
@@ -700,7 +743,10 @@ export class ContractsService {
         isRead: false,
       });
     } catch (error) {
-      this.logger.warn(`Failed to notify landlord for contract approval ${contractId}`, error);
+      this.logger.warn(
+        `Failed to notify landlord for contract approval ${contractId}`,
+        error,
+      );
     }
 
     return updated;
@@ -791,26 +837,31 @@ export class ContractsService {
       where: { landlordId: createContractDto.landlordId },
     });
 
-    if (!paymentConfig || !paymentConfig.isActive || !paymentConfig.apiToken) {
+    if (!paymentConfig || !paymentConfig.isActive) {
       throw new BadRequestException(
-        'Vui lòng cấu hình tài khoản nhận tiền (SePay) trước khi tạo hợp đồng.',
+        'Vui lòng cấu hình tài khoản nhận tiền trước khi tạo hợp đồng.',
       );
     }
 
     const { residents, ...contractData } = createContractDto;
 
     // 2. Auto-generate contract number if not provided
-    const contractNumber = contractData.contractNumber ||
-      await this.generateContractNumber(createContractDto.landlordId);
+    const contractNumber =
+      contractData.contractNumber ||
+      (await this.generateContractNumber(createContractDto.landlordId));
 
-    const paymentRef = contractNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); // Sanitize
+    const paymentRef = contractNumber
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase(); // Sanitize
     const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
     // 3. Create Contract + Soft Lock Room (Transaction)
     // Note: Room is currently AVAILABLE. We change to RESERVED.
     const contract = await this.prisma.$transaction(async (tx) => {
       // Check room availability again in transaction
-      const room = await tx.room.findUnique({ where: { id: contractData.roomId } });
+      const room = await tx.room.findUnique({
+        where: { id: contractData.roomId },
+      });
       if (room?.status !== RoomStatus.AVAILABLE) {
         throw new BadRequestException('Phòng không còn trống.');
       }
@@ -873,7 +924,10 @@ export class ContractsService {
         );
       }
     } catch (error) {
-      this.logger.warn(`Failed to send payment email for contract ${contract.id}`, error);
+      this.logger.warn(
+        `Failed to send payment email for contract ${contract.id}`,
+        error,
+      );
     }
 
     // Convert Decimal to Number
@@ -898,7 +952,7 @@ export class ContractsService {
       include: {
         room: true,
         landlord: true, // Needed for SePay config
-      }
+      },
     });
 
     if (!contract) throw new NotFoundException('Contract not found');
@@ -910,15 +964,18 @@ export class ContractsService {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
-    if (contract.status !== 'DEPOSIT_PENDING' as ContractStatus) {
+    if (contract.status !== ('DEPOSIT_PENDING' as ContractStatus)) {
       return { success: false, status: contract.status };
     }
 
-    // Call SePay Service
+    // Call Payment Service (uses configured gateway - currently Sepay)
     const expectedAmount = Number(contract.deposit);
-    const isPaid = await this.sepayService.verifyPayment(contract, expectedAmount);
+    const paymentResult = await this.paymentService.verifyPayment(
+      contract,
+      expectedAmount,
+    );
 
-    if (isPaid) {
+    if (paymentResult.success) {
       // Activate contract and sync application status
       await this.prisma.$transaction(async (tx) => {
         // 1. Activate contract
@@ -977,13 +1034,13 @@ export class ContractsService {
                 quantity: 1,
                 unitPrice: contract.deposit,
                 amount: contract.deposit,
-              }
-            }
-          }
+              },
+            },
+          },
         });
 
         // 6. Record payment linked to Invoice
-        await tx.payment.create({
+        const paymentRecord = await tx.payment.create({
           data: {
             amount: contract.deposit,
             paymentMethod: 'BANK_TRANSFER',
@@ -996,6 +1053,76 @@ export class ContractsService {
             // But this function is just 'verifyPaymentStatus', generic.
           },
         });
+
+        // 7. Create Legal Snapshot for contract_signed (MVP Week 2)
+        // FIX: Pass transaction for atomic operation
+        try {
+          const snapshotId = await this.snapshotService.create({
+            actorId: contract.tenantId,
+            actorRole: UserRole.TENANT,
+            actionType: 'contract_signed',
+            entityType: 'CONTRACT',
+            entityId: contract.id,
+            metadata: {
+              contractNumber: contract.contractNumber,
+              monthlyRent: contract.monthlyRent.toString(),
+              deposit: contract.deposit.toString(),
+              startDate: contract.startDate.toISOString(),
+              endDate: contract.endDate.toISOString(),
+            },
+          }, tx);  // ← Pass transaction for atomicity
+
+          // Link snapshot to contract (already in transaction)
+          await tx.contract.update({
+            where: { id: contract.id },
+            data: { snapshotId },
+          });
+
+          this.logger.log(
+            `Created legal snapshot ${snapshotId} for contract ${contract.id}`,
+          );
+        } catch (snapshotError) {
+          // Log but don't fail transaction
+          this.logger.error(
+            `Failed to create snapshot for contract ${contract.id}`,
+            snapshotError,
+          );
+        }
+
+        // 8. Create Legal Snapshot for payment_succeeded (MVP Week 2)
+        // FIX: Pass transaction for atomic operation
+        try {
+          const paymentSnapshotId = await this.snapshotService.create({
+            actorId: contract.tenantId,
+            actorRole: UserRole.TENANT,
+            actionType: 'payment_succeeded',
+            entityType: 'PAYMENT',
+            entityId: paymentRecord.id,
+            metadata: {
+              amount: paymentRecord.amount.toString(),
+              invoiceId: invoice.id,
+              invoiceNumber: invoice.invoiceNumber,
+              paymentMethod: paymentRecord.paymentMethod,
+              contractId: contract.id,
+            },
+          }, tx);  // ← Pass transaction for atomicity
+
+          // Link snapshot to payment (already in transaction)
+          await tx.payment.update({
+            where: { id: paymentRecord.id },
+            data: { snapshotId: paymentSnapshotId },
+          });
+
+          this.logger.log(
+            `Created legal snapshot ${paymentSnapshotId} for payment ${paymentRecord.id}`,
+          );
+        } catch (snapshotError) {
+          // Log but don't fail transaction
+          this.logger.error(
+            `Failed to create snapshot for payment ${paymentRecord.id}`,
+            snapshotError,
+          );
+        }
       });
 
       // 6. Send activation email to tenant
@@ -1019,7 +1146,10 @@ export class ContractsService {
           );
         }
       } catch (error) {
-        this.logger.warn(`Failed to send activation email for contract ${id}`, error);
+        this.logger.warn(
+          `Failed to send activation email for contract ${id}`,
+          error,
+        );
       }
 
       return { success: true, status: ContractStatus.ACTIVE };
@@ -1028,67 +1158,116 @@ export class ContractsService {
     return { success: false, status: ContractStatus.DEPOSIT_PENDING };
   }
 
-  async findAll(filterDto: FilterContractsDto) {
-    const {
-      page = 1,
-      limit = 10,
-      sortBy = 'startDate',
-      sortOrder = 'desc',
-      tenantId,
-      landlordId,
-      roomId,
-      status,
-      search,
-    } = filterDto;
+  async findAll(filterDto: FilterContractsDto, user: User) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        sortBy = 'startDate',
+        sortOrder = 'desc',
+        tenantId,
+        landlordId,
+        roomId,
+        status,
+        search,
+      } = filterDto;
 
-    const where: any = {};
+      const where: any = {};
 
-    if (tenantId) where.tenantId = tenantId;
-    if (landlordId) where.landlordId = landlordId;
-    if (roomId) where.roomId = roomId;
-    if (status) where.status = status;
-    if (search) {
-      where.contractNumber = { contains: search };
+      // CRITICAL: Apply ownership filter based on user role
+      if (user.role === UserRole.LANDLORD) {
+        const landlord = await this.prisma.landlord.findUnique({
+          where: { userId: user.id },
+        });
+        if (!landlord) {
+          throw new BadRequestException('Landlord profile not found');
+        }
+        where.landlordId = landlord.userId; // Only show this landlord's contracts
+      } else if (user.role === UserRole.TENANT) {
+        const tenant = await this.prisma.tenant.findUnique({
+          where: { userId: user.id },
+        });
+        if (!tenant) {
+          throw new BadRequestException('Tenant profile not found');
+        }
+        where.tenantId = tenant.userId; // Only show this tenant's contracts
+      }
+      // ADMIN can see all contracts (no filter)
+
+      // Apply additional filters (only if user is admin or filter matches ownership)
+      if (tenantId) where.tenantId = tenantId;
+      if (landlordId && user.role === UserRole.ADMIN) where.landlordId = landlordId;
+      if (roomId) where.roomId = roomId;
+      if (status) where.status = status;
+      if (search) {
+        where.contractNumber = { contains: search };
+      }
+
+      const [contracts, total] = await Promise.all([
+        this.prisma.contract.findMany({
+          where,
+          skip: filterDto.skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          include: {
+            tenant: { include: { user: true } },
+            landlord: { include: { user: true } },
+            room: {
+              include: {
+                property: {
+                  include: {
+                    services: true,
+                  },
+                },
+              },
+            },
+            residents: true,
+          },
+        }),
+        this.prisma.contract.count({ where }),
+      ]);
+
+      // ROBUST TRANSFORM: Sanitize all Decimals before DTO mapping
+      const transformed = contracts.map((contract) => {
+        // 1. Santize Root Fields
+        const safeContract = {
+          ...contract,
+          deposit: contract.deposit ? Number(contract.deposit) : 0,
+          monthlyRent: contract.monthlyRent ? Number(contract.monthlyRent) : 0,
+          earlyTerminationPenalty: contract.earlyTerminationPenalty
+            ? Number(contract.earlyTerminationPenalty)
+            : 0,
+          tenantName: contract.tenant?.user?.fullName,
+          tenantEmail: contract.tenant?.user?.email,
+          landlordName: contract.landlord?.user?.fullName,
+          roomNumber: contract.room?.roomNumber,
+          residents: contract.residents || [],
+        };
+
+        // 2. Sanitize Nested Services (CRITICAL)
+        if (contract.room?.property?.services) {
+          // @ts-ignore
+          safeContract.room.property.services = contract.room.property.services.map(s => ({
+            ...s,
+            unitPrice: s.unitPrice ? Number(s.unitPrice) : 0,
+          }));
+        }
+
+        return safeContract;
+      });
+
+      return new PaginatedResponse(
+        plainToClass(ContractResponseDto, transformed, {
+          excludeExtraneousValues: true,
+        }),
+        total,
+        page,
+        limit,
+      );
+    } catch (error) {
+      this.logger.error(`Error in findAll contracts: ${error.message}`, error.stack);
+      throw error;
     }
-
-    const [contracts, total] = await Promise.all([
-      this.prisma.contract.findMany({
-        where,
-        skip: filterDto.skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        include: {
-          tenant: { include: { user: true } },
-          landlord: { include: { user: true } },
-          room: true,
-          residents: true,
-        },
-      }),
-      this.prisma.contract.count({ where }),
-    ]);
-
-    const transformed = contracts.map((contract) => ({
-      ...contract,
-      deposit: Number(contract.deposit),
-      monthlyRent: Number(contract.monthlyRent),
-      earlyTerminationPenalty: contract.earlyTerminationPenalty
-        ? Number(contract.earlyTerminationPenalty)
-        : 0,
-      tenantName: contract.tenant.user.fullName,
-      tenantEmail: contract.tenant.user.email,
-      landlordName: contract.landlord.user.fullName,
-      roomNumber: contract.room.roomNumber,
-      residents: contract.residents || [],
-    }));
-
-    return new PaginatedResponse(
-      plainToClass(ContractResponseDto, transformed, {
-        excludeExtraneousValues: true,
-      }),
-      total,
-      page,
-      limit,
-    );
   }
 
   async findOne(id: string) {
@@ -1105,13 +1284,20 @@ export class ContractsService {
 
     // Debug log
     if (contract) {
-      console.log('[ContractsService] findOne raw:', JSON.stringify({
-        id: contract.id,
-        hasRoom: !!contract.room,
-        hasProperty: !!contract.room?.property,
-        deposit: contract.deposit,
-        depositType: typeof contract.deposit
-      }, null, 2));
+      console.log(
+        '[ContractsService] findOne raw:',
+        JSON.stringify(
+          {
+            id: contract.id,
+            hasRoom: !!contract.room,
+            hasProperty: !!contract.room?.property,
+            deposit: contract.deposit,
+            depositType: typeof contract.deposit,
+          },
+          null,
+          2,
+        ),
+      );
     }
 
     if (!contract) {
@@ -1131,10 +1317,11 @@ export class ContractsService {
       landlordName: contract.landlord?.user?.fullName || 'Unknown',
       roomNumber: contract.room?.roomNumber || 'Unknown',
       residents: contract.residents || [],
-      invoices: contract.invoices?.map(inv => ({
-        ...inv,
-        totalAmount: Number(inv.totalAmount)
-      })) || [],
+      invoices:
+        contract.invoices?.map((inv) => ({
+          ...inv,
+          totalAmount: Number(inv.totalAmount),
+        })) || [],
     };
 
     return plainToClass(ContractResponseDto, cleaned, {
@@ -1143,10 +1330,31 @@ export class ContractsService {
     // return { DEBUG: true, ...cleaned } as any;
   }
 
-  async update(id: string, updateContractDto: UpdateContractDto) {
+  async update(id: string, updateContractDto: UpdateContractDto, user: User) {
+    // 🔒 SECURITY: Check ownership before update
+    const existing = await this.prisma.contract.findUnique({
+      where: { id },
+      select: { landlordId: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Contract with ID ${id} not found`);
+    }
+
+    // Landlords can only update their own contracts
+    if (user.role === UserRole.LANDLORD && existing.landlordId !== user.id) {
+      throw new BadRequestException('Landlords can only update their own contracts');
+    }
+
     // Exclude immutable fields and relations that need special handling
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { tenantId, landlordId, roomId, applicationId, residents, ...updateData } = updateContractDto;
+    const {
+      tenantId,
+      landlordId,
+      roomId,
+      applicationId,
+      residents,
+      ...updateData
+    } = updateContractDto;
 
     const contract = await this.prisma.contract.update({
       where: { id },
@@ -1156,9 +1364,7 @@ export class ContractsService {
     // Convert Decimal to Number
     const cleaned = {
       ...contract,
-      deposit: contract.deposit
-        ? Number(contract.deposit)
-        : 0,
+      deposit: contract.deposit ? Number(contract.deposit) : 0,
       monthlyRent: contract.monthlyRent ? Number(contract.monthlyRent) : 0,
       earlyTerminationPenalty: contract.earlyTerminationPenalty
         ? Number(contract.earlyTerminationPenalty)
@@ -1373,6 +1579,7 @@ export class ContractsService {
   }
 
   async remove(id: string) {
+    // Admin-only endpoint (enforced by @Auth decorator in controller)
     await this.findOne(id);
 
     await this.prisma.contract.delete({

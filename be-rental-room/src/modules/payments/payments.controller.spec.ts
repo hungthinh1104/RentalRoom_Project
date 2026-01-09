@@ -84,7 +84,7 @@ describe('PaymentsController', () => {
       const result = await controller.findAll(filterDto);
 
       expect(result).toEqual(mockPayments);
-      expect(service.findAll).toHaveBeenCalledWith(filterDto);
+      expect(service.findAll).toHaveBeenCalledWith(filterDto, undefined);
     });
 
     it('should return empty array when no payments match', async () => {
@@ -95,7 +95,7 @@ describe('PaymentsController', () => {
       const result = await controller.findAll(filterDto);
 
       expect(result).toEqual([]);
-      expect(service.findAll).toHaveBeenCalledWith(filterDto);
+      expect(service.findAll).toHaveBeenCalledWith(filterDto, undefined);
     });
   });
 

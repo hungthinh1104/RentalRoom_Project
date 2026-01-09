@@ -3,10 +3,16 @@ import { ServicesController } from './services.controller';
 import { ServicesService } from './services.service';
 import { CreateServiceDto, UpdateServiceDto, FilterServicesDto } from './dto';
 import { ServiceType, BillingMethod } from './entities';
+import { UserRole } from '@prisma/client';
 
 describe('ServicesController', () => {
   let controller: ServicesController;
   let service: ServicesService;
+
+  const mockUser = {
+    id: 'admin-user-1',
+    role: UserRole.ADMIN,
+  };
 
   const mockServicesService = {
     create: jest.fn(),
@@ -134,10 +140,10 @@ describe('ServicesController', () => {
 
       mockServicesService.update.mockResolvedValue(mockUpdatedService);
 
-      const result = await controller.update(serviceId, updateDto);
+      const result = await controller.update(serviceId, updateDto, mockUser);
 
       expect(result).toEqual(mockUpdatedService);
-      expect(service.update).toHaveBeenCalledWith(serviceId, updateDto);
+      expect(service.update).toHaveBeenCalledWith(serviceId, updateDto, mockUser);
     });
   });
 
@@ -147,10 +153,10 @@ describe('ServicesController', () => {
 
       mockServicesService.remove.mockResolvedValue({ deleted: true });
 
-      const result = await controller.remove(serviceId);
+      const result = await controller.remove(serviceId, mockUser);
 
       expect(result).toEqual({ deleted: true });
-      expect(service.remove).toHaveBeenCalledWith(serviceId);
+      expect(service.remove).toHaveBeenCalledWith(serviceId, mockUser);
     });
   });
 });

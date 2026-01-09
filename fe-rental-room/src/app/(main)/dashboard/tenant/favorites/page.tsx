@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import { OptimizedImage } from "@/components/common/optimized-image";
 import { Heart, MapPin, Sparkles, Maximize, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,12 +29,13 @@ function FavoriteRoomCard({ room }: { room: FavoriteRoom }) {
 		<div className="rounded-2xl border border-border/80 bg-muted/40 p-4 flex gap-4">
 			{/* Image */}
 			<div className="relative w-24 h-24 rounded-xl overflow-hidden flex-shrink-0">
-				<Image
+				<OptimizedImage
 					src={room.images?.[0]?.imageUrl || "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200&h=200&fit=crop"}
 					alt={`Phòng ${room.roomNumber}`}
 					fill
 					className="object-cover"
 					sizes="96px"
+					fallbackSrc="/placeholder-room.jpg"
 				/>
 			</div>
 

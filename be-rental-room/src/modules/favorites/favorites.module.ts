@@ -3,8 +3,8 @@ import { FavoritesService } from './favorites.service';
 import { FavoritesController } from './favorites.controller';
 
 @Module({
-    controllers: [FavoritesController],
-    providers: [FavoritesService],
-    exports: [FavoritesService],
+  controllers: [FavoritesController],
+  providers: [FavoritesService],
+  exports: [FavoritesService],
 })
-export class FavoritesModule { }
+export class FavoritesModule {}

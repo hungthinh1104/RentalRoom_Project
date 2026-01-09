@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
+  Zap,
   Home,
   FileText,
   CreditCard,
@@ -49,6 +50,7 @@ const quickActions = [
   { href: "/dashboard/tenant/contracts", label: "Hợp đồng", icon: FileText },
   { href: "/dashboard/tenant/payments", label: "Thanh toán", icon: CreditCard },
   { href: "/dashboard/tenant/maintenance", label: "Bảo trì", icon: AlertCircle },
+  { href: "/dashboard/tenant/utilities", label: "Điện nước", icon: Zap },
   { href: "/dashboard/tenant/favorites", label: "Yêu thích", icon: Heart },
 ];
 

@@ -74,8 +74,10 @@ export default function AdminRoomsPage() {
     try {
       await updateStatus.mutateAsync({ roomId, status: newStatus });
       toast.success("Đã cập nhật trạng thái phòng");
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể cập nhật trạng thái");
+    } catch (error: unknown) {
+      const message = error && typeof error === 'object' && 'response' in error ? 
+        (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+      toast.error(message || "Không thể cập nhật trạng thái");
     }
   };
 
