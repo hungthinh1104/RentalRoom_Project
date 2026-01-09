@@ -262,7 +262,7 @@ export class LegalDocumentsService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const document = await this.findOne(documentId);
+    await this.findOne(documentId);
 
     // Get next version number
     const lastVersion = await this.prisma.documentVersion.findFirst({

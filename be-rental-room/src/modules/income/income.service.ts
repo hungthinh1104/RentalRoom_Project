@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  ForbiddenException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { SnapshotService } from '../snapshots/snapshot.service';
 import { CreateIncomeDto } from './dto/income.dto';

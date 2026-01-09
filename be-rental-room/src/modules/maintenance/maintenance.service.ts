@@ -16,7 +16,7 @@ import {
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
 import { MaintenanceStatus } from './entities';
-import { NotificationType, User, UserRole } from '@prisma/client';
+import { User, UserRole } from '@prisma/client';
 
 @Injectable()
 export class MaintenanceService {
@@ -219,7 +219,7 @@ export class MaintenanceService {
     });
   }
 
-  async remove(id: string, user: User) {
+  async remove(id: string, _user: User) {
     // Admin-only endpoint (enforced by @Auth decorator in controller)
     // No additional ownership check needed
     await this.findOne(id);

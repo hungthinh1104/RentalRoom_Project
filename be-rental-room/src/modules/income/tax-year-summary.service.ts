@@ -214,7 +214,7 @@ export class TaxYearSummaryService {
     const csvRows = incomes
       .map(
         (i) =>
-          `${i.periodMonth},${i.incomeType},${i.amount},${i.taxCategory},${i.receivedAt.toISOString()},${i.receiptNumber || 'N/A'}`,
+          `${i.periodMonth},${i.incomeType},${i.amount.toString()},${i.taxCategory},${i.receivedAt.toISOString()},${i.receiptNumber || 'N/A'}`,
       )
       .join('\n');
 

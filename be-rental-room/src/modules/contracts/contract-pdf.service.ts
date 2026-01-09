@@ -5,10 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
-import { ContractResponseDto } from './dto';
-import { plainToClass } from 'class-transformer';
 import { PDFDocument, rgb } from 'pdf-lib';
-import { Contract } from '@prisma/client';
 import fontkit from '@pdf-lib/fontkit';
 
 /**
@@ -98,13 +95,13 @@ export class ContractPdfService {
     drawText(`Phòng: ${contract.room?.roomNumber || ''}`);
     drawText(`Chủ nhà: ${contract.landlord?.user?.fullName || ''}`);
     drawText(`Người thuê: ${contract.tenant?.user?.fullName || ''}`);
-    drawText(`Tiền thuê hàng tháng: ${contract.monthlyRent}`);
-    drawText(`Tiền cọc: ${contract.deposit}`);
+    drawText(`Tiền thuê hàng tháng: ${contract.monthlyRent.toString()}`);
+    drawText(`Tiền cọc: ${contract.deposit.toString()}`);
     drawText(`Điều khoản: ${contract.terms?.substring(0, 200) || ''}`);
 
     // Add QR code image if SePay QR URL is available
     if (contract.landlord?.bankName && contract.landlord?.bankAccount) {
-      const qrUrl = `https://qr.sepay.vn/img?bank=${encodeURIComponent(contract.landlord.bankName)}&acc=${encodeURIComponent(contract.landlord.bankAccount)}&amount=${contract.deposit}&des=${encodeURIComponent(`COC ${contract.contractNumber}`)}`;
+      const qrUrl = `https://qr.sepay.vn/img?bank=${encodeURIComponent(contract.landlord.bankName)}&acc=${encodeURIComponent(contract.landlord.bankAccount)}&amount=${contract.deposit.toString()}&des=${encodeURIComponent(`COC ${contract.contractNumber}`)}`;
       try {
         const response = await fetch(qrUrl);
         if (response.ok) {

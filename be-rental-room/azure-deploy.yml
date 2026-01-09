@@ -24,25 +24,25 @@ properties:
       
       # Database (use secureValue for sensitive data)
       - name: DATABASE_URL
-        secureValue: postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres
+        secureValue: ${DATABASE_URL} # Inject this via CI/CD pipeline or replace with real value temporarily
       
       # Redis
       - name: REDIS_HOST
-        value: your-redis.upstash.io
+        value: ${REDIS_HOST}
       - name: REDIS_PORT
         value: '6379'
       - name: REDIS_PASSWORD
-        secureValue: your-redis-password
+        secureValue: ${REDIS_PASSWORD}
       - name: REDIS_TTL
         value: '3600'
       
       # JWT
       - name: JWT_SECRET
-        secureValue: your-jwt-secret
+        secureValue: ${JWT_SECRET}
       - name: JWT_EXPIRES_IN
         value: 15m
       - name: JWT_REFRESH_SECRET
-        secureValue: your-refresh-secret
+        secureValue: ${JWT_REFRESH_SECRET}
       - name: JWT_REFRESH_EXPIRES_IN
         value: 7d
       

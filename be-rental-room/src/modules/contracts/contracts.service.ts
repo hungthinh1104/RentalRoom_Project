@@ -827,7 +827,7 @@ export class ContractsService {
   // Contracts
   async create(createContractDto: CreateContractDto) {
     // 1. Check Payment Config (Strict Mode)
-    // @ts-ignore
+    // @ts-expect-error - PaymentConfig relation type mismatch
     const paymentConfig = await this.prisma.paymentConfig.findUnique({
       where: { landlordId: createContractDto.landlordId },
     });
@@ -867,11 +867,11 @@ export class ContractsService {
           ...contractData,
           applicationId: contractData.applicationId!, // Ensure not undefined
           contractNumber, // Use auto-generated or provided number
-          // @ts-ignore
+          // @ts-expect-error - Contract status type cast
           status: ContractStatus.DEPOSIT_PENDING as any,
-          // @ts-ignore
+          // @ts-expect-error - paymentRef type
           paymentRef,
-          // @ts-ignore
+          // @ts-expect-error - depositDeadline type
           depositDeadline,
           residents:
             residents && residents.length > 0
@@ -1248,7 +1248,7 @@ export class ContractsService {
 
         // 2. Sanitize Nested Services (CRITICAL)
         if (contract.room?.property?.services) {
-          // @ts-ignore
+          // @ts-expect-error - Property services type assignment
           safeContract.room.property.services =
             contract.room.property.services.map((s) => ({
               ...s,
@@ -1356,11 +1356,11 @@ export class ContractsService {
 
     // Exclude immutable fields and relations that need special handling
     const {
-      tenantId,
-      landlordId,
-      roomId,
-      applicationId,
-      residents,
+      tenantId: _tenantId,
+      landlordId: _landlordId,
+      roomId: _roomId,
+      applicationId: _applicationId,
+      residents: _residents,
       ...updateData
     } = updateContractDto;
 

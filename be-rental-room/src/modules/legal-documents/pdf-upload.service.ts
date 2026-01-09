@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { createHash } from 'crypto';
-import { createWriteStream, promises as fs } from 'fs';
+import { promises as fs } from 'fs';
 import { join } from 'path';
 import { AuditAction } from './entities/legal-document.entity';
 
@@ -17,7 +17,7 @@ export class PdfUploadService {
   private readonly allowedMimeTypes = ['application/pdf'];
 
   constructor(private readonly prisma: PrismaService) {
-    this.ensureUploadDir();
+    void this.ensureUploadDir();
   }
 
   /**

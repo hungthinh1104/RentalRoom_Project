@@ -70,7 +70,7 @@ export class PaymentGatewayFactory {
    * @param landlordId Landlord ID
    * @returns Gateway instance for landlord
    */
-  async getForLandlord(landlordId: string): Promise<IPaymentGateway> {
+  async getForLandlord(_landlordId: string): Promise<IPaymentGateway> {
     // TODO: Query PaymentConfig.gatewayType from DB when multi-gateway support added
     // const config = await this.prisma.paymentConfig.findUnique({
     //   where: { landlordId },

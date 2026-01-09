@@ -8,7 +8,6 @@ import {
   Delete,
   Query,
   Req,
-  UseGuards,
   UseInterceptors,
   UploadedFile,
 } from '@nestjs/common';
@@ -94,7 +93,7 @@ export class LegalDocumentsController {
    * SECURITY: ADMIN can see all, others only published
    */
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user?: any) {
+  findOne(@Param('id') id: string, @CurrentUser() _user?: any) {
     return this.legalDocumentsService.findOne(id);
   }
 

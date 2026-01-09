@@ -8,7 +8,7 @@ import {
   IsDateString,
   Min,
 } from 'class-validator';
-import { IncomeType, PaymentMethod, TaxCategory } from '@prisma/client';
+import { IncomeType, PaymentMethod } from '@prisma/client';
 
 export class CreateIncomeDto {
   @ApiProperty({ description: 'Rental unit ID', example: 'uuid' })
