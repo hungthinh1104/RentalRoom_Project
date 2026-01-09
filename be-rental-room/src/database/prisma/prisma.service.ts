@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService
@@ -12,6 +12,27 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(PrismaService.name);
+
+  constructor() {
+    super({
+      log: [
+        { level: 'query', emit: 'event' },
+        'warn',
+        'error',
+      ],
+    });
+
+    const slowMs = parseInt(process.env.PRISMA_SLOW_QUERY_MS || '200', 10);
+    // Lightweight slow query logging to identify hot spots
+    // Cast to any to satisfy Prisma's conditional typing for event logging
+    (this as any).$on('query', (e: Prisma.QueryEvent) => {
+      if (typeof e.duration === 'number' && e.duration >= slowMs) {
+        this.logger.warn(
+          `Slow query (${e.duration} ms): ${e.query} params: ${e.params}`,
+        );
+      }
+    });
+  }
 
   async onModuleInit() {
     const maxAttempts = parseInt(

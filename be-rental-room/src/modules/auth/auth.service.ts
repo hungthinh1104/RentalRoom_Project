@@ -260,6 +260,71 @@ export class AuthService {
     };
   }
 
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    // Don't reveal if email exists for security
+    if (!user) {
+      return { message: 'If that email exists, a reset link has been sent.' };
+    }
+
+    // Generate reset token (valid for 1 hour)
+    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationCode: resetToken, // Reuse verificationCode field for reset token
+        verificationExpiry: resetTokenExpiry,
+      },
+    });
+
+    // Send reset email
+    await this.emailService.sendEmail({
+      to: user.email,
+      subject: 'Reset Your Password',
+      html: `
+        <h2>Password Reset Request</h2>
+        <p>Hi ${user.fullName},</p>
+        <p>Click the link below to reset your password:</p>
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}">Reset Password</a>
+        <p>This link will expire in 1 hour.</p>
+        <p>If you didn't request this, please ignore this email.</p>
+      `,
+    });
+
+    return { message: 'If that email exists, a reset link has been sent.' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        verificationCode: token,
+        verificationExpiry: { gte: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update password and clear reset token
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        verificationCode: null,
+        verificationExpiry: null,
+      },
+    });
+
+    return { message: 'Password reset successfully' };
+  }
+
   private async generateTokens(user: any) {
     const payload: JwtPayload = {
       sub: user.id,

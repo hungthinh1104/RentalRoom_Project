@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreatePropertyDto,
@@ -9,6 +9,7 @@ import {
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
 import { CacheService } from 'src/common/services/cache.service';
+import { UserRole, User } from '@prisma/client';
 
 @Injectable()
 export class PropertiesService {
@@ -122,25 +123,63 @@ export class PropertiesService {
     );
   }
 
-  async update(id: string, updatePropertyDto: UpdatePropertyDto) {
-    await this.findOne(id); // Check existence
+  async update(id: string, updatePropertyDto: UpdatePropertyDto, user: User) {
+    const property = await this.findOne(id);
 
-    const property = await this.prisma.property.update({
+    // 🔒 SECURITY: Landlord can only update own property
+    if (user.role === UserRole.LANDLORD && property.landlordId !== user.id) {
+      throw new BadRequestException(
+        'Landlords can only update their own properties',
+      );
+    }
+
+    const updated = await this.prisma.property.update({
       where: { id },
       data: updatePropertyDto,
     });
 
     // Invalidate cache
     await this.cacheService.invalidatePropertyCache(id);
-    await this.cacheService.invalidateRoomCache(); // Some property info is in room list
+    await this.cacheService.invalidateRoomCache();
 
-    return plainToClass(PropertyResponseDto, property, {
+    return plainToClass(PropertyResponseDto, updated, {
       excludeExtraneousValues: true,
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id); // Check existence
+  async remove(id: string, user: User) {
+    // Get property with rooms info for cascade check
+    const property = await this.prisma.property.findUnique({
+      where: { id },
+      include: { rooms: { select: { id: true } } },
+    });
+
+    if (!property) {
+      throw new NotFoundException(`Property with ID ${id} not found`);
+    }
+
+    // 🔒 SECURITY: Landlord can only delete own property
+    if (user.role === UserRole.LANDLORD && property.landlordId !== user.id) {
+      throw new BadRequestException(
+        'Landlords can only delete their own properties',
+      );
+    }
+
+    // Check if property has active contracts
+    const activeContracts = await this.prisma.contract.count({
+      where: {
+        roomId: {
+          in: property.rooms.map((r) => r.id),
+        },
+        status: 'ACTIVE',
+      },
+    });
+
+    if (activeContracts > 0) {
+      throw new BadRequestException(
+        'Cannot delete property with active contracts. Terminate all contracts first.',
+      );
+    }
 
     await this.prisma.property.delete({
       where: { id },

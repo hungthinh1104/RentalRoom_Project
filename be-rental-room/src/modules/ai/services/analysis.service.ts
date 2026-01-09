@@ -5,7 +5,7 @@ import { AiModelFactory } from './ai-model.factory';
 export class AnalysisService {
   private readonly logger = new Logger(AnalysisService.name);
 
-  constructor(private readonly modelFactory: AiModelFactory) { }
+  constructor(private readonly modelFactory: AiModelFactory) {}
 
   async analyzeRoomDescription(text: string): Promise<{
     amenities: string[];
@@ -96,11 +96,13 @@ Output:
 
     try {
       const response = await chatModel.invoke([
-        { role: 'user', content: prompt }
+        { role: 'user', content: prompt },
       ] as any);
 
       const result = this.parseJsonResponse(response);
-      this.logger.debug(`Analyzed query: "${query}" -> ${JSON.stringify(result)}`);
+      this.logger.debug(
+        `Analyzed query: "${query}" -> ${JSON.stringify(result)}`,
+      );
       return result;
     } catch (error) {
       this.logger.warn(`Failed to analyze query: ${query}`, error);
@@ -110,7 +112,9 @@ Output:
 
   // Helper to parse JSON from AI response
   private parseJsonResponse(response: any): any {
-    const responseContent = response.content as string | Array<{ text: string }>;
+    const responseContent = response.content as
+      | string
+      | Array<{ text: string }>;
     let responseText: string;
 
     if (typeof responseContent === 'string') {

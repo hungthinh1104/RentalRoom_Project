@@ -89,12 +89,12 @@ export function PropertyCard({ property, isLandlordView = false, viewMode = 'gri
 
             {/* List Actions */}
             <div className="flex items-center gap-2 w-full sm:w-auto ml-auto">
-              <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none h-10 px-4 rounded-xl hover:bg-primary hover:text-primary-foreground transition-all">
+              <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none h-10 px-4">
                 <Link href={`/dashboard/landlord/properties/${property.id}/rooms`}>
                   Quản lý
                 </Link>
               </Button>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl" asChild>
+              <Button variant="ghost" size="icon" className="h-10 w-10" asChild>
                 <Link href={`/dashboard/landlord/properties/${property.id}/edit`}>
                   <Edit2 className="w-4 h-4" />
                 </Link>
@@ -107,51 +107,50 @@ export function PropertyCard({ property, isLandlordView = false, viewMode = 'gri
   }
 
   return (
-    <Card className="group overflow-hidden flex flex-col h-full border-border/50 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 relative bg-card">
-      {/* Visual Identity Decorator */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+    <Card className="group overflow-hidden flex flex-col h-full border-2 hover:border-primary/50 hover:shadow-lg transition-shadow duration-200 relative">
 
-      <CardHeader className="pb-4 space-y-4 pt-6 px-6">
+
+      <CardHeader className="pb-4 space-y-3 p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4 flex-1 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center text-primary flex-shrink-0 group-hover:scale-110 transition-transform duration-500 shadow-sm border border-primary/10">
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0 group-hover:scale-105 transition-transform duration-200">
               {getPropertyIcon(property.propertyType)}
             </div>
             <div className="min-w-0 flex-1">
-              <Badge variant="outline" className="mb-2 bg-muted/50 text-[10px] h-5 uppercase tracking-wider font-bold border-border/50">
+              <Badge variant="outline" className="mb-2 text-xs font-medium uppercase">
                 {PROPERTY_TYPE_LABELS[property.propertyType]}
               </Badge>
-              <CardTitle className="text-xl font-bold line-clamp-1 group-hover:text-primary transition-colors duration-300">
+              <CardTitle className="text-lg font-bold line-clamp-1 group-hover:text-primary transition-colors">
                 {property.name}
               </CardTitle>
             </div>
           </div>
           <div className="flex-shrink-0 text-right">
             <div className="inline-flex flex-col items-end">
-              <span className="text-2xl font-black text-foreground">{occupancyRate}%</span>
-              <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Lấp đầy</span>
+              <span className="text-xl font-bold text-foreground">{occupancyRate}%</span>
+              <span className="text-xs text-muted-foreground font-medium uppercase">Lấp đầy</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-start gap-2 text-sm text-muted-foreground relative">
-          <MapPin className="size-4 mt-0.5 flex-shrink-0 text-primary/70" />
-          <p className="line-clamp-1 group-hover:line-clamp-none transition-all duration-300">
+          <MapPin className="size-4 mt-0.5 flex-shrink-0 text-primary" />
+          <p className="line-clamp-1">
             {property.address}, {property.ward}
           </p>
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col flex-1 space-y-6 pt-2 pb-6 px-6">
+      <CardContent className="flex flex-col flex-1 space-y-5 pt-2 pb-6 px-6">
         {/* Occupancy Progress */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider">
+          <div className="flex items-center justify-between text-xs font-medium uppercase">
             <span className="text-muted-foreground">Tình trạng thuê</span>
             <span className="text-foreground">{occupiedRooms}/{totalRooms} phòng</span>
           </div>
-          <div className="relative h-2.5 w-full bg-muted rounded-full overflow-hidden">
+          <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden">
             <motion.div
-              className="absolute top-0 left-0 h-full bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary),0.3)]"
+              className="absolute top-0 left-0 h-full bg-primary rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${occupancyRate}%` }}
               transition={{ duration: 1, ease: "easeOut" }}
@@ -167,20 +166,20 @@ export function PropertyCard({ property, isLandlordView = false, viewMode = 'gri
             { label: "Đã thuê", value: occupiedRooms, icon: CheckCircle2, color: "text-blue-600 dark:text-blue-400" },
             { label: "Bảo trì", value: maintenanceRooms, icon: AlertCircle, color: "text-orange-600 dark:text-orange-400" }
           ].map((stat, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 rounded-2xl bg-muted/30 border border-transparent hover:border-border/50 hover:bg-muted/50 transition-all duration-300 group/stat">
-              <stat.icon className={cn("size-4 flex-shrink-0 transition-transform group-hover/stat:scale-110", stat.color)} />
+            <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border hover:border-border transition-colors">
+              <stat.icon className={cn("size-4 flex-shrink-0", stat.color)} />
               <div className="min-w-0">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-tight">{stat.label}</p>
-                <p className="text-sm font-bold text-foreground leading-tight">{stat.value}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase">{stat.label}</p>
+                <p className="text-sm font-bold text-foreground">{stat.value}</p>
               </div>
             </div>
           ))}
         </div>
 
         <div className="pt-2">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Tóm tắt giá</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase mb-2">Giá trung bình</p>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-primary">
+            <span className="text-xl font-bold text-primary">
               {new Intl.NumberFormat('vi-VN').format(Math.round(avgPrice / 1000) * 1000)}
             </span>
             <span className="text-xs font-bold text-muted-foreground">VND / tháng (TB)</span>
@@ -189,7 +188,7 @@ export function PropertyCard({ property, isLandlordView = false, viewMode = 'gri
 
         {/* Action Buttons */}
         <div className="flex gap-2 mt-auto pt-4 border-t border-border/50">
-          <Button asChild className="flex-[2] h-11 rounded-xl font-bold shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all active:scale-95">
+          <Button asChild className="flex-[2] h-10 font-semibold">
             <Link href={isLandlordView ? `/dashboard/landlord/properties/${property.id}/rooms` : `/properties/${property.id}`} className="flex items-center gap-2">
               {isLandlordView ? "Quản lý phòng" : "Xem chi tiết"}
               <ChevronRight className="w-4 h-4" />
@@ -201,7 +200,7 @@ export function PropertyCard({ property, isLandlordView = false, viewMode = 'gri
               <Button
                 variant="outline"
                 size="icon"
-                className="h-11 w-11 rounded-xl border-border/50 hover:bg-muted transition-all active:scale-95"
+                className="h-10 w-10"
                 onClick={() => onEdit?.(property)}
               >
                 <Edit2 className="w-4 h-4" />
@@ -210,7 +209,7 @@ export function PropertyCard({ property, isLandlordView = false, viewMode = 'gri
               <Button
                 variant="outline"
                 size="icon"
-                className="h-11 w-11 rounded-xl border-border/50 text-destructive hover:bg-destructive/10 transition-all active:scale-95"
+                className="h-10 w-10 text-destructive hover:bg-destructive/10"
                 onClick={() => onDelete?.(property)}
               >
                 <Trash2 className="w-4 h-4" />

@@ -35,7 +35,7 @@ export function DataTable<TData, TValue>({
     searchKey,
     loading,
 }: DataTableProps<TData, TValue>) {
-    const [columnFilters, setColumnFilters] = React.useState<any[]>([]);
+    const [columnFilters, setColumnFilters] = React.useState<Array<{ id: string; value: unknown }>>([]);
 
     const table = useReactTable({
         data,

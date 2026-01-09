@@ -91,7 +91,7 @@ export function MarketInsightsClient({ insights }: MarketInsightsClientProps) {
                                         tickFormatter={(val) => `${(val / 1000000).toFixed(0)}M`}
                                     />
                                     <Tooltip
-                                        formatter={(val: any) => [`${formatCurrency(Number(val))}`, "Giá TB"]}
+                                        formatter={(val: number | string | undefined) => [`${formatCurrency(Number(val || 0))}`, "Giá TB"]}
                                         labelStyle={{ color: 'black' }}
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                     />

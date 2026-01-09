@@ -21,9 +21,10 @@ export default function LandlordReviewsPage() {
     const [filterStatus, setFilterStatus] = useState<string>('all');
 
     const filteredReviews = useMemo(() => {
-        if (!reviewsData?.data) return [];
+        const data = reviewsData?.data;
+        if (!data) return [];
 
-        return reviewsData.data.filter((review: RoomReview) => {
+        return data.filter((review: RoomReview) => {
             // Search filter
             const matchesSearch =
                 searchQuery === '' ||
@@ -46,13 +47,14 @@ export default function LandlordReviewsPage() {
 
             return matchesSearch && matchesRating && matchesStatus;
         });
-    }, [reviewsData?.data, searchQuery, filterRating, filterStatus]);
+    }, [reviewsData, searchQuery, filterRating, filterStatus]);
 
     const stats = useMemo(() => {
-        if (!reviewsData?.data || reviewsData.data.length === 0) {
+        const data = reviewsData?.data;
+        if (!data || data.length === 0) {
             return { total: 0, avgRating: 0, pending: 0 };
         }
-        const reviews = reviewsData.data;
+        const reviews = data;
         const avgRating =
             reviews.reduce(
                 (sum: number, r: RoomReview) => sum + (r.rating + r.cleanlinessRating + r.locationRating + r.valueRating) / 4,
@@ -60,7 +62,7 @@ export default function LandlordReviewsPage() {
             ) / reviews.length;
         const pending = reviews.filter((r: RoomReview) => !r.landlordReply).length;
         return { total: reviews.length, avgRating, pending };
-    }, [reviewsData?.data]);
+    }, [reviewsData]);
 
     return (
         <div className="container py-6 space-y-6">

@@ -3,10 +3,16 @@ import { LandlordsService } from './landlords.service';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { faker } from '@faker-js/faker';
+import { UserRole } from '@prisma/client';
 
 describe('LandlordsService', () => {
   let service: LandlordsService;
   let prismaService: PrismaService;
+
+  const mockAdminUser = {
+    id: 'admin-user-1',
+    role: UserRole.ADMIN,
+  };
 
   const mockLandlord = {
     userId: faker.string.uuid(),
@@ -170,7 +176,11 @@ describe('LandlordsService', () => {
       mockPrismaService.landlord.findUnique.mockResolvedValue(mockLandlord);
       mockPrismaService.landlord.update.mockResolvedValue(updatedLandlord);
 
-      const result = await service.update(mockLandlord.userId, updateDto);
+      const result = await service.update(
+        mockLandlord.userId,
+        updateDto,
+        mockAdminUser,
+      );
 
       expect(prismaService.landlord.update).toHaveBeenCalledWith({
         where: { userId: mockLandlord.userId },

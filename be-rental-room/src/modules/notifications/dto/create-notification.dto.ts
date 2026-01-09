@@ -7,7 +7,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { NotificationType } from '../entities';
+import { NotificationType } from '@prisma/client';
 
 export class CreateNotificationDto {
   @IsUUID()

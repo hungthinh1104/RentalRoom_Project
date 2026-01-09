@@ -36,7 +36,7 @@ export class AIService {
     private readonly analysisService: AnalysisService,
     private readonly chatService: ChatService,
     private readonly prisma: PrismaService, // Inject PrismaService
-  ) { }
+  ) {}
 
   /**
    * Generate embedding for a given text
@@ -82,7 +82,10 @@ export class AIService {
    *
    * Use case: Tenant questions about properties, general inquiries
    */
-  async chatWithAI(message: string, context?: string): Promise<{
+  async chatWithAI(
+    message: string,
+    context?: string,
+  ): Promise<{
     response: string;
     rooms?: Array<{
       id: string;

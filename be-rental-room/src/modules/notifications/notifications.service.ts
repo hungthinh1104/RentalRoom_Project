@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreateNotificationDto,
@@ -8,19 +8,42 @@ import {
 } from './dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
+import { NotificationsGateway } from './gateways';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject('NOTIFICATIONS_GATEWAY')
+    private readonly notificationsGateway: NotificationsGateway,
+  ) {}
 
   async create(createDto: CreateNotificationDto) {
     const notification = await this.prisma.notification.create({
       data: createDto,
     });
 
-    return plainToClass(NotificationResponseDto, notification, {
+    const result = plainToClass(NotificationResponseDto, notification, {
       excludeExtraneousValues: true,
     });
+
+    // Emit real-time notification via WebSocket
+    try {
+      this.notificationsGateway.notifyUser(createDto.userId, notification);
+      this.logger.debug(
+        `📬 Real-time notification emitted for user ${createDto.userId}`,
+      );
+    } catch (error) {
+      // Gateway might not be available if no WebSocket connections
+      // This is fine, notification is still saved in DB
+      this.logger.debug(
+        `WebSocket notification failed (user may be offline): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return result;
   }
 
   async findAll(filterDto: FilterNotificationsDto) {

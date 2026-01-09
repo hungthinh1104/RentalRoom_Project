@@ -66,6 +66,11 @@ describe('UsersController', () => {
 
       expect(result).toEqual([]);
       expect(service.findAll).toHaveBeenCalledTimes(1);
+      expect(service.findAll).toHaveBeenCalledWith({
+        search: undefined,
+        role: undefined,
+        emailVerified: false,
+      });
     });
 
     it('should call service.findAll without parameters', async () => {
@@ -73,7 +78,11 @@ describe('UsersController', () => {
 
       await controller.findAll();
 
-      expect(service.findAll).toHaveBeenCalledWith();
+      expect(service.findAll).toHaveBeenCalledWith({
+        search: undefined,
+        role: undefined,
+        emailVerified: false,
+      });
     });
   });
 

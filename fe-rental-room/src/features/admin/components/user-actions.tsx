@@ -40,8 +40,10 @@ export function UserActions({ userId, userName, isActive, onEdit }: UserActionsP
         try {
             await toggleStatus.mutateAsync({ id: userId, active: !isActive });
             toast.success(isActive ? "Đã vô hiệu hóa tài khoản" : "Đã kích hoạt tài khoản");
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Không thể cập nhật trạng thái");
+        } catch (error: unknown) {
+            const message = error && typeof error === 'object' && 'response' in error ? 
+                (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+            toast.error(message || "Không thể cập nhật trạng thái");
         }
     };
 
@@ -50,8 +52,10 @@ export function UserActions({ userId, userName, isActive, onEdit }: UserActionsP
             await deleteUser.mutateAsync(userId);
             toast.success("Đã xóa người dùng");
             setDeleteDialogOpen(false);
-        } catch (error: any) {
-            toast.error(error?.response?.data?.message || "Không thể xóa người dùng");
+        } catch (error: unknown) {
+            const message = error && typeof error === 'object' && 'response' in error ? 
+                (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+            toast.error(message || "Không thể xóa người dùng");
         }
     };
 

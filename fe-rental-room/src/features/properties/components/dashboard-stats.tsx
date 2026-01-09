@@ -93,7 +93,7 @@ export function DashboardStats({ properties }: DashboardStatsProps) {
         >
             {stats.map((stat, idx) => (
                 <motion.div key={idx} variants={item}>
-                    <Card className="border-none shadow-sm hover:shadow-md transition-shadow">
+                    <Card className="border-2 hover:border-primary/50 hover:shadow-md transition-all">
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-1">

@@ -102,8 +102,10 @@ export default function AdminContractsPage() {
       await terminateContract.mutateAsync({ contractId: terminateId });
       toast.success("Đã chấm dứt hợp đồng");
       setTerminateId(null);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể chấm dứt hợp đồng");
+    } catch (error: unknown) {
+      const message = error && typeof error === 'object' && 'response' in error ? 
+        (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+      toast.error(message || "Không thể chấm dứt hợp đồng");
     }
   };
 

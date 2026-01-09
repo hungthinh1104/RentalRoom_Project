@@ -16,11 +16,13 @@ import {
   CreateMaintenanceFeedbackDto,
 } from './dto';
 import { Auth } from 'src/common/decorators/auth.decorator';
-import { UserRole } from '../users/entities';
+import { UserRole } from '@prisma/client';
+import type { User } from '@prisma/client';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 @Controller('maintenance')
 export class MaintenanceController {
-  constructor(private readonly maintenanceService: MaintenanceService) {}
+  constructor(private readonly maintenanceService: MaintenanceService) { }
 
   @Post('requests')
   @Auth()
@@ -45,8 +47,9 @@ export class MaintenanceController {
   update(
     @Param('id') id: string,
     @Body() updateDto: UpdateMaintenanceRequestDto,
+    @CurrentUser() user: User,
   ) {
-    return this.maintenanceService.update(id, updateDto);
+    return this.maintenanceService.update(id, updateDto, user);
   }
 
   @Patch('requests/:id/complete')
@@ -57,8 +60,8 @@ export class MaintenanceController {
 
   @Delete('requests/:id')
   @Auth(UserRole.ADMIN)
-  remove(@Param('id') id: string) {
-    return this.maintenanceService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.maintenanceService.remove(id, user);
   }
 
   @Patch('requests/:id/feedback')

@@ -27,6 +27,10 @@ import { RoomStatus } from "@/types/enums";
 import type { RoomReview, RoomImage } from '@/types';
 import { useRequireAuth } from "@/features/auth/hooks/use-require-auth";
 import { ContactLandlordModal } from "@/features/contracts/components/contact-landlord-modal";
+import { favoritesApi } from "@/lib/api/favorites-api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 
 interface RoomDetailPageProps {
   params: {
@@ -37,14 +41,36 @@ interface RoomDetailPageProps {
 export default function RoomDetailPage({ params }: RoomDetailPageProps) {
   const { id } = use(params as unknown as Promise<{ id: string }>);
   const { requireLogin } = useRequireAuth();
+  const { data: session } = useSession();
+  const queryClient = useQueryClient();
   const { data: room, isLoading, error } = useRoom(id);
   const [mainImage, setMainImage] = useState<string>("");
-  const [isBookmarked] = useState(false);
   const [isContactModalOpen, setIsContactModalOpen] = useState(false);
+
+  // Fetch favorites to check if current room is bookmarked
+  const { data: favorites = [] } = useQuery({
+    queryKey: ['favorites'],
+    queryFn: () => favoritesApi.getAll(),
+    enabled: !!session?.user,
+  });
+
+  const isBookmarked = favorites.some((fav: any) => fav.roomId === id);
+
+  // Toggle bookmark mutation
+  const bookmarkMutation = useMutation({
+    mutationFn: () => favoritesApi.toggle({ roomId: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      toast.success(isBookmarked ? "Đã bỏ yêu thích" : "Đã thêm vào yêu thích");
+    },
+    onError: () => {
+      toast.error("Không thể cập nhật yêu thích");
+    },
+  });
 
   const handleBookmark = () => {
     if (requireLogin(`/rooms/${id}`)) {
-      // TODO: Implement bookmark functionality
+      bookmarkMutation.mutate();
     }
   };
 

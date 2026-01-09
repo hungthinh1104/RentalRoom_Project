@@ -68,17 +68,17 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => router.push('/profile')}>
+          <DropdownMenuItem onClick={() => router.push(`/dashboard/${user.role?.toLowerCase()}/profile`)}>
             <User className="mr-2 h-4 w-4" />
             <span>Hồ sơ</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/profile/settings')}>
+          <DropdownMenuItem onClick={() => router.push(`/dashboard/${user.role?.toLowerCase()}/settings`)}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Cài đặt</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+        <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Đăng xuất</span>
         </DropdownMenuItem>

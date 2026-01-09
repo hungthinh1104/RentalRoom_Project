@@ -19,7 +19,7 @@ import { Auth } from 'src/common/decorators/auth.decorator';
 
 @Controller('notifications')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(private readonly notificationsService: NotificationsService) { }
 
   @Post()
   @Auth(UserRole.ADMIN)
@@ -45,10 +45,28 @@ export class NotificationsController {
     return this.notificationsService.update(id, updateDto);
   }
 
-  @Patch(':id/mark-read')
+  @Patch(':id/mark-as-read')
   @Auth()
   markAsRead(@Param('id') id: string) {
     return this.notificationsService.markAsRead(id);
+  }
+
+  @Patch('user/:userId/mark-all-as-read')
+  @Auth()
+  async markAllAsRead(@Param('userId') userId: string) {
+    // Mark all unread notifications for this user as read
+    const notifications = await this.notificationsService.findAll({
+      userId,
+      isRead: false,
+      skip: 0,
+      limit: 1000, // Get all unread
+    });
+
+    await Promise.all(
+      notifications.data.map((n) => this.notificationsService.markAsRead(n.id)),
+    );
+
+    return { message: 'All notifications marked as read' };
   }
 
   @Delete(':id')

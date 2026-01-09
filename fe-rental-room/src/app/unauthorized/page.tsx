@@ -2,12 +2,25 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function UnauthorizedPage() {
     const { data: session } = useSession();
     const router = useRouter();
+
+    useEffect(() => {
+        // If user is logged in, redirect to their dashboard
+        if (session?.user?.role) {
+            router.replace(`/dashboard/${session.user.role.toLowerCase()}`);
+        }
+    }, [session, router]);
+
+    // Don't render unauthorized page if user is logged in
+    if (session?.user?.role) {
+        return null;
+    }
 
     const handleGoToDashboard = () => {
         if (session?.user?.role === 'ADMIN') {

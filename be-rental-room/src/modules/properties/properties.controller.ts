@@ -17,8 +17,10 @@ import {
   FilterPropertiesDto,
 } from './dto';
 import { CacheTTL } from '../../common/decorators/cache.decorator';
-import { UserRole } from '../users/entities';
+import { UserRole } from '@prisma/client';
+import type { User } from '@prisma/client';
 import { Auth } from 'src/common/decorators/auth.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 
 @Controller('properties')
 export class PropertiesController {
@@ -31,9 +33,18 @@ export class PropertiesController {
   }
 
   @Get()
+  @Auth()
   // @UseInterceptors(CacheInterceptor)
   // @CacheTTL(300) // Cache for 5 minutes
-  findAll(@Query() filterDto: FilterPropertiesDto) {
+  findAll(
+    @Query() filterDto: FilterPropertiesDto,
+    @CurrentUser() user: User,
+  ) {
+    // 🔒 SECURITY: Landlords can only see their own properties
+    if (user.role === UserRole.LANDLORD) {
+      filterDto.landlordId = user.id;
+    }
+    // ADMIN and TENANT can see all (for browsing)
     return this.propertiesService.findAll(filterDto);
   }
 
@@ -49,13 +60,17 @@ export class PropertiesController {
   update(
     @Param('id') id: string,
     @Body() updatePropertyDto: UpdatePropertyDto,
+    @CurrentUser() user: User,
   ) {
-    return this.propertiesService.update(id, updatePropertyDto);
+    return this.propertiesService.update(id, updatePropertyDto, user);
   }
 
   @Delete(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  remove(@Param('id') id: string) {
-    return this.propertiesService.remove(id);
+  remove(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.propertiesService.remove(id, user);
   }
 }

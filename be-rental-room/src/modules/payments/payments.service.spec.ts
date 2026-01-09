@@ -5,9 +5,12 @@ import { NotFoundException } from '@nestjs/common';
 import { faker } from '@faker-js/faker';
 import { PaymentStatus, PaymentMethod } from './entities';
 
+import { PaymentService } from './payment.service';
+
 describe('PaymentsService', () => {
   let service: PaymentsService;
   let prismaService: PrismaService;
+  let paymentFacade: PaymentService;
 
   const mockPayment = {
     id: faker.string.uuid(),
@@ -32,6 +35,13 @@ describe('PaymentsService', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    invoice: {
+      update: jest.fn(),
+    },
+  };
+
+  const mockPaymentFacade = {
+    verifyPayment: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -42,11 +52,16 @@ describe('PaymentsService', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        {
+          provide: PaymentService,
+          useValue: mockPaymentFacade,
+        },
       ],
     }).compile();
 
     service = module.get<PaymentsService>(PaymentsService);
     prismaService = module.get<PrismaService>(PrismaService);
+    paymentFacade = module.get<PaymentService>(PaymentService);
   });
 
   afterEach(() => {
@@ -240,6 +255,39 @@ describe('PaymentsService', () => {
           }),
         }),
       );
+    });
+  });
+
+  describe('checkPaymentStatus', () => {
+    it('should return completed if already paid', async () => {
+      const paidPayment = { ...mockPayment, status: PaymentStatus.COMPLETED };
+      mockPrismaService.payment.findUnique.mockResolvedValue(paidPayment);
+
+      const result = await service.checkPaymentStatus(mockPayment.id);
+      expect(result.success).toBe(true);
+      expect((result as any).error).toBe('Payment already completed');
+    });
+
+    it('should verify and update status if successful', async () => {
+      mockPrismaService.payment.findUnique.mockResolvedValue({
+        ...mockPayment,
+        invoice: { contract: { id: 'contract-123' } },
+      });
+      mockPaymentFacade.verifyPayment.mockResolvedValue({
+        success: true,
+        transaction: { transactionId: 'TX123', content: 'Paid' },
+      });
+
+      const result = await service.checkPaymentStatus(mockPayment.id);
+
+      expect(result.success).toBe(true);
+      expect(prismaService.payment.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: mockPayment.id },
+          data: expect.objectContaining({ status: PaymentStatus.COMPLETED }),
+        }),
+      );
+      expect(prismaService.invoice.update).toHaveBeenCalled();
     });
   });
 

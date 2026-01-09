@@ -170,7 +170,7 @@ export default function AdminDashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
                       <Tooltip
                         contentStyle={{ borderRadius: '8px', border: '1px solid var(--border)' }}
-                        formatter={(value: any) => [formatCurrency(Number(value)), "Doanh thu"]}
+                        formatter={(value: number | string | undefined) => [formatCurrency(Number(value || 0)), "Doanh thu"]}
                         labelFormatter={(value) => new Date(value).toLocaleDateString('vi-VN')}
                       />
                       <Area
@@ -225,7 +225,7 @@ export default function AdminDashboardPage() {
                         <Cell key="vacant" fill="hsl(var(--muted))" />
                       </Pie>
                       <Tooltip
-                        formatter={(value: any) => [`${Number(value).toFixed(1)}%`, ""]}
+                        formatter={(value: number | string | undefined) => [`${Number(value || 0).toFixed(1)}%`, ""]}
                       />
                     </PieChart>
                   </ResponsiveContainer>
@@ -341,7 +341,7 @@ export default function AdminDashboardPage() {
             ) : (
               <div className="space-y-4">
                 {stats?.topPerformers?.landlords?.length ? (
-                  stats.topPerformers.landlords.slice(0, 5).map((landlord: any, i: number) => (
+                  stats.topPerformers.landlords.slice(0, 5).map((landlord: { landlordId: string; name: string; properties: number; occupancyRate: number; revenue: number }) => (
                     <div key={landlord.landlordId} className="flex items-center justify-between border-b last:border-0 pb-3 last:pb-0">
                       <div>
                         <p className="font-medium">{landlord.name}</p>
@@ -385,12 +385,12 @@ export default function AdminDashboardPage() {
             ) : (
               <div className="space-y-4">
                 {stats?.topPerformers?.properties?.length ? (
-                  stats.topPerformers.properties.slice(0, 5).map((property: any, i: number) => (
-                    <div key={property.propertyId} className="flex items-center justify-between border-b last:border-0 pb-3 last:pb-0">
+                  stats.topPerformers.properties.slice(0, 5).map((property: { id: string; name: string; rooms: number; occupiedRooms: number; occupancyRate: number; revenue: number }) => (
+                    <div key={property.id} className="flex items-center justify-between border-b last:border-0 pb-3 last:pb-0">
                       <div>
                         <p className="font-medium truncate max-w-[180px] sm:max-w-[240px]">{property.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {property.landlord}
+                          {property.rooms} phòng • {property.occupiedRooms} đã cho thuê
                         </p>
                       </div>
                       <div className="text-right">

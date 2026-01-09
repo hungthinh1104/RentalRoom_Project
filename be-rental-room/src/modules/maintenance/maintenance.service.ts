@@ -1,22 +1,57 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../database/prisma/prisma.service';
-import { CreateMaintenanceRequestDto } from './dto/create-maintenance-request.dto';
-import { UpdateMaintenanceRequestDto } from './dto/update-maintenance-request.dto';
-import { FilterMaintenanceRequestsDto } from './dto/filter-maintenance-requests.dto';
-import { CreateMaintenanceFeedbackDto } from './dto/create-maintenance-feedback.dto';
+import { Injectable, NotFoundException, Logger, BadRequestException } from '@nestjs/common';
+import { PrismaService } from 'src/database/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  CreateMaintenanceRequestDto,
+  UpdateMaintenanceRequestDto,
+  FilterMaintenanceRequestsDto,
+  MaintenanceRequestResponseDto,
+  CreateMaintenanceFeedbackDto,
+} from './dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
 import { MaintenanceStatus } from './entities';
-import { MaintenanceRequestResponseDto } from './dto'; // This import is still needed for the response DTO
+import { NotificationType, User, UserRole } from '@prisma/client';
 
 @Injectable()
 export class MaintenanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(MaintenanceService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) { }
 
   async create(createDto: CreateMaintenanceRequestDto) {
     const request = await this.prisma.maintenanceRequest.create({
       data: createDto,
+      include: {
+        room: {
+          include: {
+            property: {
+              include: {
+                landlord: true,
+              },
+            },
+          },
+        },
+        tenant: true,
+      },
     });
+
+    // 🔔 TRIGGER NOTIFICATION: Maintenance Request Submitted
+    try {
+      await this.notificationsService.create({
+        userId: request.room.property.landlordId,
+        title: '🔧 Yêu cầu bảo trì mới',
+        content: `Yêu cầu bảo trì mới cho phòng ${request.room.roomNumber}: ${request.title}`,
+        notificationType: 'MAINTENANCE' as any,
+        relatedEntityId: request.id,
+      });
+      this.logger.log(`📬 Maintenance notification sent to landlord ${request.room.property.landlordId}`);
+    } catch (error) {
+      this.logger.error('Failed to send maintenance notification', error);
+    }
 
     return plainToClass(MaintenanceRequestResponseDto, request, {
       excludeExtraneousValues: true,
@@ -70,12 +105,12 @@ export class MaintenanceService {
         where,
         include: landlordId
           ? {
-              room: {
-                include: {
-                  property: true,
-                },
+            room: {
+              include: {
+                property: true,
               },
-            }
+            },
+          }
           : undefined,
         skip: filterDto.skip,
         take: limit,
@@ -109,8 +144,20 @@ export class MaintenanceService {
     });
   }
 
-  async update(id: string, updateDto: UpdateMaintenanceRequestDto) {
-    await this.findOne(id);
+  async update(id: string, updateDto: UpdateMaintenanceRequestDto, user: User) {
+    const existing = await this.prisma.maintenanceRequest.findUnique({
+      where: { id },
+      include: { room: { include: { property: true } } },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Maintenance request with ID ${id} not found`);
+    }
+
+    // 🔒 SECURITY: Landlord can only update requests for their properties
+    if (user.role === UserRole.LANDLORD && existing.room.property.landlordId !== user.id) {
+      throw new BadRequestException('Landlords can only update maintenance requests for their own properties');
+    }
 
     const request = await this.prisma.maintenanceRequest.update({
       where: { id },
@@ -131,14 +178,34 @@ export class MaintenanceService {
         status: MaintenanceStatus.COMPLETED,
         completedAt: new Date(),
       },
+      include: {
+        tenant: true,
+        room: true,
+      },
     });
+
+    // 🔔 TRIGGER NOTIFICATION: Maintenance Completed
+    try {
+      await this.notificationsService.create({
+        userId: request.tenantId,
+        title: '✅ Bảo trì hoàn tất',
+        content: `Yêu cầu bảo trì "${request.title}" cho phòng ${request.room.roomNumber} đã được hoàn tất.`,
+        notificationType: 'MAINTENANCE' as any,
+        relatedEntityId: request.id,
+      });
+      this.logger.log(`📬 Maintenance completion notification sent to tenant ${request.tenantId}`);
+    } catch (error) {
+      this.logger.error('Failed to send completion notification', error);
+    }
 
     return plainToClass(MaintenanceRequestResponseDto, request, {
       excludeExtraneousValues: true,
     });
   }
 
-  async remove(id: string) {
+  async remove(id: string, user: User) {
+    // Admin-only endpoint (enforced by @Auth decorator in controller)
+    // No additional ownership check needed
     await this.findOne(id);
 
     await this.prisma.maintenanceRequest.delete({

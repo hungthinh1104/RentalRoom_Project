@@ -29,7 +29,9 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!response.ok) {
-            console.error('[NextAuth] Session validation failed:', response.status);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('[NextAuth] Session validation failed:', response.status);
+            }
             return null;
           }
 
@@ -44,7 +46,6 @@ export const authOptions: NextAuthOptions = {
             accessToken: user.access_token, // Capture token from backend
           };
         } catch (error) {
-          console.error("[NextAuth] Auth error:", error);
           return null;
         }
       },
@@ -54,24 +55,18 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       // On initial sign-in, store user data in JWT
       if (user) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[NextAuth] JWT Callback - User:', user);
-        }
         token.id = user.id;
-        token.role = user.role;
-        token.accessToken = (user as any).accessToken; // Store backend token
+        token.role = (user as { role?: string }).role || 'TENANT';
+        token.accessToken = (user as { accessToken?: string }).accessToken;
       }
       return token;
     },
     async session({ session, token }) {
       // Pass user data to client session
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[NextAuth] Session Callback - Token:', token);
-      }
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        (session as any).accessToken = token.accessToken; // Pass to client
+        session.user.id = (token.id as string) || '';
+        session.user.role = (token.role as string) || 'TENANT';
+        (session as { accessToken?: string }).accessToken = (token.accessToken as string);
       }
       return session;
     },
@@ -110,4 +105,5 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
+  events: {},
 };

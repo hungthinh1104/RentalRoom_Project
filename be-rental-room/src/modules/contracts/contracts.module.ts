@@ -11,9 +11,16 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from 'src/common/common.module';
 
 import { PaymentsModule } from '../payments/payments.module';
+import { SnapshotsModule } from '../snapshots/snapshots.module';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), NotificationsModule, CommonModule, PaymentsModule],
+  imports: [
+    ScheduleModule.forRoot(),
+    NotificationsModule,
+    CommonModule,
+    PaymentsModule,
+    SnapshotsModule,
+  ],
   controllers: [ContractsController],
   providers: [
     ContractsService,
@@ -25,4 +32,4 @@ import { PaymentsModule } from '../payments/payments.module';
   ],
   exports: [ContractsService, ContractSigningService],
 })
-export class ContractsModule { }
+export class ContractsModule {}

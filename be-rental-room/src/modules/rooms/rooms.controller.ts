@@ -4,33 +4,30 @@ import {
   Post,
   Body,
   Param,
-  Put,
   Patch,
   Delete,
   Query,
   HttpCode,
   HttpStatus,
-  UseInterceptors,
   UseGuards,
-  Request,
 } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { RoomsService } from './rooms.service';
 import {
   CreateRoomDto,
   FilterRoomsDto,
   UpdateRoomDto,
   ReplyToReviewDto,
+  CreateReviewDto,
 } from './dto';
-import { CacheTTL } from '../../common/decorators/cache.decorator';
 import { Auth } from '../../common/decorators/auth.decorator';
 import { UserRole } from '@prisma/client';
+import type { User } from '@prisma/client';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('rooms')
 export class RoomsController {
-  constructor(private readonly roomsService: RoomsService) { }
+  constructor(private readonly roomsService: RoomsService) {}
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -45,7 +42,6 @@ export class RoomsController {
   findAll(@Query() filterDto: FilterRoomsDto, @CurrentUser() user: any) {
     return this.roomsService.findAll(filterDto, user?.id);
   }
-
 
   @Get('reviews/landlord/:landlordId')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -63,20 +59,33 @@ export class RoomsController {
 
   @Patch(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  update(@Param('id') id: string, @Body() updateRoomDto: UpdateRoomDto) {
-    return this.roomsService.update(id, updateRoomDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateRoomDto: UpdateRoomDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.roomsService.update(id, updateRoomDto, user);
   }
 
   @Delete(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
-    return this.roomsService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.roomsService.remove(id, user);
   }
 
   @Post('reviews/:id/reply')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
   replyToReview(@Param('id') id: string, @Body() replyDto: ReplyToReviewDto) {
     return this.roomsService.replyToReview(id, replyDto);
+  }
+
+  @Post('reviews')
+  @Auth(UserRole.TENANT)
+  createReview(
+    @Body() createReviewDto: CreateReviewDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.roomsService.createReview(createReviewDto, user.id);
   }
 }

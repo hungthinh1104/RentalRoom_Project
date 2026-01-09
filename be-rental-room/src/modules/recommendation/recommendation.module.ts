@@ -9,4 +9,4 @@ import { RecommendationService } from './recommendation.service';
   providers: [RecommendationService, PrismaService],
   exports: [RecommendationService],
 })
-export class RecommendationModule { }
+export class RecommendationModule {}

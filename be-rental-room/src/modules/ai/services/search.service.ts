@@ -18,7 +18,7 @@ export class SearchService {
     private readonly embeddingService: EmbeddingService,
     private readonly cacheService: CacheService,
     private readonly analysisService: AnalysisService, // Injected
-  ) { }
+  ) {}
 
   /**
    * Semantic search using vector similarity
@@ -32,7 +32,8 @@ export class SearchService {
     try {
       // Step 1: Analyze query to extract structured filters (Price, Area, Location)
       // This fixes the issue where "dưới 3 triệu" is treated as keywords instead of a logical filter
-      const { filters, cleanedQuery } = await this.analysisService.analyzeSearchQuery(query);
+      const { filters, cleanedQuery } =
+        await this.analysisService.analyzeSearchQuery(query);
 
       // Step 2: If significant filters are found, use Hybrid Search for accuracy
       const hasFilters =
@@ -44,7 +45,9 @@ export class SearchService {
         (filters.amenities && filters.amenities.length > 0);
 
       if (hasFilters) {
-        this.logger.log(`Smart routing to Hybrid Search: ${JSON.stringify(filters)}`);
+        this.logger.log(
+          `Smart routing to Hybrid Search: ${JSON.stringify(filters)}`,
+        );
 
         // If location is detected, append it to the query for text matching valid rooms in that area
         const effectiveQuery = filters.location

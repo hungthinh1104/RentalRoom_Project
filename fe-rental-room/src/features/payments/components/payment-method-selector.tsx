@@ -2,7 +2,7 @@
 
 import { Label } from "@/components/ui/label";
 import { PaymentMethod } from "@/types/enums";
-import { CreditCard, Banknote, Smartphone } from "lucide-react";
+import { CreditCard } from "lucide-react";
 
 interface PaymentMethodSelectorProps {
   value: PaymentMethod;
@@ -12,10 +12,7 @@ interface PaymentMethodSelectorProps {
 
 export function PaymentMethodSelector({ value, onChange, disabled }: PaymentMethodSelectorProps) {
   const methods = [
-    { value: PaymentMethod.CASH, label: "Cash", icon: Banknote },
-    { value: PaymentMethod.BANK_TRANSFER, label: "Bank Transfer", icon: CreditCard },
-    { value: PaymentMethod.MOMO, label: "MoMo", icon: Smartphone },
-    { value: PaymentMethod.ZALOPAY, label: "ZaloPay", icon: Smartphone },
+    { value: PaymentMethod.BANK_TRANSFER, label: "Chuyển khoản qua Sepay", icon: CreditCard },
   ];
 
   return (

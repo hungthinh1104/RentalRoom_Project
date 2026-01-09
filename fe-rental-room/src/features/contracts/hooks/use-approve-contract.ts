@@ -13,8 +13,10 @@ export function useApproveContract() {
             queryClient.invalidateQueries({ queryKey: ["contracts"] });
             toast.success("Hợp đồng đã được phê duyệt!");
         },
-        onError: (error: any) => {
-            toast.error(error?.response?.data?.message || "Không thể phê duyệt hợp đồng");
+        onError: (error: unknown) => {
+            const message = error && typeof error === 'object' && 'response' in error ? 
+                (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+            toast.error(message || "Không thể phê duyệt hợp đồng");
         },
     });
 }

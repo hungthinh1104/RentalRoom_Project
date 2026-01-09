@@ -41,6 +41,20 @@ export function useConfirmPayment() {
 	});
 }
 
+export function useCheckPaymentStatus() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (id: string) => paymentsApi.checkStatus(id),
+		onSuccess: (data: { success: boolean; error?: string }) => {
+			if (data.success) {
+				queryClient.invalidateQueries({ queryKey: ['payments'] });
+				queryClient.invalidateQueries({ queryKey: ['invoices'] });
+			}
+		},
+	});
+}
+
 // Invoice hooks
 export function useInvoices(params?: PaginationParams & { status?: string }) {
 	return useQuery({

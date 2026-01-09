@@ -17,55 +17,91 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 
-# Environment variables
+# Environment variables - CRITICAL: Never commit these!
 .env
 .env.local
+.env.development
 .env.development.local
+.env.test
 .env.test.local
+.env.production
 .env.production.local
 *.env
+!.env.example
+!.env.production.example
+
+# Security - Keys and certificates
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+gcp-key.json
+service-account*.json
 
 # IDEs
 .vscode/
 .idea/
 .cursorrules
+*.swp
+*.swo
+*~
 
-# Coverage
+# Testing
 coverage/
+*.test.ts
+*.spec.ts
+*.test.tsx
+*.spec.tsx
+.nyc_output/
+test-results/
+playwright-report/
 
-# Sub-project specific ignores from original .gitignore
-be-rental-room/docs/AI_COMPLETE_GUIDE.md
-be-rental-room/docs/AI_DATABASE_ANALYSIS.md
-be-rental-room/docs/AI_IMPLEMENTATION_GUIDE.md
-be-rental-room/docs/API_FOR_FRONTEND.md
-be-rental-room/docs/DATABASE_AI_ARCHITECTURE.md
-be-rental-room/docs/EMAIL_VERIFICATION_SUMMARY.md
-be-rental-room/docs/IMAGE_STORAGE_GUIDE.md
-be-rental-room/docs/MIGRATION_GUIDE.md
-be-rental-room/docs/PROJECT_SUMMARY.md
-be-rental-room/docs/REDIS_CACHE.md
-be-rental-room/docs/REPORT_MODULE.md
-be-rental-room/docs/REPORTS_API.md
-be-rental-room/docs/REPORTS_IMPLEMENTATION_SUMMARY.md
-be-rental-room/docs/SEED_COMPLETION_REPORT.md
-be-rental-room/docs/SEED_SCRIPT_SUMMARY.md
-fe-rental-room/docs/AI_SEARCH_REDESIGN.md
-fe-rental-room/docs/API_CALL_OPTIMIZATION.md
-fe-rental-room/docs/API_FOR_FRONTEND.md
-fe-rental-room/docs/DESIGN_SYSTEM_RULES.md
-fe-rental-room/docs/README_DEPLOYMENT.txt
-fe-rental-room/docs/SEARCH_UI_PREVIEW.md
-be-rental-room/.env.example
-fe-rental-room/src/env.mjs
-fe-rental-room/.github/copilot-instructions.md
-be-rental-room/scripts/test-reports-api.sh
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Junk/Temp files
-debug_dto.json
-be-rental-room/debug_dto.json
-verify_amenities.sh
+# Temporary files
+*.tmp
+*.temp
+debug_*.json
 *.prompt.md
-package-lock.json
-package.json
-node_modules/
-fe-rental-room/tsconfig.tsbuildinfo
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# Sub-project specific ignores
+be-rental-room/docs/AI_*.md
+be-rental-room/docs/DATABASE_*.md
+be-rental-room/docs/EMAIL_*.md
+be-rental-room/docs/IMAGE_*.md
+be-rental-room/docs/MIGRATION_*.md
+be-rental-room/docs/PROJECT_*.md
+be-rental-room/docs/REDIS_*.md
+be-rental-room/docs/REPORT*.md
+be-rental-room/docs/SEED_*.md
+fe-rental-room/docs/AI_*.md
+fe-rental-room/docs/API_*.md
+fe-rental-room/docs/DESIGN_*.md
+fe-rental-room/docs/README_*.txt
+fe-rental-room/docs/SEARCH_*.md
+be-rental-room/scripts/test-*.sh
+fe-rental-room/.github/copilot-instructions.md
+
+# Artifacts directory (development only)
+.gemini/
+
+# Package lock files (optional - uncomment if using yarn/pnpm)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

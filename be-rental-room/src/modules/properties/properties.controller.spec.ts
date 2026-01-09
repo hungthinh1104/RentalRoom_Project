@@ -8,6 +8,7 @@ import {
   FilterPropertiesDto,
 } from './dto';
 import { PropertyType } from './entities';
+import { UserRole } from '@prisma/client';
 
 describe('PropertiesController', () => {
   let controller: PropertiesController;
@@ -26,6 +27,11 @@ describe('PropertiesController', () => {
     set: jest.fn(),
     del: jest.fn(),
     reset: jest.fn(),
+  };
+
+  const mockUser = {
+    id: 'admin-user-1',
+    role: UserRole.ADMIN,
   };
 
   beforeEach(async () => {
@@ -96,7 +102,7 @@ describe('PropertiesController', () => {
 
       mockPropertiesService.findAll.mockResolvedValue(mockProperties);
 
-      const result = await controller.findAll(filterDto);
+      const result = await controller.findAll(filterDto, mockUser);
 
       expect(result).toEqual(mockProperties);
       expect(service.findAll).toHaveBeenCalledWith(filterDto);
@@ -107,7 +113,7 @@ describe('PropertiesController', () => {
 
       mockPropertiesService.findAll.mockResolvedValue([]);
 
-      const result = await controller.findAll(filterDto);
+      const result = await controller.findAll(filterDto, mockUser);
 
       expect(result).toEqual([]);
       expect(service.findAll).toHaveBeenCalledWith(filterDto);
@@ -152,10 +158,10 @@ describe('PropertiesController', () => {
 
       mockPropertiesService.update.mockResolvedValue(mockUpdatedProperty);
 
-      const result = await controller.update(propertyId, updateDto);
+      const result = await controller.update(propertyId, updateDto, mockUser);
 
       expect(result).toEqual(mockUpdatedProperty);
-      expect(service.update).toHaveBeenCalledWith(propertyId, updateDto);
+      expect(service.update).toHaveBeenCalledWith(propertyId, updateDto, mockUser);
     });
   });
 
@@ -165,10 +171,10 @@ describe('PropertiesController', () => {
 
       mockPropertiesService.remove.mockResolvedValue({ deleted: true });
 
-      const result = await controller.remove(propertyId);
+      const result = await controller.remove(propertyId, mockUser);
 
       expect(result).toEqual({ deleted: true });
-      expect(service.remove).toHaveBeenCalledWith(propertyId);
+      expect(service.remove).toHaveBeenCalledWith(propertyId, mockUser);
     });
   });
 });

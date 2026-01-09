@@ -37,6 +37,15 @@ export class SystemFeedbackController {
     return this.feedbackService.create(user.id, createFeedbackDto);
   }
 
+  @Get()
+  @ApiOperation({ summary: 'Get my feedback/complaints' })
+  findMy(@CurrentUser() user: User) {
+    return this.feedbackService.findAll({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   @Get('admin')
   @Roles(UserRole.ADMIN)
   @ApiOperation({ summary: 'Get all feedback (Admin only)' })
@@ -62,5 +71,16 @@ export class SystemFeedbackController {
     @Body() updateStatusDto: UpdateFeedbackStatusDto,
   ) {
     return this.feedbackService.updateStatus(id, updateStatusDto);
+  }
+
+  @Patch(':id/response')
+  @Roles(UserRole.ADMIN, UserRole.LANDLORD)
+  @ApiOperation({ summary: 'Add response to feedback/complaint' })
+  addResponse(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Body() body: { response: string },
+  ) {
+    return this.feedbackService.addResponse(id, body.response, user.id);
   }
 }

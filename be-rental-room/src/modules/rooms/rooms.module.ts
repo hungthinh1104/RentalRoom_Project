@@ -13,4 +13,4 @@ import { UploadModule } from '../upload/upload.module';
   providers: [RoomsService, PrismaService, CacheService],
   exports: [RoomsService],
 })
-export class RoomsModule { }
+export class RoomsModule {}

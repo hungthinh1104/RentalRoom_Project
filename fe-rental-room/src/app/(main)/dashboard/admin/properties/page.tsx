@@ -64,8 +64,10 @@ export default function AdminPropertiesPage() {
 			await deleteProperty.mutateAsync(deleteId);
 			toast.success("Đã xóa bất động sản");
 			setDeleteId(null);
-		} catch (error: any) {
-			toast.error(error?.response?.data?.message || "Không thể xóa bất động sản");
+		} catch (error: unknown) {
+			const message = error && typeof error === 'object' && 'response' in error ? 
+				(error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+			toast.error(message || "Không thể xóa bất động sản");
 		}
 	};
 
