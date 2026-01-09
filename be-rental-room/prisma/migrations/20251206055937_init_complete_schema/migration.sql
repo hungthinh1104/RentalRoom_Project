@@ -1,5 +1,7 @@
--- Enable pgvector extension
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Ensure pgvector lives outside public schema to appease Supabase
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+ALTER EXTENSION vector SET SCHEMA extensions;
 
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('TENANT', 'LANDLORD', 'ADMIN');

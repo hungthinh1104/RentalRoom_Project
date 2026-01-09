@@ -22,7 +22,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @Get()
   @Auth(UserRole.ADMIN)
@@ -97,6 +97,22 @@ export class UsersController {
     }
 
     return this.usersService.updateAvatar(user.id, file);
+  }
+
+  @Post(':id/ban')
+  @Auth(UserRole.ADMIN)
+  banUser(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @CurrentUser() admin: any,
+  ) {
+    return this.usersService.banUser(id, reason || 'No reason provided', admin.id);
+  }
+
+  @Post(':id/unban')
+  @Auth(UserRole.ADMIN)
+  unbanUser(@Param('id') id: string) {
+    return this.usersService.unbanUser(id);
   }
 
   @Delete(':id')

@@ -1,0 +1,102 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "containerName": { "type": "string", "defaultValue": "rental-room-api" },
+    "location": { "type": "string", "defaultValue": "southeastasia" },
+    "imageTag": { "type": "string", "defaultValue": "latest" },
+    "acrPassword": { "type": "securestring" },
+    "databaseUrl": { "type": "securestring" },
+    "redisHost": { "type": "string" },
+    "redisPort": { "type": "string" },
+    "redisPassword": { "type": "securestring" },
+    "jwtSecret": { "type": "securestring" },
+    "jwtRefreshSecret": { "type": "securestring" },
+    "mailPassword": { "type": "securestring" },
+    "geminiApiKey": { "type": "securestring" },
+    "imagekitPrivateKey": { "type": "securestring" },
+    "encryptionKey": { "type": "securestring" },
+    "sepayApiToken": { "type": "securestring" },
+    "p12Password": { "type": "securestring" }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.ContainerInstance/containerGroups",
+      "apiVersion": "2021-09-01",
+      "name": "[parameters('containerName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "containers": [
+          {
+            "name": "api",
+            "properties": {
+              "image": "[concat('rentalroomacr.azurecr.io/rental-room-api:', parameters('imageTag'))]",
+              "resources": {
+                "requests": {
+                  "cpu": 1.0,
+                  "memoryInGb": 1.5
+                }
+              },
+              "ports": [{ "port": 3000, "protocol": "TCP" }],
+              "environmentVariables": [
+                { "name": "NODE_ENV", "value": "production" },
+                { "name": "PORT", "value": "3000" },
+                { "name": "CORS_ORIGIN", "value": "https://www.diphungthinh.io.vn/" },
+                { "name": "DATABASE_URL", "secureValue": "[parameters('databaseUrl')]" },
+                { "name": "REDIS_HOST", "value": "[parameters('redisHost')]" },
+                { "name": "REDIS_PORT", "value": "[parameters('redisPort')]" },
+                { "name": "REDIS_PASSWORD", "secureValue": "[parameters('redisPassword')]" },
+                { "name": "REDIS_TTL", "value": "3600" },
+                { "name": "JWT_SECRET", "secureValue": "[parameters('jwtSecret')]" },
+                { "name": "JWT_EXPIRES_IN", "value": "15m" },
+                { "name": "JWT_REFRESH_SECRET", "secureValue": "[parameters('jwtRefreshSecret')]" },
+                { "name": "JWT_REFRESH_EXPIRES_IN", "value": "7d" },
+                { "name": "MAIL_HOST", "value": "smtp.gmail.com" },
+                { "name": "MAIL_PORT", "value": "587" },
+                { "name": "MAIL_USER", "value": "smartroom.mail@gmail.com" },
+                { "name": "MAIL_PASSWORD", "secureValue": "[parameters('mailPassword')]" },
+                { "name": "MAIL_FROM", "value": "smartroom.mail@gmail.com" },
+                { "name": "MAIL_FROM_NAME", "value": "Rental Room" },
+                { "name": "GEMINI_API_KEY", "secureValue": "[parameters('geminiApiKey')]" },
+                { "name": "IMAGEKIT_PUBLIC_KEY", "value": "public_CW3WKGS/Cl09DLoxlAspu2m3yMU=" },
+                { "name": "IMAGEKIT_PRIVATE_KEY", "secureValue": "[parameters('imagekitPrivateKey')]" },
+                { "name": "IMAGEKIT_URL_ENDPOINT", "value": "https://ik.imagekit.io/rentalroom" },
+                { "name": "ENCRYPTION_KEY", "secureValue": "[parameters('encryptionKey')]" },
+                { "name": "SEPAY_API_URL", "value": "https://my.sepay.vn/userapi" },
+                { "name": "SEPAY_API_TOKEN", "secureValue": "[parameters('sepayApiToken')]" },
+                { "name": "P12_PASSWORD", "secureValue": "[parameters('p12Password')]" }
+              ]
+            }
+          }
+        ],
+        "osType": "Linux",
+        "ipAddress": {
+          "type": "Public",
+          "ports": [{ "port": 3000, "protocol": "TCP" }],
+          "dnsNameLabel": "rental-room-api"
+        },
+        "imageRegistryCredentials": [
+          {
+            "server": "rentalroomacr.azurecr.io",
+            "username": "rentalroomacr",
+            "password": "[parameters('acrPassword')]"
+          }
+        ]
+      },
+      "tags": {
+        "environment": "production",
+        "project": "rental-room"
+      }
+    }
+  ],
+  "outputs": {
+    "containerIPv4Address": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerName'))).ipAddress.ip]"
+    },
+    "containerFQDN": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.ContainerInstance/containerGroups', parameters('containerName'))).ipAddress.fqdn]"
+    }
+  }
+}

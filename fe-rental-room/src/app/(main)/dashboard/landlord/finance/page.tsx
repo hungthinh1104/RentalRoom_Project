@@ -29,26 +29,26 @@ export default function ThuChiPage() {
     const [historyYear, setHistoryYear] = useState(new Date().getFullYear());
     const [historyMonth, setHistoryMonth] = useState<number | undefined>(undefined);
 
-    // Fetch rooms with tenants
-    const { data: roomsData, isLoading: isLoadingRooms, error: roomsError } = useQuery({
-        queryKey: ['rooms'],
+    // Fetch active contracts (not rooms) to get rental units with tenants
+    const { data: contractsData, isLoading: isLoadingContracts, error: contractsError } = useQuery({
+        queryKey: ['active-contracts'],
         queryFn: async () => {
-            const response = await roomsApi.getAll({ limit: 100 });
+            const response = await contractsApi.filterContracts({ status: 'ACTIVE', limit: 100 });
             return response?.data || [];
         },
     });
 
-    // Transform rooms to rental units with tenants
+    // Transform contracts to rental units with tenants
     const rentalUnits = useMemo(() => {
-        return (roomsData || []).map((room: any) => ({
-            id: room.id,
-            name: `${room.property?.name || 'Property'} - Phòng ${room.roomNumber}`,
-            tenants: room.contracts?.filter((c: any) => c.status === 'ACTIVE').map((c: any) => ({
-                id: c.tenant?.id || c.tenantId,
-                name: c.tenant?.fullName || c.tenant?.email || 'Unknown',
-            })) || [],
+        return (contractsData || []).map((contract: any) => ({
+            id: contract.room?.id || contract.roomId,
+            name: `${contract.room?.property?.name || 'Property'} - Phòng ${contract.room?.roomNumber}`,
+            tenants: [{
+                id: contract.tenant?.id || contract.tenantId,
+                name: contract.tenant?.user?.fullName || contract.tenant?.email || 'Unknown',
+            }],
         }));
-    }, [roomsData]);
+    }, [contractsData]);
 
     const handleAddClick = () => {
         if (activeTab === 'expenses') {
@@ -59,6 +59,28 @@ export default function ThuChiPage() {
             setIsIncomeModalOpen(true);
         }
     };
+
+    // Error state
+    if (contractsError) {
+        return (
+            <div className="container mx-auto p-8 max-w-7xl">
+                <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                    <div className="p-4 bg-destructive/10 rounded-full mb-4">
+                        <svg className="h-12 w-12 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">Không thể tải dữ liệu</h3>
+                    <p className="text-muted-foreground mb-4">
+                        {contractsError?.message || 'Đã xảy ra lỗi khi tải danh sách hợp đồng'}
+                    </p>
+                    <Button onClick={() => window.location.reload()} variant="outline">
+                        Thử lại
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container mx-auto p-4 md:p-6 space-y-8 max-w-7xl animate-in fade-in duration-500">
@@ -164,7 +186,7 @@ export default function ThuChiPage() {
                             </Select>
                         </div>
                     </div>
-                    
+
                     <Card className="border shadow-sm">
                         <CardContent className="p-0 sm:p-6">
                             <IncomeTable year={historyYear} month={historyMonth} />
@@ -175,7 +197,7 @@ export default function ThuChiPage() {
                 {/* Tab: Expenses */}
                 <TabsContent value="expenses" className="space-y-6 focus-visible:outline-none">
                     <div className="bg-card p-4 rounded-xl border shadow-sm flex items-center justify-between">
-                         <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                             <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
                                 <Receipt className="h-5 w-5 text-red-600 dark:text-red-400" />
                             </div>

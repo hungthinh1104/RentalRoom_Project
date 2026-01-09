@@ -55,12 +55,14 @@ export const adminUserSchema = z.object({
   email: z.string(),
   role: z.enum(["TENANT", "LANDLORD", "ADMIN"]),
   emailVerified: z.boolean().optional(),
+  isBanned: z.boolean().optional(),
+  bannedAt: z.string().optional(),
 }).transform((data) => ({
   id: data.id,
   name: data.fullName || data.email.split('@')[0], // Fallback to email username
   email: data.email,
   role: data.role,
-  status: data.emailVerified ? "Hoạt động" : "Vô hiệu" as "Hoạt động" | "Vô hiệu",
+  status: data.isBanned ? "Vô hiệu" : "Hoạt động" as "Hoạt động" | "Vô hiệu",
 }));
 
 export const ratingSchema = z.object({

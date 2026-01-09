@@ -84,19 +84,60 @@ async function request<T>(
 	}
 
 	let res: Response;
-	try {
-		res = await fetch(fullUrl, fetchOptions);
-	} catch (fetchError) {
+	let lastError: Error | null = null;
+	const maxRetries = 3;
+	const baseDelay = 1000; // 1 second
+
+	// Retry logic with exponential backoff
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			res = await fetch(fullUrl, fetchOptions);
+			break; // Success, exit retry loop
+		} catch (fetchError) {
+			lastError = fetchError instanceof Error ? fetchError : new Error(String(fetchError));
+
+			// Don't retry on last attempt
+			if (attempt === maxRetries) {
+				break;
+			}
+
+			// Check if we should retry (network errors only)
+			const shouldRetry =
+				lastError.message.includes('fetch') ||
+				lastError.message.includes('network') ||
+				lastError.message.includes('ECONNREFUSED') ||
+				(typeof window !== 'undefined' && !navigator.onLine);
+
+			if (!shouldRetry) {
+				break; // Don't retry non-network errors
+			}
+
+			// Exponential backoff: 1s, 2s, 4s
+			const delay = baseDelay * Math.pow(2, attempt);
+
+			if (process.env.NODE_ENV === 'development') {
+				console.warn(
+					`[API Client] Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms`,
+				);
+			}
+
+			// Wait before retrying
+			await new Promise((resolve) => setTimeout(resolve, delay));
+		}
+	}
+
+	// If all retries failed
+	if (!res!) {
 		// Only log network errors in development
 		if (process.env.NODE_ENV === 'development') {
-			console.error('[API Client] Network error:', {
+			console.error('[API Client] Network error after retries:', {
 				url: fullUrl,
 				method,
-				message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+				message: lastError?.message || 'Unknown error',
 				online: typeof window !== 'undefined' ? navigator.onLine : undefined,
 			});
 		}
-		const message = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+		const message = lastError?.message || 'Unknown error';
 		throw new ApiError(0, `Network error: ${message}. Check if backend is running.`);
 	}
 

@@ -35,7 +35,7 @@ export class BillingService {
     private readonly notificationsService: NotificationsService,
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
-  ) {}
+  ) { }
 
   async createInvoice(
     createInvoiceDto: CreateInvoiceDto,
@@ -338,28 +338,8 @@ export class BillingService {
       this.logger.error('Failed to create snapshot for invoice payment', error);
     }
 
-    // 💰 AUTO-CREATE INCOME: Invoice Paid
-    try {
-      const paidDate = new Date();
-      await this.incomeService.create(
-        {
-          rentalUnitId: updatedInvoice.contract.roomId,
-          tenantId: updatedInvoice.tenantId,
-          amount: Number(updatedInvoice.totalAmount),
-          incomeType: IncomeType.RENTAL, // From invoice
-          receivedAt: paidDate.toISOString(),
-          paymentMethod: 'BANK_TRANSFER', // Default
-          note: `Thu từ hóa đơn ${updatedInvoice.invoiceNumber}`,
-        },
-        updatedInvoice.contract.landlordId,
-      );
-      this.logger.log(
-        `💰 Auto-created income for invoice ${updatedInvoice.invoiceNumber}`,
-      );
-    } catch (error) {
-      this.logger.error('Failed to auto-create income', error);
-      // Don't fail the invoice payment if income creation fails
-    }
+    // Note: Income should be created manually by Landlord
+    // Auto-creation removed to prevent duplicate income records
 
     // Convert Decimal to Number
     const cleaned = {

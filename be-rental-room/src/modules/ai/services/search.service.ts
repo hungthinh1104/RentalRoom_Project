@@ -18,7 +18,7 @@ export class SearchService {
     private readonly embeddingService: EmbeddingService,
     private readonly cacheService: CacheService,
     private readonly analysisService: AnalysisService, // Injected
-  ) {}
+  ) { }
 
   /**
    * Semantic search using vector similarity
@@ -30,6 +30,17 @@ export class SearchService {
    */
   async semanticSearch(query: string, limit: number = 12) {
     try {
+      // Check cache first (COST OPTIMIZATION)
+      const cacheKey = `search:${query}:${limit}`;
+      const cached = await this.cacheService.get(cacheKey);
+
+      if (cached && typeof cached === 'string') {
+        this.logger.log(`Cache HIT: ${query}`);
+        return JSON.parse(cached);
+      }
+
+      this.logger.log(`Cache MISS: ${query} - Calling AI API`);
+
       // Step 1: Analyze query to extract structured filters (Price, Area, Location)
       // This fixes the issue where "dưới 3 triệu" is treated as keywords instead of a logical filter
       const { filters, cleanedQuery } =
@@ -132,10 +143,15 @@ export class SearchService {
         .sort((a, b) => b.similarity - a.similarity)
         .slice(0, Math.min(limit, 50));
 
-      return roomsWithSimilarity.map((r) => ({
+      const results = roomsWithSimilarity.map((r) => ({
         ...r.room,
         similarity: parseFloat(r.similarity.toFixed(2)),
       }));
+
+      // Cache results for 5 minutes (300 seconds)
+      await this.cacheService.set(cacheKey, JSON.stringify(results), 300);
+
+      return results;
     } catch (error) {
       this.logger.error(`Semantic search failed:`, error);
       return this.fallbackSearch(limit);

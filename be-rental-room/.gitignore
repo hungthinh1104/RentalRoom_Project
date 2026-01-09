@@ -81,3 +81,4 @@ certs/
 # Storage
 storage/
 uploads/
+azure-deploy.processed.yml

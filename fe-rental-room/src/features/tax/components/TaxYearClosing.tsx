@@ -46,7 +46,7 @@ export function TaxYearClosing({ year }: TaxYearClosingProps) {
             });
         },
         onError: (error: unknown) => {
-            const message = error && typeof error === 'object' && 'response' in error ? 
+            const message = error && typeof error === 'object' && 'response' in error ?
                 (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
             toast({
                 title: 'Lỗi',
@@ -62,7 +62,7 @@ export function TaxYearClosing({ year }: TaxYearClosingProps) {
             const data = await taxService.exportTaxYear(year);
 
             // Create download link
-            const blob = new Blob([data], { type: 'text/csv' });
+            const blob = new Blob([data as any], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;

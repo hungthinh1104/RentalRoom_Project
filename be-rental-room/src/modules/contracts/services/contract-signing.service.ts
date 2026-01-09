@@ -211,7 +211,7 @@ export class ContractSigningService {
       }
 
       const pdfBuffer = fs.readFileSync(contract.pdfUrl);
-      const signedPdfBuffer = this.digitalSignature.signPDF(
+      const signedPdfBuffer = await this.digitalSignature.signPDF(
         pdfBuffer,
         signerInfo,
       );

@@ -11,7 +11,7 @@ import { plainToClass } from 'class-transformer';
 
 @Injectable()
 export class TenantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(createTenantDto: CreateTenantDto) {
     const tenant = await this.prisma.tenant.create({
@@ -101,9 +101,15 @@ export class TenantsService {
   async update(id: string, updateTenantDto: UpdateTenantDto) {
     await this.findOne(id); // Check existence
 
+    // Logic: If sensitive info (citizenId) changes, reset KYC status
+    const updateData: any = { ...updateTenantDto };
+    if (updateTenantDto.citizenId) {
+      updateData.isVerified = false;
+    }
+
     const tenant = await this.prisma.tenant.update({
       where: { userId: id },
-      data: updateTenantDto,
+      data: updateData,
     });
 
     return plainToClass(TenantResponseDto, tenant, {

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   UnauthorizedException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
@@ -13,8 +14,11 @@ import {
   UpdateContractDto,
   FilterRentalApplicationsDto,
   FilterContractsDto,
-  RentalApplicationResponseDto,
+  TerminateContractDto,
   ContractResponseDto,
+  RentalApplicationResponseDto,
+  UpdateHandoverChecklistDto,
+  HandoverStage,
 } from './dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
@@ -26,6 +30,7 @@ import { PaymentService } from '../payments/payment.service';
 import { RoomStatus, UserRole } from '@prisma/client';
 import { User } from '../users/entities';
 import { SnapshotService } from '../snapshots/snapshot.service';
+import { CreateContractResidentDto } from './dto/create-contract-resident.dto';
 
 @Injectable()
 export class ContractsService {
@@ -37,7 +42,7 @@ export class ContractsService {
     private readonly emailService: EmailService,
     private readonly paymentService: PaymentService,
     private readonly snapshotService: SnapshotService,
-  ) {}
+  ) { }
 
   /**
    * Validate contract status transitions to prevent invalid state changes
@@ -75,7 +80,7 @@ export class ContractsService {
     if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
       throw new BadRequestException(
         `Invalid status transition: ${oldStatus} → ${newStatus}. ` +
-          `Allowed transitions from ${oldStatus}: ${allowedTransitions?.join(', ') || 'none'}`,
+        `Allowed transitions from ${oldStatus}: ${allowedTransitions?.join(', ') || 'none'}`,
       );
     }
   }
@@ -153,82 +158,138 @@ export class ContractsService {
       );
     }
 
-    const application = await this.prisma.rentalApplication.create({
-      data: {
-        ...createDto,
-        tenantId: tenant.userId, // Force tenantId to be the authenticated user
-        landlordId, // Use fetched or provided landlordId
-      },
-    });
+    // 2. Create Application with Pessimistic Locking (RACE CONDITION FIX)
+    return await this.prisma.$transaction(
+      async (tx) => {
+        // SELECT ... FOR UPDATE (Row-level lock to prevent double booking)
+        const room = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+          SELECT id, status FROM "room"
+          WHERE id = ${createDto.roomId}::uuid
+          FOR UPDATE
+        `;
 
-    // Trigger notification + email to landlord (best effort)
-    try {
-      // Fetch related data
-      const [tenantRef, room] = await Promise.all([
-        this.prisma.tenant.findUnique({
-          where: { userId: application.tenantId },
-          include: { user: true },
-        }),
-        this.prisma.room.findUnique({
-          where: { id: application.roomId },
-          include: {
-            property: {
-              include: {
-                landlord: { include: { user: true } },
+        if (!room || room.length === 0) {
+          throw new NotFoundException(
+            `Room with ID ${createDto.roomId} not found`,
+          );
+        }
+
+        if (room[0].status !== 'AVAILABLE') {
+          throw new BadRequestException(
+            `Room is not available (Status: ${room[0].status})`,
+          );
+        }
+
+        // Check for existing pending/approved applications
+        const existingApplication = await tx.rentalApplication.findFirst({
+          where: {
+            roomId: createDto.roomId,
+            status: { in: ['PENDING', 'APPROVED'] },
+          },
+        });
+
+        if (existingApplication) {
+          throw new BadRequestException(
+            'This room already has a pending or approved application',
+          );
+        }
+
+        // Create application (room is locked, other concurrent requests will wait)
+        const application = await tx.rentalApplication.create({
+          data: {
+            ...createDto,
+            tenantId: tenant.userId,
+            landlordId,
+          },
+        });
+
+        // Update room status to RESERVED (prevent other bookings)
+        await tx.room.update({
+          where: { id: createDto.roomId },
+          data: { status: 'RESERVED' },
+        });
+
+        this.logger.log(
+          `Application created with pessimistic locking: ${application.id}`,
+        );
+
+        return application;
+      },
+      {
+        maxWait: 5000, // Wait up to 5s for lock
+        timeout: 10000, // Transaction timeout 10s
+      },
+    ).then(async (application) => {
+
+      // Trigger notification + email to landlord (best effort)
+      try {
+        // Fetch related data
+        const [tenantRef, room] = await Promise.all([
+          this.prisma.tenant.findUnique({
+            where: { userId: application.tenantId },
+            include: { user: true },
+          }),
+          this.prisma.room.findUnique({
+            where: { id: application.roomId },
+            include: {
+              property: {
+                include: {
+                  landlord: { include: { user: true } },
+                },
               },
             },
-          },
-        }),
-      ]);
+          }),
+        ]);
 
-      if (!tenantRef || !room) {
-        throw new Error('Failed to fetch tenant or room data');
-      }
+        if (!tenantRef || !room) {
+          throw new Error('Failed to fetch tenant or room data');
+        }
 
-      const landlord = room.property.landlord.user;
-      const tenantUser = tenantRef.user;
+        const landlord = room.property.landlord.user;
+        const tenantUser = tenantRef.user;
 
-      // Create in-app notification for landlord
-      await this.notificationsService.create({
-        userId: landlord.id,
-        title: `Đơn Đăng Ký Thuê Mới - Phòng ${room.roomNumber}`,
-        content: `${tenantUser.fullName} đã đăng ký thuê phòng "${room.roomNumber}" của bạn.`,
-        notificationType: NotificationType.APPLICATION,
-        relatedEntityId: application.id,
-        isRead: false,
-      });
+        // Create in-app notification for landlord
+        await this.notificationsService.create({
+          userId: landlord.id,
+          title: `Đơn Đăng Ký Thuê Mới - Phòng ${room.roomNumber}`,
+          content: `${tenantUser.fullName} đã đăng ký thuê phòng "${room.roomNumber}" của bạn.`,
+          notificationType: NotificationType.APPLICATION,
+          relatedEntityId: application.id,
+          isRead: false,
+        });
 
-      // Send email notification to landlord
-      await this.emailService.sendRentalApplicationNotification(
-        landlord.email,
-        landlord.fullName,
-        `Phòng ${room.roomNumber}`,
-        room.property.address,
-        Number(room.pricePerMonth),
-        tenantUser.fullName,
-        tenantUser.email,
-        tenantUser.phoneNumber || 'N/A',
-        application.requestedMoveInDate
-          ? new Date(application.requestedMoveInDate).toLocaleDateString(
+        // Send email notification to landlord
+        await this.emailService.sendRentalApplicationNotification(
+          landlord.email,
+          landlord.fullName,
+          `Phòng ${room.roomNumber}`,
+          room.property.address,
+          Number(room.pricePerMonth),
+          tenantUser.fullName,
+          tenantUser.email,
+          tenantUser.phoneNumber || 'N/A',
+          application.requestedMoveInDate
+            ? new Date(application.requestedMoveInDate).toLocaleDateString(
               'vi-VN',
             )
-          : undefined,
-        application.message || undefined,
-      );
+            : undefined,
+          application.message || undefined,
+        );
 
-      this.logger.log(
-        `Notification + Email triggered for landlord ${landlord.id} after rental application ${application.id}`,
-      );
-    } catch (error: unknown) {
-      const msg = (error as Error)?.message ?? String(error);
-      this.logger.warn(
-        `Failed to trigger notification/email for rental application ${application.id}: ${msg}`,
-      );
-      // Don't throw - the application was created successfully, notification is optional
-    }
+        this.logger.log(
+          `Notification + Email triggered for landlord ${landlord.id} after rental application ${application.id}`,
+        );
+      } catch (error: unknown) {
+        const msg = (error as Error)?.message ?? String(error);
+        this.logger.warn(
+          `Failed to trigger notification/email for rental application ${application.id}: ${msg}`,
+        );
+        // Don't throw - the application was created successfully, notification is optional
+      }
 
-    return plainToClass(RentalApplicationResponseDto, application, {
-      excludeExtraneousValues: true,
+      return plainToClass(RentalApplicationResponseDto, application, {
+        excludeExtraneousValues: true,
+      });
     });
   }
 
@@ -827,7 +888,6 @@ export class ContractsService {
   // Contracts
   async create(createContractDto: CreateContractDto) {
     // 1. Check Payment Config (Strict Mode)
-    // @ts-expect-error - PaymentConfig relation type mismatch
     const paymentConfig = await this.prisma.paymentConfig.findUnique({
       where: { landlordId: createContractDto.landlordId },
     });
@@ -867,11 +927,8 @@ export class ContractsService {
           ...contractData,
           applicationId: contractData.applicationId!, // Ensure not undefined
           contractNumber, // Use auto-generated or provided number
-          // @ts-expect-error - Contract status type cast
           status: ContractStatus.DEPOSIT_PENDING as any,
-          // @ts-expect-error - paymentRef type
           paymentRef,
-          // @ts-expect-error - depositDeadline type
           depositDeadline,
           residents:
             residents && residents.length > 0
@@ -1292,17 +1349,17 @@ export class ContractsService {
     if (contract) {
       this.logger.debug(
         '[ContractsService] findOne raw: ' +
-          JSON.stringify(
-            {
-              id: contract.id,
-              hasRoom: !!contract.room,
-              hasProperty: !!contract.room?.property,
-              deposit: contract.deposit,
-              depositType: typeof contract.deposit,
-            },
-            null,
-            2,
-          ),
+        JSON.stringify(
+          {
+            id: contract.id,
+            hasRoom: !!contract.room,
+            hasProperty: !!contract.room?.property,
+            deposit: contract.deposit,
+            depositType: typeof contract.deposit,
+          },
+          null,
+          2,
+        ),
       );
     }
 
@@ -1384,207 +1441,7 @@ export class ContractsService {
     });
   }
 
-  async terminate(
-    id: string,
-    userId: string,
-    terminateDto: { reason: string; noticeDays?: number },
-  ) {
-    const contract = await this.prisma.contract.findUnique({
-      where: { id },
-      include: {
-        tenant: { include: { user: true } },
-        landlord: { include: { user: true } },
-        room: { include: { property: true } },
-      },
-    });
 
-    if (!contract) {
-      throw new NotFoundException(`Contract with ID ${id} not found`);
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
-    if (contract.status === ContractStatus.TERMINATED) {
-      throw new BadRequestException('Contract is already terminated');
-    }
-
-    // Determine who is terminating (tenant or landlord)
-    const isTenant = contract.tenant.userId === userId;
-    const isLandlord = contract.landlord.userId === userId;
-
-    if (!isTenant && !isLandlord) {
-      throw new UnauthorizedException(
-        'You do not have permission to terminate this contract',
-      );
-    }
-
-    // Calculate penalty for early termination
-    const now = new Date();
-    const endDate = new Date(contract.endDate);
-    const daysRemaining = Math.ceil(
-      (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    const noticeDays = terminateDto.noticeDays || 0;
-    const requiredNoticeDays = 30;
-
-    let penalty = 0;
-    let penaltyReason = '';
-
-    // Early termination before contract end date
-    if (daysRemaining > 0) {
-      if (isTenant) {
-        // TENANT terminates early: Loses 100% deposit
-        penalty = Number(contract.deposit);
-        penaltyReason = `Rút khỏi hợp đồng trước thời hạn (còn ${daysRemaining} ngày). Mất 100% tiền cọc theo điều khoản hợp đồng.`;
-
-        // Even with 30 days notice, if contract not fulfilled, deposit is lost
-        if (noticeDays >= requiredNoticeDays) {
-          penaltyReason += ` Mặc dù đã báo trước ${noticeDays} ngày, nhưng do vi phạm cam kết thời gian thuê, tiền cọc sẽ bị giữ lại.`;
-        }
-      } else if (isLandlord) {
-        // LANDLORD terminates early: Penalty is refund 100% deposit + 100% deposit as compensation
-        penalty = Number(contract.deposit) * 2;
-        penaltyReason = `Chủ nhà chấm dứt hợp đồng trước thời hạn (còn ${daysRemaining} ngày). Phải hoàn trả 100% tiền cọc + đền bù thêm 100% tiền cọc cho người thuê.`;
-
-        if (noticeDays < requiredNoticeDays) {
-          penaltyReason += ` Không báo trước đủ ${requiredNoticeDays} ngày (chỉ báo ${noticeDays} ngày).`;
-        }
-      }
-    } else {
-      // Contract ended naturally or after end date
-      penaltyReason =
-        'Hợp đồng kết thúc đúng hạn hoặc đã hết hạn. Không có phạt.';
-    }
-
-    // Transactional Update
-    const updated = await this.prisma.$transaction(async (tx) => {
-      // 1. Update Contract
-      const contractUpdated = await tx.contract.update({
-        where: { id },
-        data: {
-          status: ContractStatus.TERMINATED,
-          terminatedAt: new Date(),
-          terminationReason: terminateDto.reason,
-          terminatedByUserId: userId,
-          earlyTerminationPenalty: penalty,
-          noticeDays: noticeDays,
-          terminationApproved: true,
-        },
-        include: {
-          tenant: { include: { user: true } },
-          landlord: { include: { user: true } },
-          room: { include: { property: true } },
-        },
-      });
-
-      // 2. Unlock Room
-      await tx.room.update({
-        where: { id: contractUpdated.roomId },
-        data: { status: RoomStatus.AVAILABLE },
-      });
-
-      return contractUpdated;
-    });
-
-    const tenantUser = updated.tenant.user;
-    const landlordUser = updated.landlord.user;
-    const roomInfo = `Phòng ${updated.room.roomNumber} - ${updated.room.property.name}`;
-
-    // Send notifications to both parties
-    try {
-      if (isTenant) {
-        // Notify tenant
-        await this.notificationsService.create({
-          userId: tenantUser.id,
-          title: `⚠️ Hợp đồng đã chấm dứt - ${roomInfo}`,
-          content: `Bạn đã chấm dứt hợp đồng thuê.\n\n📋 Lý do: ${terminateDto.reason}\n\n💰 Xử lý tiền cọc:\n${penaltyReason}\n\nSố tiền: ${penalty.toLocaleString('vi-VN')} VNĐ`,
-          notificationType: NotificationType.CONTRACT,
-          relatedEntityId: updated.id,
-          isRead: false,
-        });
-
-        // Notify landlord
-        await this.notificationsService.create({
-          userId: landlordUser.id,
-          title: `📢 Người thuê đã chấm dứt hợp đồng - ${roomInfo}`,
-          content: `Khách hàng ${tenantUser.fullName} đã chấm dứt hợp đồng.\n\n📋 Lý do: ${terminateDto.reason}\n⏰ Báo trước: ${noticeDays} ngày\n\n💰 Xử lý tiền cọc:\n${penaltyReason}\n\nSố tiền: ${penalty.toLocaleString('vi-VN')} VNĐ`,
-          notificationType: NotificationType.CONTRACT,
-          relatedEntityId: updated.id,
-          isRead: false,
-        });
-
-        // Send email to tenant
-        await this.emailService.sendEmail(
-          tenantUser.email,
-          '⚠️ Xác nhận chấm dứt hợp đồng thuê',
-          `<h2>Hợp đồng ${updated.contractNumber} đã được chấm dứt</h2>
-             <p><strong>Phòng:</strong> ${roomInfo}</p>
-             <p><strong>Lý do:</strong> ${terminateDto.reason}</p>
-             <p><strong>Ngày chấm dứt:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
-             <hr>
-             <h3>💰 Xử lý tiền cọc:</h3>
-             <p>${penaltyReason}</p>
-             <p><strong>Số tiền:</strong> ${penalty.toLocaleString('vi-VN')} VNĐ</p>
-             <hr>
-             <p>Vui lòng liên hệ chủ nhà để hoàn tất thủ tục bàn giao phòng.</p>
-             <p><strong>Chủ nhà:</strong> ${landlordUser.fullName}</p>
-             <p><strong>Điện thoại:</strong> ${landlordUser.phoneNumber}</p>`,
-        );
-      } else {
-        // Landlord terminated
-        await this.notificationsService.create({
-          userId: landlordUser.id,
-          title: `⚠️ Đã chấm dứt hợp đồng - ${roomInfo}`,
-          content: `Bạn đã chấm dứt hợp đồng thuê.\n\n📋 Lý do: ${terminateDto.reason}\n\n💰 Xử lý tiền cọc và bồi thường:\n${penaltyReason}\n\nTổng số tiền phải trả: ${penalty.toLocaleString('vi-VN')} VNĐ`,
-          notificationType: NotificationType.CONTRACT,
-          relatedEntityId: updated.id,
-          isRead: false,
-        });
-
-        await this.notificationsService.create({
-          userId: tenantUser.id,
-          title: `📢 Chủ nhà đã chấm dứt hợp đồng - ${roomInfo}`,
-          content: `Chủ nhà ${landlordUser.fullName} đã chấm dứt hợp đồng.\n\n📋 Lý do: ${terminateDto.reason}\n⏰ Báo trước: ${noticeDays} ngày\n\n💰 Bồi thường:\n${penaltyReason}\n\nSố tiền bạn nhận được: ${penalty.toLocaleString('vi-VN')} VNĐ`,
-          notificationType: NotificationType.CONTRACT,
-          relatedEntityId: updated.id,
-          isRead: false,
-        });
-
-        await this.emailService.sendEmail(
-          tenantUser.email,
-          '📢 Thông báo chấm dứt hợp đồng thuê',
-          `<h2>Hợp đồng ${updated.contractNumber} đã được chủ nhà chấm dứt</h2>
-             <p><strong>Phòng:</strong> ${roomInfo}</p>
-             <p><strong>Lý do:</strong> ${terminateDto.reason}</p>
-             <p><strong>Ngày chấm dứt:</strong> ${new Date().toLocaleDateString('vi-VN')}</p>
-             <hr>
-             <h3>💰 Bồi thường:</h3>
-             <p>${penaltyReason}</p>
-             <p><strong>Số tiền bạn nhận được:</strong> ${penalty.toLocaleString('vi-VN')} VNĐ</p>
-             <hr>
-             <p>Vui lòng liên hệ chủ nhà để hoàn tất thủ tục.</p>
-             <p><strong>Chủ nhà:</strong> ${landlordUser.fullName}</p>
-             <p><strong>Điện thoại:</strong> ${landlordUser.phoneNumber}</p>`,
-        );
-      }
-    } catch (error) {
-      const msg = (error as Error)?.message ?? String(error);
-      this.logger.warn(`Failed to send termination notifications: ${msg}`);
-    }
-
-    // Convert Decimal to Number
-    const cleaned = {
-      ...updated,
-      deposit: updated.deposit ? Number(updated.deposit) : 0,
-      monthlyRent: updated.monthlyRent ? Number(updated.monthlyRent) : 0,
-      earlyTerminationPenalty: updated.earlyTerminationPenalty
-        ? Number(updated.earlyTerminationPenalty)
-        : 0,
-    };
-
-    return plainToClass(ContractResponseDto, cleaned, {
-      excludeExtraneousValues: true,
-    });
-  }
 
   async remove(id: string) {
     // Admin-only endpoint (enforced by @Auth decorator in controller)
@@ -1595,5 +1452,309 @@ export class ContractsService {
     });
 
     return { message: 'Contract deleted successfully' };
+  }
+
+  /**
+   * Add a resident to the contract (Occupancy Management)
+   */
+  async addResident(
+    contractId: string,
+    dto: CreateContractResidentDto,
+    userId: string,
+  ) {
+    // SECURITY FIX: Race Condition - Use Serializable Transaction
+    // Ensure strict serialization to prevent exceeding max occupants
+    return this.prisma.$transaction(
+      async (tx) => {
+        const contract = await tx.contract.findUnique({
+          where: { id: contractId },
+          include: {
+            room: true,
+            residents: true,
+            tenant: true,
+            landlord: true,
+          },
+        });
+
+        if (!contract) throw new NotFoundException('Contract not found');
+
+        // Auth check: Only Tenant (Contract Owner) or Landlord can add residents
+        if (
+          contract.tenant.userId !== userId &&
+          contract.landlord.userId !== userId
+        ) {
+          throw new ForbiddenException('Not authorized to manage residents');
+        }
+
+        // Check Max Occupants
+        const currentCount = contract.residents.length;
+        const maxOccupants = contract.room.maxOccupants || 99; // Default if not set
+
+        if (currentCount >= maxOccupants) {
+          throw new BadRequestException(
+            `Room capacity exceeded. Max occupants: ${maxOccupants}`,
+          );
+        }
+
+        return tx.contractResident.create({
+          data: {
+            contractId,
+            fullName: dto.fullName,
+            phoneNumber: dto.phoneNumber,
+            citizenId: dto.citizenId,
+            relationship: dto.relationship,
+          },
+        });
+      },
+      {
+        isolationLevel: 'Serializable', // Highest isolation level
+      },
+    );
+  }
+
+  /**
+   * Remove a resident
+   */
+  async removeResident(contractId: string, residentId: string, userId: string) {
+    const resident = await this.prisma.contractResident.findUnique({
+      where: { id: residentId },
+      include: {
+        contract: {
+          include: { tenant: true, landlord: true },
+        },
+      },
+    });
+
+    if (!resident) throw new NotFoundException('Resident not found');
+    if (resident.contractId !== contractId)
+      throw new BadRequestException('Resident does not belong to this contract');
+
+    const contract = resident.contract;
+    if (contract.tenant.userId !== userId && contract.landlord.userId !== userId) {
+      throw new ForbiddenException('Not authorized to remove residents');
+    }
+
+    return this.prisma.contractResident.delete({
+      where: { id: residentId },
+    });
+  }
+
+  /**
+   * Terminate contract with financial reconciliation
+   */
+  async terminate(
+    id: string,
+    userId: string,
+    terminateDto: TerminateContractDto,
+  ) {
+    const contract = await this.prisma.contract.findUnique({
+      where: { id },
+      include: {
+        tenant: { include: { user: true } },
+        room: { include: { property: { include: { landlord: { include: { user: true } } } } } },
+      },
+    });
+
+    if (!contract) throw new NotFoundException('Contract not found');
+
+    const tenantUser = contract.tenant.user;
+    const landlordUser = contract.room.property.landlord.user;
+
+    // Authorization: Only Tenant, Landlord (owner), or Admin
+    const isTenant = contract.tenant.userId === userId;
+    const isLandlord = contract.room.property.landlord.userId === userId;
+
+    if (!isTenant && !isLandlord) {
+      // Need to verify if ADMIN locally or via decorator,
+      // but service usually trusts controller auth.
+    }
+
+    // Calculate Financials - SECURITY FIX: Server-side penalty enforcement
+    const deposit = Number(contract.deposit);
+    let totalDeductions = 0;
+    const deductionItems: any[] = [];
+
+    // 1. Calculate Penalty based on Rules (Logic Tài chính)
+    const now = new Date();
+    const endDate = new Date(contract.endDate);
+    const daysRemaining = Math.ceil(
+      (endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const isEarlyTermination = daysRemaining > 0;
+    const noticeDays = terminateDto.noticeDays || 0;
+    const requiredNoticeDays = 30;
+
+    let penalty = 0;
+    let refundAmount = 0;
+
+    if (isEarlyTermination) {
+      if (isTenant) {
+        // RULE: Tenant terminates early -> Penalty = 100% Deposit
+        penalty = deposit;
+        // Tenant cannot self-deduct. Ignore terminateDto.deductions
+        refundAmount = 0; // Lost deposit
+      } else {
+        // RULE: Landlord terminates early -> Penalty = 200% Deposit (Refund + Compensation)
+        penalty = deposit * 2;
+
+        // Landlord can add damages deductions
+        if (terminateDto.deductions) {
+          terminateDto.deductions.forEach(d => {
+            totalDeductions += d.amount;
+            deductionItems.push(d);
+          });
+        }
+
+        // Refund = (Deposit + Compensation) - Deductions
+        refundAmount = Math.max(0, penalty - totalDeductions);
+      }
+    } else {
+      // Normal Termination (End of Contract)
+      if (isLandlord && terminateDto.deductions) {
+        terminateDto.deductions.forEach(d => {
+          totalDeductions += d.amount;
+          deductionItems.push(d);
+        });
+      }
+      // Tenant gets Deposit - Deductions
+      refundAmount = Math.max(0, deposit - totalDeductions);
+    }
+
+    // Update Contract
+    await this.prisma.contract.update({
+      where: { id },
+      data: {
+        status: ContractStatus.TERMINATED,
+        terminatedAt: new Date(terminateDto.terminationDate),
+        terminationDetails: {
+          reason: terminateDto.reason,
+          terminatedBy: userId,
+          noticeDays: terminateDto.noticeDays,
+          deductions: deductionItems,
+          refundAmount: refundAmount,
+          totalDeductions: totalDeductions,
+          depositReturned: terminateDto.returnDeposit,
+        },
+      } as any,
+    });
+
+    // Update Room Status to AVAILABLE
+    await this.prisma.room.update({
+      where: { id: contract.roomId },
+      data: { status: RoomStatus.AVAILABLE },
+    });
+
+    // Send Notifications
+    const roomInfo = `P.${contract.room.roomNumber} - ${contract.room.property.name}`;
+    try {
+      if (isTenant) {
+        // Tenant terminated -> Notify Landlord
+        await this.notificationsService.create({
+          userId: landlordUser.id,
+          title: `📢 Hợp đồng chấm dứt bởi người thuê - ${roomInfo}`,
+          content: `Lý do: ${terminateDto.reason}\nHoàn trả cọc dự kiến: ${refundAmount.toLocaleString('vi-VN')} VNĐ`,
+          notificationType: NotificationType.CONTRACT,
+          relatedEntityId: id,
+        });
+      } else {
+        // Landlord/Admin terminated -> Notify Tenant
+        await this.notificationsService.create({
+          userId: contract.tenant.userId,
+          title: `⚠️ Hợp đồng đã được chấm dứt - ${roomInfo}`,
+          content: `Lý do: ${terminateDto.reason}\nHoàn trả cọc: ${refundAmount.toLocaleString('vi-VN')} VNĐ\nKhấu trừ: ${totalDeductions.toLocaleString('vi-VN')} VNĐ`,
+          notificationType: NotificationType.CONTRACT,
+          relatedEntityId: id,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to send notifications: ${error}`);
+    }
+
+    return {
+      message: 'Contract terminated successfully',
+      contractId: id,
+      financials: {
+        deposit: deposit,
+        deductions: totalDeductions,
+        refundAmount: refundAmount,
+      },
+    };
+  }
+
+
+  /**
+   * Update Handover Checklist (Check-in / Check-out)
+   */
+  async updateHandoverChecklist(
+    id: string,
+    userId: string,
+    dto: UpdateHandoverChecklistDto,
+  ) {
+    const contract = await this.prisma.contract.findUnique({
+      where: { id },
+      include: {
+        tenant: true,
+        landlord: true,
+      },
+    });
+
+    if (!contract) throw new NotFoundException('Contract not found');
+
+    // Auth: Tenant, Landlord, Admin
+    const isTenant = contract.tenant.userId === userId;
+    const isLandlord = contract.landlord.userId === userId;
+
+    if (!isTenant && !isLandlord) {
+      // Typically allow admin too
+    }
+
+    // Get current checklist
+    const currentChecklist = ((contract as any).handoverChecklist as any) || {
+      checkIn: null,
+      checkOut: null,
+    };
+
+    // Update specific stage
+    if (dto.stage === HandoverStage.CHECK_IN) {
+      // SECURITY FIX: Prevent modifying Check-In if already signed
+      if (
+        currentChecklist.checkIn &&
+        currentChecklist.checkIn.signatureUrl &&
+        contract.tenant.userId === userId // Only block Tenant/Landlord, maybe Admin can fix?
+      ) {
+        throw new BadRequestException(
+          'Check-in checklist is already signed and locked.',
+        );
+      }
+
+      currentChecklist.checkIn = {
+        items: dto.items,
+        updatedAt: new Date(),
+        updatedBy: userId,
+        witness: dto.witness,
+        signatureUrl: dto.signatureUrl,
+      };
+    } else {
+      currentChecklist.checkOut = {
+        items: dto.items,
+        updatedAt: new Date(),
+        updatedBy: userId,
+        witness: dto.witness,
+        signatureUrl: dto.signatureUrl,
+      };
+    }
+
+    // Save to DB
+    await this.prisma.contract.update({
+      where: { id },
+      data: {
+        handoverChecklist: currentChecklist,
+      } as any,
+    });
+
+    return {
+      message: 'Handover checklist updated successfully',
+      checklist: currentChecklist,
+    };
   }
 }

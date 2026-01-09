@@ -23,7 +23,10 @@ import {
   UpdateContractDto,
   FilterRentalApplicationsDto,
   FilterContractsDto,
+  TerminateContractDto,
+  UpdateHandoverChecklistDto,
 } from './dto';
+import { CreateContractResidentDto } from './dto/create-contract-resident.dto';
 import { User, UserRole } from '../users/entities';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
@@ -35,7 +38,17 @@ export class ContractsController {
     private readonly contractSigningService: ContractSigningService,
     private readonly pdfQueueService: PdfQueueService,
     private readonly contractPdfService: ContractPdfService,
-  ) {}
+  ) { }
+
+  @Patch(':id/handover')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  updateHandoverChecklist(
+    @Param('id') id: string,
+    @Body() dto: UpdateHandoverChecklistDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.contractsService.updateHandoverChecklist(id, user.id, dto);
+  }
 
   // ===== RENTAL APPLICATIONS ENDPOINTS =====
 
@@ -158,7 +171,7 @@ export class ContractsController {
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   terminate(
     @Param('id') id: string,
-    @Body() terminateDto: { reason: string; noticeDays?: number },
+    @Body() terminateDto: TerminateContractDto,
     @CurrentUser() user: User,
   ) {
     return this.contractsService.terminate(id, user.id, terminateDto);
@@ -168,6 +181,27 @@ export class ContractsController {
   @Auth(UserRole.ADMIN)
   remove(@Param('id') id: string) {
     return this.contractsService.remove(id);
+  }
+
+  // ===== RESIDENT MANAGEMENT (Occupancy) =====
+  @Post(':id/residents')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  addResident(
+    @Param('id') id: string,
+    @Body() dto: CreateContractResidentDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.contractsService.addResident(id, dto, user.id);
+  }
+
+  @Delete(':id/residents/:residentId')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  removeResident(
+    @Param('id') id: string,
+    @Param('residentId') residentId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.contractsService.removeResident(id, residentId, user.id);
   }
 
   // ===== DIGITAL SIGNATURE ENDPOINTS (Chữ ký số) =====

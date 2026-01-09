@@ -78,21 +78,49 @@ echo -e "${GREEN}✓ ACR credentials retrieved${NC}"
 
 # Step 8: Deploy to Azure Container Instances
 echo -e "\n${YELLOW}Step 8: Deploying to Azure Container Instances...${NC}"
-echo -e "${YELLOW}⚠️  Make sure to update azure-deploy.yml with your environment variables!${NC}"
-read -p "Have you updated azure-deploy.yml? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    # Update ACR password in deployment file
-    sed -i "s/<get-from-azure-portal>/$ACR_PASSWORD/g" azure-deploy.yml
-    
-    az container create --resource-group $RESOURCE_GROUP \
-        --file azure-deploy.yml
-    
-    echo -e "${GREEN}✓ Container deployed${NC}"
+echo -e "${YELLOW}Loading environment variables from .env.production...${NC}"
+if [[ -f .env.production ]]; then
+        set -a
+        source .env.production
+        set +a
+        echo -e "${GREEN}✓ Loaded .env.production${NC}"
 else
-    echo -e "${RED}Deployment cancelled. Please update azure-deploy.yml and run again.${NC}"
-    exit 1
+        echo -e "${RED}Missing .env.production in be-rental-room. Aborting.${NC}"
+        exit 1
 fi
+
+# Generate processed deployment file by substituting ${VAR} with values
+PROCESSED_YML="azure-deploy.processed.yml"
+cp azure-deploy.yml "$PROCESSED_YML"
+
+VARS=(
+    NODE_ENV PORT CORS_ORIGIN DATABASE_URL REDIS_HOST REDIS_PORT REDIS_PASSWORD REDIS_TTL 
+    JWT_SECRET JWT_EXPIRES_IN JWT_REFRESH_SECRET JWT_REFRESH_EXPIRES_IN 
+    MAIL_HOST MAIL_PORT MAIL_USER MAIL_PASSWORD MAIL_FROM MAIL_FROM_NAME 
+    GEMINI_API_KEY IMAGEKIT_PUBLIC_KEY IMAGEKIT_PRIVATE_KEY IMAGEKIT_URL_ENDPOINT 
+    ENCRYPTION_KEY SEPAY_API_URL SEPAY_API_TOKEN P12_PASSWORD
+)
+
+echo -e "${YELLOW}Injecting variables into azure-deploy.yml...${NC}"
+
+# Use Python script for safe variable replacement
+chmod +x inject-env.py
+python3 inject-env.py azure-deploy.yml "$PROCESSED_YML"
+
+# Update ACR password
+python3 -c "
+import sys
+with open('$PROCESSED_YML', 'r') as f:
+    content = f.read()
+content = content.replace('<get-from-azure-portal>', '$ACR_PASSWORD')
+with open('$PROCESSED_YML', 'w') as f:
+    f.write(content)
+"
+
+az container create --resource-group $RESOURCE_GROUP \
+    --file "$PROCESSED_YML"
+
+echo -e "${GREEN}✓ Container deployed${NC}"
 
 # Step 9: Get container IP
 echo -e "\n${YELLOW}Step 9: Getting container IP...${NC}"

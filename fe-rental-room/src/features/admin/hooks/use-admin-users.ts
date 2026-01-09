@@ -125,18 +125,28 @@ export function useDeleteUser() {
 }
 
 /**
- * Hook to toggle user status (activate/deactivate)
+ * Hook to toggle user status (ban/unban)
  */
 export function useToggleUserStatus() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-            const { data } = await api.patch<AdminUser>(`/users/${id}`, { emailVerified: active });
-            return data;
+        mutationFn: async ({ id, active, reason }: { id: string; active: boolean; reason?: string }) => {
+            if (active) {
+                // Unban user (activate)
+                const { data } = await api.post<AdminUser>(`/users/${id}/unban`);
+                return data;
+            } else {
+                // Ban user (deactivate)
+                const { data } = await api.post<AdminUser>(`/users/${id}/ban`, {
+                    reason: reason || 'Vô hiệu hóa bởi admin'
+                });
+                return data;
+            }
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: adminUserKeys.all });
         },
     });
 }
+

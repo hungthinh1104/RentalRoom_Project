@@ -19,7 +19,7 @@ interface FindAllParams {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findAll(params?: FindAllParams) {
     const { search, role, emailVerified } = params || {};
@@ -50,6 +50,8 @@ export class UsersService {
         phoneNumber: true,
         role: true,
         emailVerified: true,
+        isBanned: true,
+        bannedAt: true,
         createdAt: true,
         updatedAt: true,
         // Exclude passwordHash
@@ -284,6 +286,70 @@ export class UsersService {
     } else if (newRole === UserRole.LANDLORD) {
       await this.prisma.landlord.create({ data: { userId } });
     }
+  }
+
+  /**
+   * Ban user - Admin only
+   */
+  async banUser(userId: string, reason: string, adminId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.isBanned) {
+      throw new BadRequestException('User is already banned');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isBanned: true,
+        bannedAt: new Date(),
+        bannedReason: reason,
+        bannedBy: adminId,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isBanned: true,
+        bannedAt: true,
+        bannedReason: true,
+      },
+    });
+  }
+
+  /**
+   * Unban user - Admin only
+   */
+  async unbanUser(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.isBanned) {
+      throw new BadRequestException('User is not banned');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isBanned: false,
+        bannedAt: null,
+        bannedReason: null,
+        bannedBy: null,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        isBanned: true,
+      },
+    });
   }
 
   /**

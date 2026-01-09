@@ -28,7 +28,7 @@ export class BillingController {
   constructor(
     private readonly billingService: BillingService,
     private readonly pdfService: PdfService,
-  ) {}
+  ) { }
 
   @Post('invoices')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -79,7 +79,7 @@ export class BillingController {
   }
 
   @Patch('invoices/:id/mark-paid')
-  @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  @Auth(UserRole.LANDLORD)  // Only landlord owns invoices
   markAsPaid(@Param('id') id: string) {
     return this.billingService.markAsPaid(id);
   }
@@ -140,26 +140,7 @@ export class BillingController {
     return this.billingService.getMeterReadings(contractId, month);
   }
 
-  /**
-   * Get utility billing details for tenant
-   */
-  @Get('tenant/utilities')
-  @Auth(UserRole.TENANT)
-  async getTenantUtilityBilling(
-    @CurrentUser() user: any,
-    @Query('month') month: string,
-  ) {
-    return this.billingService.getTenantUtilityBilling(user.id, month);
-  }
 
-  /**
-   * Get last meter readings for tenant
-   */
-  @Get('tenant/last-readings')
-  @Auth(UserRole.TENANT)
-  async getTenantLastReadings(@CurrentUser() user: any) {
-    return this.billingService.getTenantLastReadings(user.id);
-  }
 
   /**
    * Generate utility invoice from meter readings

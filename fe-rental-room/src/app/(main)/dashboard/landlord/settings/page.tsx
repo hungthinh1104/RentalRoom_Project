@@ -70,14 +70,14 @@ export default function LandlordSettingsPage() {
                 currentPassword: passwordData.currentPassword,
                 newPassword: passwordData.newPassword,
             });
-            
+
             toast({
                 title: 'Thành công',
                 description: 'Đã thay đổi mật khẩu',
             });
             setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
         } catch (error) {
-            const errorMessage = error?.response?.data?.message || 'Không thể thay đổi mật khẩu';
+            const errorMessage = (error as any)?.response?.data?.message || 'Không thể thay đổi mật khẩu';
             toast({
                 title: 'Lỗi',
                 description: errorMessage,

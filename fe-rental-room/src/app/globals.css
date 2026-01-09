@@ -416,3 +416,47 @@
 html {
   font-size: var(--font-size);
 }
+/* ============================================
+   PERFORMANCE OPTIMIZATIONS - CSS Animations
+   ============================================ */
+@layer utilities {
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-fade-in-up { animation: fadeInUp 0.5s ease-out; }
+
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-fade-in-down { animation: fadeInDown 0.5s ease-out; }
+
+  @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+  .animate-scale-in { animation: scaleIn 0.3s ease-out; }
+
+  @keyframes slideInRight { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+  .animate-slide-in-right { animation: slideInRight 0.4s ease-out; }
+
+  @keyframes slideInLeft { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+  .animate-slide-in-left { animation: slideInLeft 0.4s ease-out; }
+
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  .will-change-transform { will-change: transform; }
+  .will-change-opacity { will-change: opacity; }
+
+  .hover-scale { transition: transform 0.2s ease-out; }
+  .hover-scale:hover { transform: scale(1.02); }
+
+  .hover-lift { transition: transform 0.2s ease-out, box-shadow 0.2s ease-out; }
+  .hover-lift:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+}

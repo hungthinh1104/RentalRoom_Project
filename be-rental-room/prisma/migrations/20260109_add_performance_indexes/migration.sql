@@ -8,13 +8,13 @@ CREATE INDEX IF NOT EXISTS "user_email_verified_idx" ON "user"("email_verified")
 
 -- Property indexes
 CREATE INDEX IF NOT EXISTS "property_landlord_id_idx" ON "property"("landlord_id");
-CREATE INDEX IF NOT EXISTS "property_type_idx" ON "property"("type");
+CREATE INDEX IF NOT EXISTS "property_type_idx" ON "property"("property_type");
 CREATE INDEX IF NOT EXISTS "property_created_at_idx" ON "property"("created_at");
 
 -- Room indexes
 CREATE INDEX IF NOT EXISTS "room_property_id_idx" ON "room"("property_id");
 CREATE INDEX IF NOT EXISTS "room_status_idx" ON "room"("status");
-CREATE INDEX IF NOT EXISTS "room_price_idx" ON "room"("price");
+CREATE INDEX IF NOT EXISTS "room_price_idx" ON "room"("price_per_month");
 CREATE INDEX IF NOT EXISTS "room_created_at_idx" ON "room"("created_at");
 
 -- Contract indexes
@@ -29,7 +29,6 @@ CREATE INDEX IF NOT EXISTS "contract_dates_idx" ON "contract"("start_date", "end
 -- Invoice indexes
 CREATE INDEX IF NOT EXISTS "invoice_contract_id_idx" ON "invoice"("contract_id");
 CREATE INDEX IF NOT EXISTS "invoice_tenant_id_idx" ON "invoice"("tenant_id");
-CREATE INDEX IF NOT EXISTS "invoice_landlord_id_idx" ON "invoice"("landlord_id");
 CREATE INDEX IF NOT EXISTS "invoice_status_idx" ON "invoice"("status");
 CREATE INDEX IF NOT EXISTS "invoice_due_date_idx" ON "invoice"("due_date");
 CREATE INDEX IF NOT EXISTS "invoice_created_at_idx" ON "invoice"("created_at");
@@ -53,6 +52,5 @@ CREATE INDEX IF NOT EXISTS "notification_created_at_idx" ON "notification"("crea
 
 -- Composite indexes for common queries
 CREATE INDEX IF NOT EXISTS "invoice_tenant_status_idx" ON "invoice"("tenant_id", "status");
-CREATE INDEX IF NOT EXISTS "invoice_landlord_status_idx" ON "invoice"("landlord_id", "status");
 CREATE INDEX IF NOT EXISTS "contract_tenant_status_idx" ON "contract"("tenant_id", "status");
 CREATE INDEX IF NOT EXISTS "room_property_status_idx" ON "room"("property_id", "status");

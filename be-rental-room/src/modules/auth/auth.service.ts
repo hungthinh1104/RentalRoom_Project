@@ -277,16 +277,16 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        verificationCode: resetToken, // Reuse verificationCode field for reset token
+        verificationCode: resetToken,
         verificationExpiry: resetTokenExpiry,
       },
     });
 
     // Send reset email
-    await this.emailService.sendEmail({
-      to: user.email,
-      subject: 'Reset Your Password',
-      html: `
+    await this.emailService.sendEmail(
+      user.email,
+      'Reset Your Password',
+      `
         <h2>Password Reset Request</h2>
         <p>Hi ${user.fullName},</p>
         <p>Click the link below to reset your password:</p>
@@ -294,7 +294,7 @@ export class AuthService {
         <p>This link will expire in 1 hour.</p>
         <p>If you didn't request this, please ignore this email.</p>
       `,
-    });
+    );
 
     return { message: 'If that email exists, a reset link has been sent.' };
   }

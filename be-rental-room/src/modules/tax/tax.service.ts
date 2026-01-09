@@ -9,7 +9,7 @@ export class TaxService {
   private readonly logger = new Logger(TaxService.name);
   private readonly TAX_THRESHOLD = 500_000_000; // 500M VND/year
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Generate monthly revenue snapshot for a landlord
@@ -164,6 +164,46 @@ export class TaxService {
   }
 
   /**
+   * Get effective regulation for a given year
+   */
+  async getEffectiveRegulation(year: number) {
+    // Find the latest active regulation for the given year
+    const regulation = await this.prisma.regulationVersion.findFirst({
+      where: {
+        type: 'RENTAL_TAX',
+        effectiveFrom: {
+          lte: new Date(year, 11, 31), // Active by end of year
+        },
+        OR: [
+          { effectiveTo: null },
+          { effectiveTo: { gte: new Date(year, 0, 1) } },
+        ],
+      },
+      orderBy: {
+        effectiveFrom: 'desc',
+      },
+    });
+
+    if (!regulation) {
+      this.logger.warn(
+        `No tax regulation found for year ${year}. Using default threshold.`,
+      );
+      // Default fallback (Vietnamese Law 2024: 100M VND)
+      return {
+        threshold: 100_000_000,
+        taxRate: 0.05 + 0.05, // 5% VAT + 5% PIT
+      };
+    }
+
+    // Parse configuration from JSON
+    const config = (regulation as any).configuration;
+    return {
+      threshold: Number(config?.threshold) || 100_000_000,
+      taxRate: Number(config?.taxRate) || 0.1,
+    };
+  }
+
+  /**
    * Export tax data for a landlord (CSV format)
    * Includes disclaimer - NOT tax advice
    * FIX: Added service-layer authorization for defense-in-depth
@@ -186,6 +226,10 @@ export class TaxService {
         );
       }
     }
+
+    // Fetch Dynamic Configuration
+    const { threshold } = await this.getEffectiveRegulation(year);
+
     const snapshots = await this.prisma.landlordRevenueSnapshot.findMany({
       where: {
         landlordId,
@@ -208,12 +252,12 @@ export class TaxService {
 
     // Convert to number only for threshold comparison (safe after aggregation)
     const totalAsNumber = totalRevenue.toNumber();
-    const exceedsThreshold = totalAsNumber > this.TAX_THRESHOLD;
+    const exceedsThreshold = totalAsNumber > threshold;
 
     return {
       csv,
       totalRevenue: totalAsNumber, //← Convert for JSON response
-      threshold: this.TAX_THRESHOLD,
+      threshold: threshold,
       exceedsThreshold,
       disclaimer: `
         ❗ DISCLAIMER: This report is for reference only.
@@ -223,7 +267,7 @@ export class TaxService {
         - Please consult a licensed tax professional or accountant
         - Vietnam tax laws may change - verify current regulations
         
-        Threshold notice: ${exceedsThreshold ? '⚠️ Revenue exceeds 500M VND/year. Tax declaration may be required.' : '✅ Revenue below 500M VND/year threshold.'}
+        Threshold notice: ${exceedsThreshold ? `⚠️ Revenue exceeds ${threshold.toLocaleString('vi-VN')} VND/year. Tax declaration may be required.` : `✅ Revenue below ${threshold.toLocaleString('vi-VN')} VND/year threshold.`}
       `.trim(),
     };
   }

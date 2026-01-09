@@ -4,6 +4,8 @@ import "./globals.css";
 import Providers from '@/components/landing/providers';
 import { AIChatWidget } from '@/features/ai/components/ai-chat-widget';
 import { Toaster } from 'sonner';
+import { OfflineBanner } from '@/components/offline-banner';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,11 +26,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        <Providers>
-          {children}
-          <AIChatWidget />
-          <Toaster position="top-right" richColors />
-        </Providers>
+        <ErrorBoundary>
+          <Providers>
+            <OfflineBanner />
+            {children}
+            <AIChatWidget />
+            <Toaster position="top-right" richColors />
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   );

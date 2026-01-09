@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { CacheInterceptor } from '@nestjs/cache-manager';
 import { PropertiesService } from './properties.service';
@@ -21,10 +22,11 @@ import { UserRole } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 @Controller('properties')
 export class PropertiesController {
-  constructor(private readonly propertiesService: PropertiesService) {}
+  constructor(private readonly propertiesService: PropertiesService) { }
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
@@ -33,15 +35,15 @@ export class PropertiesController {
   }
 
   @Get()
-  @Auth()
+  @UseGuards(OptionalJwtAuthGuard)
   // @UseInterceptors(CacheInterceptor)
   // @CacheTTL(300) // Cache for 5 minutes
-  findAll(@Query() filterDto: FilterPropertiesDto, @CurrentUser() user: User) {
+  findAll(@Query() filterDto: FilterPropertiesDto, @CurrentUser() user: any) {
     // 🔒 SECURITY: Landlords can only see their own properties
-    if (user.role === UserRole.LANDLORD) {
+    if (user?.role === UserRole.LANDLORD) {
       filterDto.landlordId = user.id;
     }
-    // ADMIN and TENANT can see all (for browsing)
+    // GUESTS, ADMIN, TENANT can see all (for browsing)
     return this.propertiesService.findAll(filterDto);
   }
 

@@ -204,6 +204,12 @@ model User {
   verificationCode   String?   @map("verification_code") @db.VarChar(6)
   verificationExpiry DateTime? @map("verification_expiry")
 
+  // Ban/Unban (Admin User Management)
+  isBanned     Boolean   @default(false) @map("is_banned")
+  bannedAt     DateTime? @map("banned_at")
+  bannedReason String?   @map("banned_reason") @db.VarChar(500)
+  bannedBy     String?   @map("banned_by") @db.Uuid
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -230,6 +236,7 @@ model Tenant {
   budgetMax         Decimal?  @map("budget_max") @db.Decimal(10, 2)
   preferredLocation String?   @map("preferred_location") @db.VarChar(100)
   employmentStatus  String?   @map("employment_status") @db.VarChar(50)
+  isVerified        Boolean   @default(false) @map("is_verified") // KYC Status
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -449,6 +456,10 @@ model Contract {
   signedAt       DateTime? @map("signed_at") // Landlord signature
   tenantSignedAt DateTime? @map("tenant_signed_at") // Tenant signature
   terminatedAt   DateTime? @map("terminated_at")
+
+  // Termination & Handover (New Features)
+  terminationDetails Json? @map("termination_details") // { reason, deductions: [], refundAmount }
+  handoverChecklist  Json? @map("handover_checklist")  // { checkIn: {}, checkOut: {} }
 
   // Terms and Residents
   paymentDay   Int                @default(5) @map("payment_day")
@@ -996,6 +1007,9 @@ model RegulationVersion {
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Dynamic Configuration (New Feature)
+  configuration Json? @map("configuration") // { "threshold": 100000000, "taxRate": 10 }
 
   // Relations
   taxYearSummaries TaxYearSummary[] @relation("TaxRegulations")

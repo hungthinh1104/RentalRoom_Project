@@ -32,11 +32,11 @@ export class PrismaService
 
   async onModuleInit() {
     const maxAttempts = parseInt(
-      process.env.PRISMA_CONNECT_RETRIES || '10',
+      process.env.PRISMA_CONNECT_RETRIES || '3',
       10,
     );
     const delayMs = parseInt(
-      process.env.PRISMA_CONNECT_RETRY_DELAY_MS || '2000',
+      process.env.PRISMA_CONNECT_RETRY_DELAY_MS || '500',
       10,
     );
 
@@ -49,7 +49,14 @@ export class PrismaService
         this.logger.warn(
           `Prisma connect attempt ${attempt}/${maxAttempts} failed: ${err?.message || err}`,
         );
-        if (attempt === maxAttempts) throw err;
+        if (attempt === maxAttempts) {
+          // Instead of crashing, log warning and allow app to start
+          // Routes will fail gracefully when attempting DB operations
+          this.logger.error(
+            `Failed to connect to database after ${maxAttempts} attempts. App starting without DB connection.`,
+          );
+          return;
+        }
         await new Promise((r) => setTimeout(r, delayMs));
       }
     }
