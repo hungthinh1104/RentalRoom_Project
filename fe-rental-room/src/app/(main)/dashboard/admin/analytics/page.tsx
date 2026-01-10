@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table";
 import { MarketInsightsClient } from "./market-insights-client";
 
+export const dynamic = 'force-dynamic';
+
 async function MarketInsights() {
   const insights = await fetchAdminMarketInsights();
 
