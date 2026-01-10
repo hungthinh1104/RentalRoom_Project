@@ -23,7 +23,7 @@ import type {
 
 // ============ SSR-COMPATIBLE API HELPERS ============
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:3005";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:3000";
 const API_PREFIX = "/api/v1";
 
 type SessionWithToken = Session & { accessToken?: string };

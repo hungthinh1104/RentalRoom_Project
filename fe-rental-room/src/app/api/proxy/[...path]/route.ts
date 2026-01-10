@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Server-side proxy can call HTTP without mixed-content issues
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://rental-room-api.southeastasia.azurecontainer.io:3000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 export async function POST(
   request: NextRequest,

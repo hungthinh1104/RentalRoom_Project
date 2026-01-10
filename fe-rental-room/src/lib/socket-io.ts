@@ -15,7 +15,7 @@ export function initializeNotificationSocket(token: string): Socket {
     return socket;
   }
 
-  const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+  const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
   socket = io(`${socketUrl}/notifications`, {
     auth: {

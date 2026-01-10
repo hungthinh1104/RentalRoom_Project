@@ -7,8 +7,8 @@ import { getSession } from 'next-auth/react';
 
 const baseUrl =
 	typeof window === 'undefined'
-		? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005'
-		: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3005';
+		? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
+		: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3000';
 const apiPrefix = ''; // Vercel proxy already includes /api/v1 in rewrite destination
 
 // Custom error class

@@ -126,7 +126,7 @@ export default function TenantFinancePage() {
       toast.info("Đang tải hóa đơn...");
 
       // Create download link
-      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/v1/billing/invoices/${invoiceId}/download`;
+      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/v1/billing/invoices/${invoiceId}/download`;
 
       // Open in new tab to trigger download
       window.open(downloadUrl, '_blank');

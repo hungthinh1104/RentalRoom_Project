@@ -59,7 +59,7 @@ export function AvatarUpload({ currentAvatar, onUploadComplete, disabled }: Avat
             // Validates: JPEG/PNG/WebP, max 5MB
             // Returns: { message, avatarUrl }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005'}/api/v1/users/me/avatar`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/v1/users/me/avatar`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include',

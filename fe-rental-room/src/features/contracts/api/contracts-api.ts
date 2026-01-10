@@ -144,7 +144,7 @@ export const contractsApi = {
 	async downloadSigned(contractId: string) {
 		const baseUrl =
 			typeof window === 'undefined'
-				? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+				? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
 				: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3001';
 
 		const res = await fetch(`${baseUrl}/api/v1/contracts/${contractId}/download-signed`, {

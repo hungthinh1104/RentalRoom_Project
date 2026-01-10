@@ -20,7 +20,7 @@ interface ImageUploadProps {
 const urlEndpoint = process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT;
 const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 const getAuthEndpoint = () => {
     if (API_URL.endsWith("/api/v1")) {
@@ -245,7 +245,7 @@ export function ImageUpload({ value = [], onChange, maxFiles = 5, fileNamePrefix
                                     onChange(value.filter(u => u !== url));
                                     try {
                                         // Call backend to delete file
-                                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+                                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
                                         const endpoint = apiUrl.endsWith("/api/v1") ? `${apiUrl}/upload/delete` : `${apiUrl}/api/v1/upload/delete`;
                                         await fetch(`${endpoint}?url=${encodeURIComponent(url)}`);
                                         toast.success("Đã xóa ảnh.");
