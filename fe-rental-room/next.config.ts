@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV === 'development';
 const connectSrc = isDev
   ? "'self' https: http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:3005 http://127.0.0.1:3005 ws://localhost:3000 wss://localhost:3000 ws://localhost:3001 wss://localhost:3001 ws://localhost:3005 wss://localhost:3005 "
-  : "'self' https: http://rental-room-api.southeastasia.azurecontainer.io:3000"; // Allow Azure FQDN
+  : "'self' https: http://rental-room-api.southeastasia.azurecontainer.io:3000"; // Production: Allow Azure FQDN HTTP backend
 
 const csp = [
   "default-src 'self'",
@@ -49,8 +49,7 @@ const nextConfig: NextConfig = {
       {
         source: '/(.*)',
         headers: [
-          // CSP temporarily disabled for demo - HTTP backend causes mixed-content issues
-          // { key: 'Content-Security-Policy', value: csp },
+          { key: 'Content-Security-Policy', value: csp },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
