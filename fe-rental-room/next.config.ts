@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV === 'development';
 const connectSrc = isDev
   ? "'self' https: http://localhost:3000 http://127.0.0.1:3000 http://localhost:3001 http://127.0.0.1:3001 http://localhost:3005 http://127.0.0.1:3005 ws://localhost:3000 wss://localhost:3000 ws://localhost:3001 wss://localhost:3001 ws://localhost:3005 wss://localhost:3005 "
-  : "'self' https: http://rental-room-api.southeastasia.azurecontainer.io:3000"; // Production: Allow Azure FQDN HTTP backend
+  : "'self' https: https://rental-room-api.azurewebsites.net"; // Production: Allow Azure App Service
 
 const csp = [
   "default-src 'self'",
