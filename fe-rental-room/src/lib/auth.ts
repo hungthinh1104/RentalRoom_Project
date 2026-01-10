@@ -72,16 +72,25 @@ export const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       // Redirect logic after sign in/out
-      if (!url) return baseUrl;
+      console.log('[NextAuth] redirect called with url:', url, 'baseUrl:', baseUrl);
+      if (!url) {
+        console.log('[NextAuth] redirect: no url, returning baseUrl');
+        return baseUrl;
+      }
       if (typeof url === 'string' && url.startsWith('/')) {
+        console.log('[NextAuth] redirect: relative path, returning:', url);
         return url;
       }
       try {
         const parsed = new URL(url);
-        if (parsed.origin === baseUrl) return url;
+        if (parsed.origin === baseUrl) {
+          console.log('[NextAuth] redirect: same origin, returning:', url);
+          return url;
+        }
       } catch (e) {
         console.warn('[NextAuth] redirect: invalid url', url, e);
       }
+      console.log('[NextAuth] redirect: default to baseUrl:', baseUrl);
       return baseUrl;
     },
   },
