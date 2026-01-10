@@ -12,7 +12,7 @@ import { useEffect, useRef } from 'react';
  */
 export function usePrefetchOnHover(href: string) {
     const router = useRouter();
-    const hasPrefe tched = useRef(false);
+    const hasPrefetched = useRef<boolean>(false);
 
     const handleMouseEnter = () => {
         if (!hasPrefetched.current && href) {

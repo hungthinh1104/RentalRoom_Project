@@ -33,7 +33,7 @@ export default function ThuChiPage() {
     const { data: contractsData, isLoading: isLoadingContracts, error: contractsError } = useQuery({
         queryKey: ['active-contracts'],
         queryFn: async () => {
-            const response = await contractsApi.filterContracts({ status: 'ACTIVE', limit: 100 });
+            const response = await contractsApi.getApplications({ status: 'ACTIVE', limit: 100 });
             return response?.data || [];
         },
     });
