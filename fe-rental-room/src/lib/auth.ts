@@ -17,33 +17,32 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Call the new /auth/session endpoint
-          const response = await fetch(`${API_URL}/api/v1/auth/session`, {
+          // Call backend login endpoint
+          const response = await fetch(`${API_URL}/api/v1/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               email: credentials.email,
               password: credentials.password,
             }),
-            credentials: 'include', // Important: send cookies
           });
 
           if (!response.ok) {
             if (process.env.NODE_ENV === 'development') {
-              console.error('[NextAuth] Session validation failed:', response.status);
+              console.error('[NextAuth] Login failed:', response.status);
             }
             return null;
           }
 
-          const user = await response.json();
+          const data = await response.json();
 
           // Return user data for NextAuth session
           return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-            accessToken: user.access_token, // Capture token from backend
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.fullName,
+            role: data.user.role,
+            accessToken: data.access_token, // Capture token from backend
           };
         } catch (error) {
           return null;
