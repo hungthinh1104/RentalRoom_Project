@@ -206,6 +206,7 @@ export function LoginForm() {
               </div>
               <Link
                 href="/forgot-password"
+                prefetch={false}
                 className="text-sm text-primary hover:underline font-medium"
               >
                 Quên mật khẩu?
@@ -242,6 +243,7 @@ export function LoginForm() {
               Chưa có tài khoản?{" "}
               <Link
                 href="/register"
+                prefetch={false}
                 className="text-primary hover:underline font-medium"
               >
                 Đăng ký ngay
@@ -250,6 +252,7 @@ export function LoginForm() {
             <span className="text-muted-foreground">•</span>
             <Link
               href="/verify-email"
+              prefetch={false}
               className="text-primary hover:underline font-medium"
             >
               Xác thực email

@@ -98,12 +98,13 @@ export function RegisterForm() {
   };
 
   const onSubmit = (data: RegisterInput) => {
-    // Remove confirmPassword from payload and map `phone` -> `phoneNumber` for API
+    // Remove confirmPassword from payload and add selectedRole
     const { phone, ...rest } = data;
-    // Send 'phone' property (not phoneNumber) and exclude confirmPassword
+    // Send 'phone' property (not phoneNumber), add role, and exclude confirmPassword
     const payload = {
       ...rest,
       phone,
+      role: selectedRole,
     };
 
     // Debug payload in dev to verify confirmPassword is not sent and phone property exists
