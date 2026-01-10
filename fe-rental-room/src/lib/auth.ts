@@ -56,8 +56,9 @@ export const authOptions: NextAuthOptions = {
       // On initial sign-in, store user data in JWT
       if (user) {
         token.id = user.id;
-        token.role = (user as { role?: string }).role || 'TENANT';
-        token.accessToken = (user as { accessToken?: string }).accessToken;
+        token.role = (user as any).role || 'TENANT';
+        token.accessToken = (user as any).accessToken;
+        console.log('[NextAuth] jwt callback - setting token with role:', token.role);
       }
       return token;
     },
