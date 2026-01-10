@@ -39,7 +39,7 @@ export default function ForgotPasswordPage() {
       await api.post('/auth/forgot-password', { email });
       setSubmitted(true);
       toast.success('Email đặt lại mật khẩu đã được gửi!');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Forgot password error:', error);
       // Always show success message for security (don't reveal if email exists)
       setSubmitted(true);
