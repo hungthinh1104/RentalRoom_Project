@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://57.155.79.177:3000';
+// Use environment variable, but force HTTPS for production
+const getBackendUrl = () => {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://57.155.79.177:3000';
+  // Convert HTTP to HTTPS for Azure FQDN
+  if (baseUrl.includes('azurecontainer.io')) {
+    return baseUrl.replace('http://', 'https://');
+  }
+  return baseUrl;
+};
+
+const BACKEND_URL = getBackendUrl();
 
 export async function POST(
   request: NextRequest,
