@@ -33,7 +33,6 @@ export async function proxy(request: NextRequest) {
 	}
 	// Tenant routes - ONLY for TENANT role
 	else if (pathname.startsWith("/dashboard/tenant") && token?.role !== "TENANT") {
-		console.log('[Middleware] Tenant access denied - token:', token, 'role:', token?.role);
 		response = NextResponse.redirect(new URL("/unauthorized", request.url));
 	}
 	// Redirect signed-in users away from auth pages (to their appropriate dashboard)
