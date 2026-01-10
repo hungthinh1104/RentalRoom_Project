@@ -1,7 +1,8 @@
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || 'http://localhost:3000';
+// For server-side NextAuth, use full backend URL
+const API_URL = process.env.BACKEND_API_URL || 'https://rental-room-api.azurewebsites.net';
 
 export const authOptions: NextAuthOptions = {
   providers: [
