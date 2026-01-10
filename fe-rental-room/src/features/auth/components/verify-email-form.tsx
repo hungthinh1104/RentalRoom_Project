@@ -20,17 +20,17 @@ export function VerifyEmailForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const emailParam = searchParams.get('email') || ''
-  
+
   const { mutate: verify, isPending: isVerifying, error: verifyError, reset: resetVerifyError } = useVerifyEmail()
   const { mutate: resend, isPending: isResending } = useResendVerification()
-  
+
   const [code, setCode] = React.useState("")
   const [countdown, setCountdown] = React.useState(60)
   const [success, setSuccess] = React.useState(false)
   const [showResendSuccess, setShowResendSuccess] = React.useState(false)
   const [targetEmail, setTargetEmail] = React.useState(emailParam)
   const [emailInput, setEmailInput] = React.useState("")
-  
+
   // Countdown timer for resend button
   React.useEffect(() => {
     if (countdown > 0) {
@@ -78,7 +78,7 @@ export function VerifyEmailForm() {
 
   const handleResend = () => {
     if (countdown > 0 || !targetEmail) return
-    
+
     resend(targetEmail, {
       onSuccess: () => {
         setCountdown(60)
@@ -92,7 +92,7 @@ export function VerifyEmailForm() {
   // Success screen
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-gradient-to-br from-page-gradient-from to-page-gradient-to flex items-center justify-center px-4 py-12">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -109,7 +109,7 @@ export function VerifyEmailForm() {
                 <div className="absolute inset-0 bg-success/20 rounded-full blur-2xl animate-pulse" />
                 <CheckCircle2 className="w-20 h-20 text-success relative" strokeWidth={2} />
               </motion.div>
-              
+
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -140,7 +140,7 @@ export function VerifyEmailForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-page-gradient-from to-page-gradient-to flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-[760px]">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -232,7 +232,7 @@ export function VerifyEmailForm() {
             />
 
             {/* Helper text */}
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}

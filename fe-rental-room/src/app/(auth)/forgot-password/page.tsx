@@ -52,7 +52,7 @@ export default function ForgotPasswordPage() {
   // Success State
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12">
+      <div className="min-h-screen bg-gradient-to-br from-page-gradient-from to-page-gradient-to flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-[760px]">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -187,7 +187,7 @@ export default function ForgotPasswordPage() {
 
   // Form State
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-page-gradient-from to-page-gradient-to flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-[760px]">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
