@@ -16,6 +16,11 @@ export class PrismaService
   constructor() {
     super({
       log: [{ level: 'query', emit: 'event' }, 'warn', 'error'],
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL,
+        },
+      },
     });
 
     const slowMs = parseInt(process.env.PRISMA_SLOW_QUERY_MS || '200', 10);
