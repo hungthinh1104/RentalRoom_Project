@@ -18,7 +18,7 @@ export class SearchService {
     private readonly embeddingService: EmbeddingService,
     private readonly cacheService: CacheService,
     private readonly analysisService: AnalysisService, // Injected
-  ) { }
+  ) {}
 
   /**
    * Semantic search using vector similarity

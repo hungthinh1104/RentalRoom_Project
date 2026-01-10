@@ -9,7 +9,7 @@ export class TaxService {
   private readonly logger = new Logger(TaxService.name);
   private readonly TAX_THRESHOLD = 500_000_000; // 500M VND/year
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Generate monthly revenue snapshot for a landlord

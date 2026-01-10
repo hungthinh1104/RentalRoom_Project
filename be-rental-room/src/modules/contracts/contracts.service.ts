@@ -42,7 +42,7 @@ export class ContractsService {
     private readonly emailService: EmailService,
     private readonly paymentService: PaymentService,
     private readonly snapshotService: SnapshotService,
-  ) { }
+  ) {}
 
   /**
    * Validate contract status transitions to prevent invalid state changes
@@ -80,7 +80,7 @@ export class ContractsService {
     if (!allowedTransitions || !allowedTransitions.includes(newStatus)) {
       throw new BadRequestException(
         `Invalid status transition: ${oldStatus} → ${newStatus}. ` +
-        `Allowed transitions from ${oldStatus}: ${allowedTransitions?.join(', ') || 'none'}`,
+          `Allowed transitions from ${oldStatus}: ${allowedTransitions?.join(', ') || 'none'}`,
       );
     }
   }
@@ -159,138 +159,141 @@ export class ContractsService {
     }
 
     // 2. Create Application with Pessimistic Locking (RACE CONDITION FIX)
-    return await this.prisma.$transaction(
-      async (tx) => {
-        // SELECT ... FOR UPDATE (Row-level lock to prevent double booking)
-        const room = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+    return await this.prisma
+      .$transaction(
+        async (tx) => {
+          // SELECT ... FOR UPDATE (Row-level lock to prevent double booking)
+          const room = await tx.$queryRaw<
+            Array<{ id: string; status: string }>
+          >`
           SELECT id, status FROM "room"
           WHERE id = ${createDto.roomId}::uuid
           FOR UPDATE
         `;
 
-        if (!room || room.length === 0) {
-          throw new NotFoundException(
-            `Room with ID ${createDto.roomId} not found`,
+          if (!room || room.length === 0) {
+            throw new NotFoundException(
+              `Room with ID ${createDto.roomId} not found`,
+            );
+          }
+
+          if (room[0].status !== 'AVAILABLE') {
+            throw new BadRequestException(
+              `Room is not available (Status: ${room[0].status})`,
+            );
+          }
+
+          // Check for existing pending/approved applications
+          const existingApplication = await tx.rentalApplication.findFirst({
+            where: {
+              roomId: createDto.roomId,
+              status: { in: ['PENDING', 'APPROVED'] },
+            },
+          });
+
+          if (existingApplication) {
+            throw new BadRequestException(
+              'This room already has a pending or approved application',
+            );
+          }
+
+          // Create application (room is locked, other concurrent requests will wait)
+          const application = await tx.rentalApplication.create({
+            data: {
+              ...createDto,
+              tenantId: tenant.userId,
+              landlordId,
+            },
+          });
+
+          // Update room status to RESERVED (prevent other bookings)
+          await tx.room.update({
+            where: { id: createDto.roomId },
+            data: { status: 'RESERVED' },
+          });
+
+          this.logger.log(
+            `Application created with pessimistic locking: ${application.id}`,
           );
-        }
 
-        if (room[0].status !== 'AVAILABLE') {
-          throw new BadRequestException(
-            `Room is not available (Status: ${room[0].status})`,
-          );
-        }
-
-        // Check for existing pending/approved applications
-        const existingApplication = await tx.rentalApplication.findFirst({
-          where: {
-            roomId: createDto.roomId,
-            status: { in: ['PENDING', 'APPROVED'] },
-          },
-        });
-
-        if (existingApplication) {
-          throw new BadRequestException(
-            'This room already has a pending or approved application',
-          );
-        }
-
-        // Create application (room is locked, other concurrent requests will wait)
-        const application = await tx.rentalApplication.create({
-          data: {
-            ...createDto,
-            tenantId: tenant.userId,
-            landlordId,
-          },
-        });
-
-        // Update room status to RESERVED (prevent other bookings)
-        await tx.room.update({
-          where: { id: createDto.roomId },
-          data: { status: 'RESERVED' },
-        });
-
-        this.logger.log(
-          `Application created with pessimistic locking: ${application.id}`,
-        );
-
-        return application;
-      },
-      {
-        maxWait: 5000, // Wait up to 5s for lock
-        timeout: 10000, // Transaction timeout 10s
-      },
-    ).then(async (application) => {
-
-      // Trigger notification + email to landlord (best effort)
-      try {
-        // Fetch related data
-        const [tenantRef, room] = await Promise.all([
-          this.prisma.tenant.findUnique({
-            where: { userId: application.tenantId },
-            include: { user: true },
-          }),
-          this.prisma.room.findUnique({
-            where: { id: application.roomId },
-            include: {
-              property: {
-                include: {
-                  landlord: { include: { user: true } },
+          return application;
+        },
+        {
+          maxWait: 5000, // Wait up to 5s for lock
+          timeout: 10000, // Transaction timeout 10s
+        },
+      )
+      .then(async (application) => {
+        // Trigger notification + email to landlord (best effort)
+        try {
+          // Fetch related data
+          const [tenantRef, room] = await Promise.all([
+            this.prisma.tenant.findUnique({
+              where: { userId: application.tenantId },
+              include: { user: true },
+            }),
+            this.prisma.room.findUnique({
+              where: { id: application.roomId },
+              include: {
+                property: {
+                  include: {
+                    landlord: { include: { user: true } },
+                  },
                 },
               },
-            },
-          }),
-        ]);
+            }),
+          ]);
 
-        if (!tenantRef || !room) {
-          throw new Error('Failed to fetch tenant or room data');
+          if (!tenantRef || !room) {
+            throw new Error('Failed to fetch tenant or room data');
+          }
+
+          const landlord = room.property.landlord.user;
+          const tenantUser = tenantRef.user;
+
+          // Create in-app notification for landlord
+          await this.notificationsService.create({
+            userId: landlord.id,
+            title: `Đơn Đăng Ký Thuê Mới - Phòng ${room.roomNumber}`,
+            content: `${tenantUser.fullName} đã đăng ký thuê phòng "${room.roomNumber}" của bạn.`,
+            notificationType: NotificationType.APPLICATION,
+            relatedEntityId: application.id,
+            isRead: false,
+          });
+
+          // Send email notification to landlord
+          await this.emailService.sendRentalApplicationNotification(
+            landlord.email,
+            landlord.fullName,
+            `Phòng ${room.roomNumber}`,
+            room.property.address,
+            Number(room.pricePerMonth),
+            tenantUser.fullName,
+            tenantUser.email,
+            tenantUser.phoneNumber || 'N/A',
+            application.requestedMoveInDate
+              ? new Date(application.requestedMoveInDate).toLocaleDateString(
+                  'vi-VN',
+                )
+              : undefined,
+            application.message || undefined,
+          );
+
+          this.logger.log(
+            `Notification + Email triggered for landlord ${landlord.id} after rental application ${application.id}`,
+          );
+        } catch (error: unknown) {
+          const msg = (error as Error)?.message ?? String(error);
+          this.logger.warn(
+            `Failed to trigger notification/email for rental application ${application.id}: ${msg}`,
+          );
+          // Don't throw - the application was created successfully, notification is optional
         }
 
-        const landlord = room.property.landlord.user;
-        const tenantUser = tenantRef.user;
-
-        // Create in-app notification for landlord
-        await this.notificationsService.create({
-          userId: landlord.id,
-          title: `Đơn Đăng Ký Thuê Mới - Phòng ${room.roomNumber}`,
-          content: `${tenantUser.fullName} đã đăng ký thuê phòng "${room.roomNumber}" của bạn.`,
-          notificationType: NotificationType.APPLICATION,
-          relatedEntityId: application.id,
-          isRead: false,
+        return plainToClass(RentalApplicationResponseDto, application, {
+          excludeExtraneousValues: true,
         });
-
-        // Send email notification to landlord
-        await this.emailService.sendRentalApplicationNotification(
-          landlord.email,
-          landlord.fullName,
-          `Phòng ${room.roomNumber}`,
-          room.property.address,
-          Number(room.pricePerMonth),
-          tenantUser.fullName,
-          tenantUser.email,
-          tenantUser.phoneNumber || 'N/A',
-          application.requestedMoveInDate
-            ? new Date(application.requestedMoveInDate).toLocaleDateString(
-              'vi-VN',
-            )
-            : undefined,
-          application.message || undefined,
-        );
-
-        this.logger.log(
-          `Notification + Email triggered for landlord ${landlord.id} after rental application ${application.id}`,
-        );
-      } catch (error: unknown) {
-        const msg = (error as Error)?.message ?? String(error);
-        this.logger.warn(
-          `Failed to trigger notification/email for rental application ${application.id}: ${msg}`,
-        );
-        // Don't throw - the application was created successfully, notification is optional
-      }
-
-      return plainToClass(RentalApplicationResponseDto, application, {
-        excludeExtraneousValues: true,
       });
-    });
   }
 
   async findAllApplications(filterDto: FilterRentalApplicationsDto) {
@@ -1349,17 +1352,17 @@ export class ContractsService {
     if (contract) {
       this.logger.debug(
         '[ContractsService] findOne raw: ' +
-        JSON.stringify(
-          {
-            id: contract.id,
-            hasRoom: !!contract.room,
-            hasProperty: !!contract.room?.property,
-            deposit: contract.deposit,
-            depositType: typeof contract.deposit,
-          },
-          null,
-          2,
-        ),
+          JSON.stringify(
+            {
+              id: contract.id,
+              hasRoom: !!contract.room,
+              hasProperty: !!contract.room?.property,
+              deposit: contract.deposit,
+              depositType: typeof contract.deposit,
+            },
+            null,
+            2,
+          ),
       );
     }
 
@@ -1440,8 +1443,6 @@ export class ContractsService {
       excludeExtraneousValues: true,
     });
   }
-
-
 
   async remove(id: string) {
     // Admin-only endpoint (enforced by @Auth decorator in controller)
@@ -1527,10 +1528,15 @@ export class ContractsService {
 
     if (!resident) throw new NotFoundException('Resident not found');
     if (resident.contractId !== contractId)
-      throw new BadRequestException('Resident does not belong to this contract');
+      throw new BadRequestException(
+        'Resident does not belong to this contract',
+      );
 
     const contract = resident.contract;
-    if (contract.tenant.userId !== userId && contract.landlord.userId !== userId) {
+    if (
+      contract.tenant.userId !== userId &&
+      contract.landlord.userId !== userId
+    ) {
       throw new ForbiddenException('Not authorized to remove residents');
     }
 
@@ -1551,7 +1557,11 @@ export class ContractsService {
       where: { id },
       include: {
         tenant: { include: { user: true } },
-        room: { include: { property: { include: { landlord: { include: { user: true } } } } } },
+        room: {
+          include: {
+            property: { include: { landlord: { include: { user: true } } } },
+          },
+        },
       },
     });
 
@@ -1599,7 +1609,7 @@ export class ContractsService {
 
         // Landlord can add damages deductions
         if (terminateDto.deductions) {
-          terminateDto.deductions.forEach(d => {
+          terminateDto.deductions.forEach((d) => {
             totalDeductions += d.amount;
             deductionItems.push(d);
           });
@@ -1611,7 +1621,7 @@ export class ContractsService {
     } else {
       // Normal Termination (End of Contract)
       if (isLandlord && terminateDto.deductions) {
-        terminateDto.deductions.forEach(d => {
+        terminateDto.deductions.forEach((d) => {
           totalDeductions += d.amount;
           deductionItems.push(d);
         });
@@ -1681,7 +1691,6 @@ export class ContractsService {
     };
   }
 
-
   /**
    * Update Handover Checklist (Check-in / Check-out)
    */
@@ -1709,7 +1718,7 @@ export class ContractsService {
     }
 
     // Get current checklist
-    const currentChecklist = ((contract as any).handoverChecklist as any) || {
+    const currentChecklist = (contract as any).handoverChecklist || {
       checkIn: null,
       checkOut: null,
     };

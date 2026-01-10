@@ -36,10 +36,7 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    const maxAttempts = parseInt(
-      process.env.PRISMA_CONNECT_RETRIES || '3',
-      10,
-    );
+    const maxAttempts = parseInt(process.env.PRISMA_CONNECT_RETRIES || '3', 10);
     const delayMs = parseInt(
       process.env.PRISMA_CONNECT_RETRY_DELAY_MS || '500',
       10,

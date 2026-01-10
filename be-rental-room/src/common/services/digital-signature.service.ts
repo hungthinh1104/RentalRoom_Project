@@ -14,7 +14,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 export class DigitalSignatureService {
   private readonly logger = new Logger(DigitalSignatureService.name);
 
-  constructor(private readonly certificateService: CertificateService) { }
+  constructor(private readonly certificateService: CertificateService) {}
 
   /**
    * Tính Hash (SHA-256) của file PDF
@@ -88,7 +88,13 @@ export class DigitalSignatureService {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-    const drawText = (text: string, x: number, y: number, fontRef = font, size = 12) => {
+    const drawText = (
+      text: string,
+      x: number,
+      y: number,
+      fontRef = font,
+      size = 12,
+    ) => {
       page.drawText(text, { x, y, size, font: fontRef });
     };
 

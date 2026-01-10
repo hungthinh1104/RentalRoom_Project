@@ -38,7 +38,7 @@ export class ContractsController {
     private readonly contractSigningService: ContractSigningService,
     private readonly pdfQueueService: PdfQueueService,
     private readonly contractPdfService: ContractPdfService,
-  ) { }
+  ) {}
 
   @Patch(':id/handover')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)

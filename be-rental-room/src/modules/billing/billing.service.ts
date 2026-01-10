@@ -35,7 +35,7 @@ export class BillingService {
     private readonly notificationsService: NotificationsService,
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
-  ) { }
+  ) {}
 
   async createInvoice(
     createInvoiceDto: CreateInvoiceDto,

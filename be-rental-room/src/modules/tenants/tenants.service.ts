@@ -11,7 +11,7 @@ import { plainToClass } from 'class-transformer';
 
 @Injectable()
 export class TenantsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createTenantDto: CreateTenantDto) {
     const tenant = await this.prisma.tenant.create({
