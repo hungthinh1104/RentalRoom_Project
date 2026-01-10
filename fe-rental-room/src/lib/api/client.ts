@@ -9,7 +9,7 @@ const baseUrl =
 	typeof window === 'undefined'
 		? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3005'
 		: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3005';
-const apiPrefix = '/api/proxy'; // Use Next.js proxy route instead of direct backend
+const apiPrefix = '/api/v1'; // Direct backend calls - CSP allows HTTP FQDN
 
 // Custom error class
 export class ApiError extends Error {
