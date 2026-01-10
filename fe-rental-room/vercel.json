@@ -6,7 +6,7 @@
         },
         {
             "source": "/api/v1/:path*",
-            "destination": "http://rental-room-api.southeastasia.azurecontainer.io:3000/api/v1/:path*"
+            "destination": "https://rental-room-api.azurewebsites.net/api/v1/:path*"
         }
     ],
     "headers": [
