@@ -24,15 +24,15 @@ export async function proxy(request: NextRequest) {
 
 	// ======== ROLE-BASED ACCESS CONTROL ========
 	// Admin routes - ONLY for ADMIN role
-	else if (pathname.startsWith("/dashboard/admin") && token?.role !== "ADMIN") {
+	else if (pathname.startsWith("/dashboard/admin") && token && token?.role !== "ADMIN") {
 		response = NextResponse.redirect(new URL("/unauthorized", request.url));
 	}
 	// Landlord routes - ONLY for LANDLORD role
-	else if (pathname.startsWith("/dashboard/landlord") && token?.role !== "LANDLORD") {
+	else if (pathname.startsWith("/dashboard/landlord") && token && token?.role !== "LANDLORD") {
 		response = NextResponse.redirect(new URL("/unauthorized", request.url));
 	}
 	// Tenant routes - ONLY for TENANT role
-	else if (pathname.startsWith("/dashboard/tenant") && token?.role !== "TENANT") {
+	else if (pathname.startsWith("/dashboard/tenant") && token && token?.role !== "TENANT") {
 		response = NextResponse.redirect(new URL("/unauthorized", request.url));
 	}
 	// Redirect signed-in users away from auth pages (to their appropriate dashboard)

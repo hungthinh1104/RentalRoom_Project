@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Server-side proxy can call HTTP without mixed-content issues
+// Local/production proxy for /api/v1/* to backend API
 const BACKEND_URL = process.env.BACKEND_API_URL || 'https://rental-room-api.azurewebsites.net';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ path: string[] }> }
+) {
+  const { path } = await params;
+  const pathStr = path.join('/');
+  const url = new URL(request.url);
+  const queryString = url.search;
+
+  const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'GET',
+      headers: {
+        'Cookie': request.headers.get('cookie') || '',
+      },
+      credentials: 'include',
+    });
+    const data = await response.json().catch(() => ({}));
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    console.error('Proxy GET error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
 
 export async function POST(
   request: NextRequest,
@@ -11,9 +37,8 @@ export async function POST(
   const pathStr = path.join('/');
   const url = new URL(request.url);
   const queryString = url.search;
-  
+
   const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
-  
   try {
     const body = await request.json().catch(() => ({}));
     const response = await fetch(targetUrl, {
@@ -25,46 +50,11 @@ export async function POST(
       body: JSON.stringify(body),
       credentials: 'include',
     });
-
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Proxy error:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
-) {
-  const { path } = await params;
-  const pathStr = path.join('/');
-  const url = new URL(request.url);
-  const queryString = url.search;
-  
-  const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
-  
-  try {
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
-      credentials: 'include',
-    });
-
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
-  } catch (error) {
-    console.error('Proxy error:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    console.error('Proxy POST error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -76,9 +66,8 @@ export async function PUT(
   const pathStr = path.join('/');
   const url = new URL(request.url);
   const queryString = url.search;
-  
+
   const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
-  
   try {
     const body = await request.json().catch(() => ({}));
     const response = await fetch(targetUrl, {
@@ -90,15 +79,11 @@ export async function PUT(
       body: JSON.stringify(body),
       credentials: 'include',
     });
-
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Proxy error:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    console.error('Proxy PUT error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -110,9 +95,8 @@ export async function DELETE(
   const pathStr = path.join('/');
   const url = new URL(request.url);
   const queryString = url.search;
-  
+
   const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
-  
   try {
     const response = await fetch(targetUrl, {
       method: 'DELETE',
@@ -121,14 +105,10 @@ export async function DELETE(
       },
       credentials: 'include',
     });
-
     const data = await response.json().catch(() => ({}));
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error('Proxy error:', error);
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    );
+    console.error('Proxy DELETE error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
