@@ -1,0 +1,58 @@
+
+// ============================================================================
+// PCCC (FIRE SAFETY COMPLIANCE) - Luật 55/2024/QH15
+// ============================================================================
+
+enum PCCCPropertyType {
+  NHA_TRO           // Nhà trọ
+  CHUNG_CU_MINI     // Chung cư mini
+  KINH_DOANH        // Nhà ở kết hợp kinh doanh
+}
+
+enum PCCCStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+model PCCCReport {
+  id              String            @id @default(uuid()) @db.Uuid
+  propertyId      String            @map("property_id") @db.Uuid
+  landlordId      String            @map("landlord_id") @db.Uuid
+  
+  // Property specifications
+  propertyType    PCCCPropertyType  @map("property_type")
+  floors          Int
+  area            Decimal           @db.Decimal(10, 2)
+  volume          Decimal?          @db.Decimal(10, 2)
+  laneWidth       Decimal?          @map("lane_width") @db.Decimal(5, 2)
+  hasCage         Boolean           @default(false) @map("has_cage")
+  
+  // Generated requirements (JSON)
+  requirements    Json              // Fire extinguishers, alarms, etc.
+  
+  // Compliance
+  complianceScore Int               @map("compliance_score") // 0-100
+  status          PCCCStatus        @default(DRAFT)
+  
+  // Generated files
+  pdfUrl          String?           @map("pdf_url") @db.Text
+  qrCode          String?           @map("qr_code") @db.Text
+  
+  // Validity
+  expiryDate      DateTime          @map("expiry_date") // Valid for 6 months
+  
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  landlord        Landlord          @relation(fields: [landlordId], references: [userId])
+  
+  @@index([propertyId])
+  @@index([landlordId])
+  @@index([status])
+  @@index([expiryDate])
+  @@map("pccc_report")
+}

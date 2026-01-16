@@ -55,7 +55,7 @@ done
 
 # Backend cleanup
 echo "🔧 Cleaning backend..."
-cd be-rental-room
+cd rentalroom-be
 
 # Remove debug/test scripts
 DEBUG_FILES=(

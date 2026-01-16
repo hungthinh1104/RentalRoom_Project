@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database with pgvector
   postgres:
@@ -61,7 +59,7 @@ services:
   # Backend API
   backend:
     build:
-      context: ./be-rental-room
+      context: ./rentalroom-be
       dockerfile: Dockerfile
       cache_from:
         - node:20-alpine

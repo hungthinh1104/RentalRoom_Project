@@ -12,8 +12,8 @@ This is a full-stack application designed for managing rental properties, contra
 
 ```
 rental-room/
-├── fe-rental-room/          # Next.js 16 + React 19 frontend
-├── be-rental-room/          # NestJS 11 backend API
+├── rentalroom-fe/          # Next.js 16 + React 19 frontend
+├── rentalroom-be/          # NestJS 11 backend API
 ├── docker-compose.yml       # Local development setup
 └── docs/                    # Additional documentation
 ```
@@ -83,7 +83,7 @@ docker-compose up -d
 #### 3. Setup Backend
 
 ```bash
-cd be-rental-room
+cd rentalroom-be
 
 # Install dependencies
 npm install --legacy-peer-deps
@@ -109,7 +109,7 @@ API Documentation (Swagger): `http://localhost:3005/api/docs`
 #### 4. Setup Frontend
 
 ```bash
-cd fe-rental-room
+cd rentalroom-fe
 
 # Install dependencies
 npm install
@@ -126,7 +126,7 @@ Frontend will be available at: `http://localhost:3000`
 
 ## 📦 Project Structure
 
-### Backend (`be-rental-room/`)
+### Backend (`rentalroom-be/`)
 
 ```
 src/
@@ -145,7 +145,7 @@ src/
 └── database/            # Prisma schema & migrations
 ```
 
-### Frontend (`fe-rental-room/`)
+### Frontend (`rentalroom-fe/`)
 
 ```
 src/
@@ -217,7 +217,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 ```bash
 # Build optimized backend image (1.31GB)
-cd be-rental-room
+cd rentalroom-be
 docker build -t rental-room-api:latest .
 
 # Run with docker-compose
@@ -254,7 +254,7 @@ See [PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md) for detailed deployme
 ### Backend Tests
 
 ```bash
-cd be-rental-room
+cd rentalroom-be
 
 # Run all tests
 npm test
@@ -271,7 +271,7 @@ npm run test:e2e
 ### Frontend Tests
 
 ```bash
-cd fe-rental-room
+cd rentalroom-fe
 
 # Lint check
 npm run lint
@@ -282,12 +282,12 @@ npm run build
 
 ## 📚 Documentation
 
-- [Backend API Documentation](./be-rental-room/README.md)
-- [Frontend Documentation](./fe-rental-room/README.md)
+- [Backend API Documentation](./rentalroom-be/README.md)
+- [Frontend Documentation](./rentalroom-fe/README.md)
 - [Architecture Diagram](./ARCHITECTURE_DIAGRAM.txt)
 - [Production Deployment Guide](./PRODUCTION_DEPLOYMENT.md)
-- [API Reference for Frontend](./fe-rental-room/docs/API_FOR_FRONTEND.md)
-- [Design System Rules](./fe-rental-room/docs/DESIGN_SYSTEM_RULES.md)
+- [API Reference for Frontend](./rentalroom-fe/docs/API_FOR_FRONTEND.md)
+- [Design System Rules](./rentalroom-fe/docs/DESIGN_SYSTEM_RULES.md)
 
 ## 🛠️ Development Tools
 
@@ -295,7 +295,7 @@ npm run build
 
 ```bash
 # Backend
-cd be-rental-room
+cd rentalroom-be
 npm run start:dev          # Start with hot-reload
 npm run build              # Build for production
 npm run format             # Format code with Prettier
@@ -303,7 +303,7 @@ npm run lint               # Lint and fix code
 npm run seed               # Seed database
 
 # Frontend
-cd fe-rental-room
+cd rentalroom-fe
 npm run dev                # Start development server
 npm run build              # Build for production
 npm run start              # Start production server
@@ -313,7 +313,7 @@ npm run lint               # Lint code
 ### Database Management
 
 ```bash
-cd be-rental-room
+cd rentalroom-be
 
 # Create migration
 npx prisma migrate dev --name migration_name

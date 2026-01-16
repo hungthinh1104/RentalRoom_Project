@@ -27,7 +27,7 @@ az account show &> /dev/null || {
 
 # Build backend
 echo "📦 Building backend..."
-cd be-rental-room
+cd rentalroom-be
 npm ci
 npx prisma generate
 npm run build

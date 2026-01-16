@@ -1,0 +1,1674 @@
+// PRISMA SCHEMA - ROOM RENTAL MANAGEMENT SYSTEM (PHASE 3 - WITH AI)
+// This file is the single source of truth for your database schema
+// Version: 3.0 - Production Ready with AI Features
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  TENANT
+  LANDLORD
+  ADMIN
+  SYSTEM
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  STUDIO
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  UNAVAILABLE     // Maintenance, Police Lock, Quarantine
+  DEPOSIT_PENDING // Reserved, Waiting for deposit
+  MAINTENANCE     // Legacy support
+  RESERVED        // Legacy support
+}
+
+enum AmenityType {
+  AC
+  FRIDGE
+  WASHER
+  BED
+  WIFI
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  COMPLETED // Contract created and activated
+}
+
+enum ContractStatus {
+  DRAFT
+  PENDING_SIGNATURE
+  DEPOSIT_PENDING
+  ACTIVE
+  TERMINATED
+  EXPIRED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum ItemType {
+  RENT
+  UTILITY
+  SERVICE
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOMO
+  ZALOPAY
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum ServiceType {
+  ELECTRICITY
+  WATER
+  INTERNET
+  PARKING
+  CLEANING
+}
+
+enum BillingMethod {
+  FIXED
+  METERED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MaintenanceCategory {
+  PLUMBING
+  ELECTRICAL
+  APPLIANCE
+  OTHER
+}
+
+enum MaintenanceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  PAYMENT
+  CONTRACT
+  MAINTENANCE
+  APPLICATION
+  SYSTEM
+  COMPLAINT_CREATED
+  COMPLAINT_RESPONDED
+}
+
+enum FeedbackType {
+  BUG_REPORT
+  FEATURE_REQUEST
+  GENERAL_INQUIRY
+  OTHER
+}
+
+enum FeedbackStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum UserAiFeedback {
+  HELPFUL
+  NOT_HELPFUL
+  INACCURATE
+  OFFENSIVE
+}
+
+// ============================================================================
+// CONTRACT MANAGEMENT (Added Phase 3)
+// ============================================================================
+
+enum ContractType {
+  RENTAL_AGREEMENT
+  DEPOSIT_RECEIPT
+  HANDOVER_CHECKLIST
+  SERVICE_AGREEMENT
+  LIQUIDATION_MINUTES // Biên bản thanh lý
+  PCCC_APPLICATION    // 🔥 NEW: Hồ sơ PCCC
+  PCCC_CHECKLIST      // Checklist tự đánh giá
+}
+
+enum TemplateStatus {
+  DRAFT      // Chưa review
+  REVIEWED   // PCCC expert OK
+  ACTIVE     // Live production
+  DEPRECATED // Giữ history
+}
+
+model ContractTemplate {
+  id              String        @id @default(uuid()) @db.Uuid
+  type            ContractType  @map("type")
+  name            String        @db.VarChar(100)
+  title           String        @db.VarChar(200)
+  content         String        @db.Text
+  version         Int           @default(1)
+  status          TemplateStatus @default(DRAFT)  // 🔥 CRITICAL
+  legalDisclaimer String        @default("Mẫu tham khảo, không thay thế xác nhận chính thức Cảnh sát PCCC") @map("legal_disclaimer") @db.Text
+  pcccPartner     String?       @map("pccc_partner") // "618 Architects"
+  description     String?       @db.Text
+  isActive        Boolean       @default(false) @map("is_active")   // Only ACTIVE templates
+  isDefault       Boolean       @default(false) @map("is_default")
+  
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  createdBy       String?       @map("created_by") @db.Uuid
+  reviewedBy      String?       @map("reviewed_by") @db.Uuid           // 🔥 PCCC expert
+  reviewDate      DateTime?     @map("review_date")
+  
+  // Relations
+  deletedAt       DateTime?     @map("deleted_at")
+  audits          ContractTemplateAudit[]
+  userAgreements  UserAgreement[]
+  
+  @@unique([name, version])
+  @@index([type, status])
+  @@index([isActive])
+  @@map("contract_template")
+}
+
+model UserAgreement {
+  id          String   @id @default(uuid()) @db.Uuid
+  templateId  String   @map("template_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  ipAddress   String?  @map("ip_address") @db.VarChar(50)
+  userAgent   String?  @map("user_agent") @db.Text
+  phone       String?  @map("phone") @db.VarChar(20) // Audit phone
+  acceptedAt  DateTime @default(now()) @map("accepted_at")
+  
+  // Relations
+  template ContractTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id])
+
+  @@index([templateId])
+  @@index([userId])
+  @@map("user_agreement")
+}
+
+model ContractTemplateAudit {
+  id          String   @id @default(uuid()) @db.Uuid
+  templateId  String   @map("template_id") @db.Uuid
+  action      String   @db.VarChar(50) // EDIT, ACTIVATE, PREVIEW, DELETE, CREATE
+  oldContent  String?  @map("old_content") @db.Text
+  newContent  String?  @map("new_content") @db.Text
+  userId      String   @map("user_id") @db.Uuid
+  timestamp   DateTime @default(now())
+
+  // Relations
+  template ContractTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id])
+
+  @@index([templateId])
+  @@index([userId])
+  @@map("contract_template_audit")
+}
+
+// ============================================================================
+// INCOME-BASED TAX ENUMS (Phase 3)
+// ============================================================================
+
+enum TaxCategory {
+  TAXABLE // Tính thuế
+  NON_TAXABLE // Không tính (deposit refundable, utilities passthrough)
+  CONDITIONAL // Tùy điều kiện (cần xác định thủ công)
+}
+
+enum IncomeType {
+  RENTAL // Tiền thuê + utilities (from invoices)
+  PENALTY // Phạt, deposit forfeit
+  DEPOSIT // Tiền cọc (refundable)
+  OTHER // Thu nhập khác
+}
+
+enum ExpenseType {
+  ELECTRICITY
+  WATER
+  MAINTENANCE
+  TAX_PAID
+  INSURANCE
+  OTHER
+}
+
+enum TaxStatus {
+  BELOW_THRESHOLD // Dưới ngưỡng
+  MUST_DECLARE // Phải khai
+  DECLARED // Đã khai
+  PAID // Đã nộp
+}
+
+//============================================================================
+// CORE MODELS
+// ============================================================================
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  fullName     String   @map("full_name") @db.VarChar(100)
+  email        String   @unique @db.VarChar(100)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  phoneNumber  String?  @map("phone_number") @db.VarChar(20)
+  avatarUrl    String?  @map("avatar_url") @db.VarChar(500)
+  role         UserRole
+
+  // Email Verification
+  emailVerified      Boolean   @default(false) @map("email_verified")
+  verificationCode   String?   @map("verification_code") @db.VarChar(6)
+  verificationExpiry DateTime? @map("verification_expiry")
+
+  // Ban/Unban (Admin User Management)
+  isBanned     Boolean   @default(false) @map("is_banned")
+  bannedAt     DateTime? @map("banned_at")
+  bannedReason String?   @map("banned_reason") @db.VarChar(500)
+  bannedBy     String?   @map("banned_by") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant                  Tenant?
+  landlord                Landlord?
+  notifications           Notification[]
+  aiInteractionLogs       AiInteractionLog[]
+  assignedMaintenanceReqs MaintenanceRequest[] @relation("AssignedMaintenanceRequests")
+  terminatedContracts     Contract[]           @relation("ContractTerminatedBy")
+  systemFeedbacks         SystemFeedback[]
+  consentLogs             ConsentLog[] // PDPL compliance (Phase 2)
+  contractTemplateAudits  ContractTemplateAudit[]
+  userAgreements          UserAgreement[]
+
+  @@index([email])
+  @@map("user")
+}
+
+model Tenant {
+  userId            String    @id @map("user_id") @db.Uuid
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
+  citizenId         String?   @map("citizen_id") @db.VarChar(20)
+  emergencyContact  String?   @map("emergency_contact") @db.VarChar(100)
+  budgetMin         Decimal?  @map("budget_min") @db.Decimal(10, 2)
+  budgetMax         Decimal?  @map("budget_max") @db.Decimal(10, 2)
+  preferredLocation String?   @map("preferred_location") @db.VarChar(100)
+  employmentStatus  String?   @map("employment_status") @db.VarChar(50)
+  isVerified        Boolean   @default(false) @map("is_verified") // KYC Status
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rentalApplications  RentalApplication[]
+  contracts           Contract[]
+  maintenanceRequests MaintenanceRequest[]
+  payments            Payment[]
+  invoices            Invoice[]
+  roomReviews         RoomReview[]
+  aiProfile           TenantAiProfile?
+  favoriteRooms       FavoriteRoom[]
+
+  // Income-Based Tax
+  incomes Income[]
+
+  @@index([userId])
+  @@map("tenant")
+}
+
+model Landlord {
+  userId        String  @id @map("user_id") @db.Uuid
+  citizenId     String? @map("citizen_id") @db.VarChar(20)
+  bankAccount   String? @map("bank_account") @db.VarChar(50)
+  bankName      String? @map("bank_name") @db.VarChar(100)
+  address       String? @db.Text
+  propertyCount Int     @default(0) @map("property_count") // NOTE: Update via app logic or trigger
+  rating        Float?
+  verified      Boolean @default(false)
+
+  paymentConfig PaymentConfig?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  properties         Property[]
+  rentalApplications RentalApplication[]
+  contracts          Contract[]
+  revenueSnapshots   LandlordRevenueSnapshot[] // Tax dashboard (Phase 2)
+  rentalUnits        RentalUnit[]              @relation("LandlordRentalUnits")
+  taxYearSummaries   TaxYearSummary[]          @relation("LandlordTaxSummaries")
+  pcccReports        PCCCReport[]
+
+  @@index([userId])
+  @@index([verified])
+  @@map("landlord")
+}
+
+model Property {
+  id           String       @id @default(uuid()) @db.Uuid
+  landlordId   String       @map("landlord_id") @db.Uuid
+  name         String       @db.VarChar(100)
+  address      String       @db.Text
+  city         String       @db.VarChar(50) // Province / City (e.g., TP. Hồ Chí Minh)
+  cityCode     String?      @map("city_code") @db.VarChar(20) // Optional administrative code
+  ward         String       @db.VarChar(50) // Ward / Commune / Township (e.g., Phường Võ Thị Sáu)
+  wardCode     String?      @map("ward_code") @db.VarChar(20) // Optional administrative code
+  propertyType PropertyType @map("property_type")
+  description  String?      @db.Text
+  images       String[]     @default([]) @map("images")
+
+  // Soft Delete
+  deletedAt DateTime? @map("deleted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  landlord Landlord  @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  rooms    Room[]
+  services Service[]
+  pcccReports PCCCReport[]
+
+  @@unique([landlordId, name]) // Prevent duplicate property names per landlord
+  @@index([landlordId])
+  @@index([city, ward]) // Optimized index for Province -> Ward searches
+  @@index([deletedAt])
+  @@map("property")
+}
+
+model Room {
+  id            String     @id @default(uuid()) @db.Uuid
+  propertyId    String     @map("property_id") @db.Uuid
+  roomNumber    String     @map("room_number") @db.VarChar(20)
+  area          Float
+  pricePerMonth Decimal    @map("price_per_month") @db.Decimal(10, 2)
+  deposit       Decimal    @db.Decimal(10, 2)
+  status        RoomStatus
+  description   String?    @db.Text
+  maxOccupants  Int?       @map("max_occupants")
+
+  // Lean State Management
+  unavailableReason String? @map("unavailable_reason") @db.VarChar(500)
+  metadata          Json?
+
+  // Soft Delete
+  deletedAt DateTime? @map("deleted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  property            Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  images              RoomImage[]
+  amenities           RoomAmenity[]
+  rentalApplications  RentalApplication[]
+  contracts           Contract[]
+  maintenanceRequests MaintenanceRequest[]
+  reviews             RoomReview[]
+  embedding           RoomEmbedding?
+  aiInteractionLogs   AiInteractionLog[]   @relation("ClickedRoom")
+  favoritedBy         FavoriteRoom[]
+
+  @@unique([propertyId, roomNumber])
+  @@index([propertyId, status]) // Frequent query: rooms by property + status
+  @@index([pricePerMonth]) // Frequent query: search by price
+  @@index([status])
+  @@index([deletedAt])
+  @@map("room")
+}
+
+model RoomImage {
+  id           String  @id @default(uuid()) @db.Uuid
+  roomId       String  @map("room_id") @db.Uuid
+  imageUrl     String  @map("image_url") @db.Text
+  fileId       String? @map("file_id") @db.VarChar(255) // ImageKit fileId for deletion
+  displayOrder Int     @map("display_order")
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, displayOrder]) // Prevent duplicate order per room
+  @@index([roomId])
+  @@index([fileId]) // Index for faster deletion lookups
+  @@map("room_image")
+}
+
+model RoomAmenity {
+  id          String      @id @default(uuid()) @db.Uuid
+  roomId      String      @map("room_id") @db.Uuid
+  amenityType AmenityType @map("amenity_type")
+  quantity    Int
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_amenity")
+}
+
+model RentalApplication {
+  id                  String            @id @default(uuid()) @db.Uuid
+  roomId              String            @map("room_id") @db.Uuid
+  tenantId            String            @map("tenant_id") @db.Uuid
+  landlordId          String            @map("landlord_id") @db.Uuid
+  contractId          String?           @map("contract_id") @db.Uuid // Link to created contract
+  applicationDate     DateTime          @default(now()) @map("application_date") @db.Date
+  status              ApplicationStatus @default(PENDING)
+  requestedMoveInDate DateTime?         @map("requested_move_in_date") @db.Date
+  message             String?           @db.Text
+  rejectionReason     String?           @map("rejection_reason") @db.Text // Why rejected
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  reviewedAt DateTime? @map("reviewed_at")
+
+  // Relations
+  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant   Tenant    @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  landlord Landlord  @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  contract Contract?
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@index([landlordId])
+  @@index([status])
+  @@map("rental_application")
+}
+
+model Contract {
+  id             String         @id @default(uuid()) @db.Uuid
+  applicationId  String         @unique @map("application_id") @db.Uuid
+  roomId         String         @map("room_id") @db.Uuid
+  tenantId       String         @map("tenant_id") @db.Uuid
+  landlordId     String         @map("landlord_id") @db.Uuid
+  contractNumber String         @unique @map("contract_number") @db.VarChar(50)
+  startDate      DateTime       @map("start_date") @db.Date
+  endDate        DateTime       @map("end_date") @db.Date
+  monthlyRent    Decimal        @map("monthly_rent") @db.Decimal(10, 2)
+  deposit        Decimal        @map("deposit_amount") @db.Decimal(10, 2)
+  status         ContractStatus @default(ACTIVE)
+  eSignatureUrl  String?        @map("e_signature_url") @db.Text
+
+  // Digital Signature Fields (Chữ ký số - PKI)
+  pdfUrl          String? @map("pdf_url") @db.Text // Original PDF path
+  pdfHash         String? @map("pdf_hash") @db.VarChar(64) // SHA-256 hash của PDF gốc
+  signedUrl       String? @map("signed_url") @db.Text // Signed PDF path
+  signatureStatus String? @map("signature_status") @db.VarChar(50) // PENDING_SIGNATURE, SIGNED, VERIFIED
+
+  // Payment & Deposit (Strict Flow)
+  depositDeadline DateTime? @map("deposit_deadline")
+  paymentRef      String?   @map("payment_ref") @db.VarChar(50)
+
+  // Negotiation Logic
+  lastNegotiationNote String? @map("last_negotiation_note") @db.Text
+
+  // Termination tracking
+  terminationReason       String?  @map("termination_reason") @db.Text
+  terminatedByUserId      String?  @map("terminated_by_user_id") @db.Uuid
+  earlyTerminationPenalty Decimal? @default(0) @map("early_termination_penalty") @db.Decimal(10, 2)
+  noticeDays              Int?     @default(0) @map("notice_days")
+  terminationApproved     Boolean  @default(false) @map("termination_approved")
+
+  // Legal Snapshot Link (MVP)
+  snapshotId String? @map("snapshot_id") @db.Uuid
+
+  // Soft Delete (Important for legal/audit trail)
+  deletedAt DateTime? @map("deleted_at")
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  signedAt       DateTime? @map("signed_at") // Landlord signature
+  tenantSignedAt DateTime? @map("tenant_signed_at") // Tenant signature
+  terminatedAt   DateTime? @map("terminated_at")
+
+  // Termination & Handover (New Features)
+  terminationDetails Json? @map("termination_details") // { reason, deductions: [], refundAmount }
+  handoverChecklist  Json? @map("handover_checklist")  // { checkIn: {}, checkOut: {} }
+
+  // Terms and Residents
+  paymentDay   Int                @default(5) @map("payment_day")
+  terms        String?            @db.Text
+  maxOccupants Int?               @map("max_occupants")
+  residents    ContractResident[]
+
+  // Relations
+  application   RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  room          Room              @relation(fields: [roomId], references: [id])
+  tenant        Tenant            @relation(fields: [tenantId], references: [userId])
+  landlord      Landlord          @relation(fields: [landlordId], references: [userId])
+  terminatedBy  User?             @relation("ContractTerminatedBy", fields: [terminatedByUserId], references: [id], onDelete: SetNull)
+  invoices      Invoice[]
+  reviews       RoomReview[]
+  meterReadings MeterReading[]    @relation("MeterReadings")
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@index([landlordId])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([terminatedByUserId])
+  // Performance: PCCC expiration monitoring (10-20x faster)
+  @@index([endDate, status])
+  @@index([status, endDate])
+  @@map("contract")
+}
+
+model ContractResident {
+  id           String  @id @default(uuid()) @db.Uuid
+  contractId   String  @map("contract_id") @db.Uuid
+  fullName     String  @map("full_name") @db.VarChar(100)
+  phoneNumber  String? @map("phone_number") @db.VarChar(20)
+  citizenId    String? @map("citizen_id") @db.VarChar(20)
+  relationship String? @db.VarChar(50) // SPOUSE, CHILD, FRIEND, OTHER
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([contractId])
+  @@map("contract_resident")
+}
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  contractId    String        @map("contract_id") @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  invoiceNumber String        @unique @map("invoice_number") @db.VarChar(50) // Must be unique
+  issueDate     DateTime      @map("issue_date") @db.Date
+  dueDate       DateTime      @map("due_date") @db.Date
+  totalAmount   Decimal       @map("total_amount") @db.Decimal(10, 2)
+  status        InvoiceStatus @default(PENDING)
+
+  // Soft Delete (Important for accounting)
+  deletedAt DateTime? @map("deleted_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  paidAt    DateTime? @map("paid_at")
+
+  // Relations
+  contract  Contract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  tenant    Tenant            @relation(fields: [tenantId], references: [userId])
+  lineItems InvoiceLineItem[]
+  income    Income? // Auto-created income when paid
+  payments  Payment[]
+  snapshot  LegalSnapshot? @relation("InvoiceSnapshot", fields: [snapshotId], references: [id])
+
+  snapshotId String? @map("snapshot_id") @db.Uuid
+
+  @@index([contractId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([deletedAt])
+  @@index([snapshotId])
+  // Performance: Debt recovery overdue queries (15-20x faster)
+  @@index([dueDate, status])
+  @@index([status, dueDate])
+  @@map("invoice")
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  serviceId   String?  @map("service_id") @db.Uuid
+  itemType    ItemType @map("item_type")
+  description String?  @db.Text
+  quantity    Decimal  @db.Decimal(10, 2)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  amount      Decimal  @db.Decimal(10, 2)
+
+  // Relations
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  service Service? @relation(fields: [serviceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([serviceId])
+  @@map("invoice_line_item")
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  invoiceId     String        @map("invoice_id") @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod PaymentMethod @map("payment_method")
+  paymentDate   DateTime      @default(now()) @map("payment_date")
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique @map("transaction_id") @db.VarChar(100) // Must be unique
+
+  // Legal Snapshot Link (MVP)
+  snapshotId String? @map("snapshot_id") @db.Uuid
+
+  // Soft Delete (Important for accounting)
+  deletedAt DateTime? @map("deleted_at")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  paidAt    DateTime? @map("paid_at")
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [userId])
+
+  @@index([invoiceId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([deletedAt])
+  // Performance: Transaction reconciliation (10-15x faster)
+  @@index([transactionId, status])
+  @@map("payment")
+}
+
+model Service {
+  id            String        @id @default(uuid()) @db.Uuid
+  propertyId    String        @map("property_id") @db.Uuid
+  serviceName   String        @map("service_name") @db.VarChar(50)
+  serviceType   ServiceType   @map("service_type")
+  billingMethod BillingMethod @map("billing_method")
+  unitPrice     Decimal       @map("unit_price") @db.Decimal(10, 2)
+  unit          String?       @db.VarChar(20)
+  description   String?       @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  invoiceLineItems InvoiceLineItem[]
+  meterReadings    MeterReading[]
+
+  @@index([propertyId])
+  @@map("service")
+}
+
+model MaintenanceRequest {
+  id          String              @id @default(uuid()) @db.Uuid
+  roomId      String              @map("room_id") @db.Uuid
+  tenantId    String              @map("tenant_id") @db.Uuid
+  title       String              @db.VarChar(200)
+  description String              @db.Text
+  priority    MaintenancePriority @default(MEDIUM)
+  category    MaintenanceCategory
+  status      MaintenanceStatus   @default(PENDING)
+  requestDate DateTime            @default(now()) @map("request_date")
+  assignedTo  String?             @map("assigned_to") @db.Uuid
+  cost        Decimal?            @db.Decimal(10, 2)
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  // Feedback
+  rating     Int? // Rating 1-5
+  feedback   String?   @db.Text
+  feedbackAt DateTime? @map("feedback_at")
+
+  // Relations
+  room         Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tenant       Tenant @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  assignedUser User?  @relation("AssignedMaintenanceRequests", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([priority])
+  @@index([status, updatedAt]) // Optimized for completed maintenance reporting
+  @@map("maintenance_request")
+}
+
+model RoomReview {
+  id                String  @id @default(uuid()) @db.Uuid
+  tenantId          String  @map("tenant_id") @db.Uuid
+  roomId            String  @map("room_id") @db.Uuid
+  contractId        String  @map("contract_id") @db.Uuid
+  rating            Int
+  cleanlinessRating Int     @map("cleanliness_rating")
+  locationRating    Int     @map("location_rating")
+  valueRating       Int     @map("value_rating")
+  comment           String? @db.Text
+
+  // Enhanced Review Features
+  reviewImages  String[]  @default([]) @map("review_images")
+  landlordReply String?   @map("landlord_reply") @db.Text
+  repliedAt     DateTime? @map("replied_at")
+  isVisible     Boolean   @default(true) @map("is_visible")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant   Tenant   @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([tenantId])
+  @@map("room_review")
+}
+
+model FavoriteRoom {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, roomId])
+  @@index([tenantId])
+  @@index([roomId])
+  @@map("favorite_room")
+}
+
+model Notification {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  title            String           @db.VarChar(100)
+  content          String           @db.Text
+  notificationType NotificationType @map("notification_type")
+  relatedEntityId  String?          @map("related_entity_id") @db.Uuid
+  isRead           Boolean          @default(false) @map("is_read")
+  sentAt           DateTime         @default(now()) @map("sent_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  readAt           DateTime?        @map("read_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([notificationType])
+  @@map("notification")
+}
+
+model SystemFeedback {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  type        FeedbackType
+  title       String         @db.VarChar(200)
+  description String         @db.Text
+  rating      Int? // Optional 1-5 rating
+  status      FeedbackStatus @default(PENDING)
+  images      String[]       @default([]) // URLs of attached images
+  response    String?        @db.Text // Response from admin/landlord
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@map("system_feedback")
+}
+
+model PaymentConfig {
+  id         String  @id @default(uuid()) @db.Uuid
+  landlordId String  @unique @map("landlord_id") @db.Uuid
+  provider   String  @default("SEPAY") @db.VarChar(20)
+  isActive   Boolean @default(true) @map("is_active")
+
+  // SePay Credentials (token from env, only need bank info)
+  accountNumber String @map("account_number") @db.VarChar(50)
+  bankName      String @map("bank_name") @db.VarChar(100)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  landlord Landlord @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+
+  @@index([landlordId])
+  @@map("payment_config")
+}
+
+// ============================================================================
+// AI MODULE - SEMANTIC SEARCH & RECOMMENDATIONS
+// ============================================================================
+
+// 1. Vector Embeddings for Rooms (Semantic Search)
+model RoomEmbedding {
+  id     String @id @default(uuid()) @db.Uuid
+  roomId String @unique @map("room_id") @db.Uuid
+
+  // Text used to generate vector (auto-generated from Room data)
+  rawText String @map("raw_text") @db.Text
+
+  // Vector 768 dimensions (Gemini text-embedding-004)
+  // NOTE: Requires pgvector extension: CREATE EXTENSION IF NOT EXISTS vector;
+  embedding Unsupported("vector(768)")?
+
+  // Metadata for tracking
+  embeddingModel String   @default("gemini-text-embedding-004") @map("embedding_model") @db.VarChar(50)
+  lastUpdated    DateTime @updatedAt @map("last_updated")
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_embedding")
+}
+
+// 2. Tenant AI Profile (Personalized Recommendations)
+model TenantAiProfile {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @map("tenant_id") @db.Uuid
+
+  // Search history (limit to 50 most recent queries)
+  // NOTE: Consider moving to separate table if grows large
+  searchHistory String[] @default([]) @map("search_history")
+
+  // Preference vector (average of search queries)
+  preferenceVector Unsupported("vector(768)")? @map("preference_vector")
+
+  // Metadata
+  searchCount  Int      @default(0) @map("search_count")
+  lastSearched DateTime @default(now()) @map("last_searched")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tenant Tenant @relation(fields: [tenantId], references: [userId], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([lastSearched])
+  @@map("tenant_ai_profile")
+}
+
+// 3. Search Cache (PostgreSQL cache for vector queries)
+// NOTE: Use Redis for hot cache, PostgreSQL for persistence
+model SearchCache {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Original query (lowercase, trimmed for normalization)
+  query String @unique @db.VarChar(500)
+
+  // Query vector
+  queryVector Unsupported("vector(768)")? @map("query_vector")
+
+  // Metadata
+  hitCount  Int      @default(1) @map("hit_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  lastUsed  DateTime @default(now()) @map("last_used")
+
+  // Auto-expire after 7 days (handled by DB or cron job)
+  expiresAt DateTime @default(dbgenerated("now() + INTERVAL '7 DAYS'")) @map("expires_at")
+
+  @@index([query])
+  @@index([lastUsed])
+  @@index([hitCount(sort: Desc)])
+  @@map("search_cache")
+}
+
+// 4. AI Interaction Log (Analytics & Improvement)
+model AiInteractionLog {
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @map("user_id") @db.Uuid
+
+  // Action type
+  action String @db.VarChar(50)
+  // VIEW_ROOM, LIKE_ROOM, SEARCH, BOOK_ROOM, SEMANTIC_SEARCH, HYBRID_SEARCH
+
+  // Input data (JSON)
+  inputData Json? @map("input_data")
+
+  // AI response (JSON)
+  aiResponse Json? @map("ai_response")
+
+  // Metadata
+  searchType     String? @map("search_type") @db.VarChar(20) // SEMANTIC, HYBRID, KEYWORD
+  resultCount    Int?    @map("result_count")
+  responseTimeMs Int?    @map("response_time_ms")
+  clickedRoomId  String? @map("clicked_room_id") @db.Uuid
+
+  // AI Feedback
+  userFeedback   UserAiFeedback? @map("user_feedback")
+  feedbackReason String?         @map("feedback_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user        User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clickedRoom Room? @relation("ClickedRoom", fields: [clickedRoomId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([searchType])
+  @@index([createdAt])
+  @@index([clickedRoomId])
+  @@map("ai_interaction_log")
+}
+
+// 5. Popular Searches (Analytics Dashboard)
+model PopularSearch {
+  id           String   @id @default(uuid()) @db.Uuid
+  query        String   @unique @db.VarChar(500)
+  searchCount  Int      @default(1) @map("search_count")
+  lastSearched DateTime @default(now()) @map("last_searched")
+
+  // Cache results for popular queries (Optional - use Redis instead)
+  cachedResults Json?     @map("cached_results")
+  cacheExpiry   DateTime? @map("cache_expiry")
+
+  @@index([searchCount(sort: Desc)])
+  @@index([lastSearched(sort: Desc)])
+  @@map("popular_search")
+}
+
+// ============================================================================
+// METER READINGS - For tracking utility consumption (electricity, water, etc)
+// ============================================================================
+
+model MeterReading {
+  id              String  @id @default(uuid()) @db.Uuid
+  serviceId       String  @map("service_id") @db.Uuid
+  contractId      String  @map("contract_id") @db.Uuid
+  month           String  @db.VarChar(7) // YYYY-MM format
+  previousReading Decimal @default(0) @map("previous_reading") @db.Decimal(12, 2)
+  currentReading  Decimal @map("current_reading") @db.Decimal(12, 2)
+  usage           Decimal @db.Decimal(12, 2) // currentReading - previousReading
+  amount          Decimal @db.Decimal(12, 2) // usage * unitPrice
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  service  Service  @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  contract Contract @relation("MeterReadings", fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, serviceId, month])
+  @@index([contractId])
+  @@index([serviceId])
+  @@index([month])
+  @@map("meter_reading")
+}
+
+// ============================================================================
+// LEGAL SNAPSHOT ENGINE - Core Tables for Evidence & Compliance
+// ============================================================================
+
+// Legal Snapshot: Immutable record of legally significant actions
+// Purpose: Source of truth for disputes, auditing, and compliance
+model LegalSnapshot {
+  id String @id @default(uuid()) @db.Uuid
+
+  // WHO (Actor)
+  actorId   String   @map("actor_id") @db.Uuid
+  actorRole UserRole @map("actor_role")
+
+  // WHAT (Action)
+  actionType String @map("action_type") @db.VarChar(50)
+  // Examples: contract_signed, payment_succeeded, invoice_issued, consent_updated
+
+  entityType String @map("entity_type") @db.VarChar(50)
+  // Examples: CONTRACT, PAYMENT, INVOICE, CONSENT
+
+  entityId String @map("entity_id") @db.Uuid
+
+  // WHEN (with timezone)
+  timestamp DateTime @db.Timestamptz
+
+  // WHERE/HOW (Context)
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(255)
+  city      String? @db.VarChar(100)
+
+  // LEGAL CONTEXT
+  // Regulations active at time of action
+  // Format: [{type: "RENTAL_TAX", version: "2026.01", hash: "abc..."}]
+  regulations Json @default("[]")
+
+  // Document versions (privacy policy, terms, etc.)
+  // Format: [{type: "privacy_policy", version: "1.0", hash: "xyz..."}]
+  documentVersions Json @default("[]") @map("document_versions")
+
+  // IMMUTABILITY
+  dataHash String @db.VarChar(64)
+  // SHA-256 hash of entire snapshot content
+
+  // Optional metadata for extensibility
+  metadata Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations to entities
+  incomes          Income[]         @relation("IncomeSnapshot")
+  invoices         Invoice[]        @relation("InvoiceSnapshot")
+  expenses         Expense[]        @relation("ExpenseSnapshot")
+  taxYearSummaries TaxYearSummary[] @relation("TaxYearSnapshot")
+
+  @@index([actorId, actionType])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@index([actionType])
+  @@map("legal_snapshot")
+}
+
+// Regulation Version: Track law changes over time
+// Purpose: Metadata for snapshots, not business logic
+model RegulationVersion {
+  id String @id @default(uuid()) @db.Uuid
+
+  // Regulation identifier
+  type String @db.VarChar(50)
+  // Examples: RENTAL_TAX, VAT, PRIVACY_POLICY, HOUSING_LAW
+
+  version String @db.VarChar(20)
+  // Examples: 2026.01, 1.0, HCM.2026
+
+  // Human-readable summary
+  summary String @db.Text
+
+  // Content integrity
+  contentHash String @map("content_hash") @db.VarChar(64)
+  // SHA-256 hash of full regulation document
+
+  contentUrl String? @map("content_url") @db.Text
+  // Optional link to full document (PDF/text)
+
+  // TEMPORAL (Timezone-aware)
+  effectiveFrom DateTime  @map("effective_from") @db.Timestamptz
+  effectiveTo   DateTime? @map("effective_to") @db.Timestamptz
+
+  // Soft delete (important: never hard delete regulations)
+  deletedAt DateTime? @map("deleted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Dynamic Configuration (New Feature)
+  configuration Json? @map("configuration") // { "threshold": 100000000, "taxRate": 10 }
+
+  // Relations
+  taxYearSummaries TaxYearSummary[] @relation("TaxRegulations")
+
+  @@unique([type, version])
+  @@index([type, effectiveFrom])
+  @@index([deletedAt])
+  @@map("regulation_version")
+}
+
+// Consent Log: PDPL compliance - track user consent history
+// Purpose: Prove consent was given/revoked at specific time with specific document version
+model ConsentLog {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId       String @map("user_id") @db.Uuid
+  documentType String @map("document_type") @db.VarChar(50)
+  // Examples: privacy_policy, terms_of_service, ai_consent, data_processing
+
+  documentVersion String @map("document_version") @db.VarChar(20)
+  documentHash    String @map("document_hash") @db.VarChar(64)
+
+  action String @db.VarChar(20) // GRANTED, REVOKED, UPDATED
+
+  // Context
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.VarChar(255)
+
+  // Snapshot link (consent_updated action)
+  snapshotId String @map("snapshot_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, documentType])
+  @@index([documentType, action])
+  @@index([createdAt])
+  @@map("consent_log")
+}
+
+// Landlord Revenue Snapshot: Pre-calculated revenue for tax dashboard
+// Purpose: Fast tax export without expensive real-time queries
+model LandlordRevenueSnapshot {
+  id         String @id @default(uuid()) @db.Uuid
+  landlordId String @map("landlord_id") @db.Uuid
+
+  year  Int
+  month Int? // Nullable for annual snapshots (1-12 for monthly, null for yearly)
+
+  // Aggregated data
+  totalRevenue Decimal @map("total_revenue") @db.Decimal(16, 2) // Upgraded from (15,2)
+  invoiceCount Int     @map("invoice_count")
+
+  // Room-level breakdown (optional, for detailed view)
+  breakdown Json? // [{roomId, roomNumber, revenue}]
+
+  // Immutability
+  snapshotHash String @map("snapshot_hash") @db.VarChar(64)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  landlord Landlord @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+
+  @@unique([landlordId, year, month])
+  @@index([landlordId, year])
+  @@index([year, month])
+  @@map("landlord_revenue_snapshot")
+}
+
+// ============================================================================
+// INCOME-BASED TAX SYSTEM (Phase 3)
+// ============================================================================
+
+// Rental Unit: Đơn vị cho thuê (unit tạo doanh thu)
+model RentalUnit {
+  id         String @id @default(uuid()) @db.Uuid
+  name       String @db.VarChar(100)
+  address    String @db.Text
+  landlordId String @map("landlord_id") @db.Uuid
+
+  landlord Landlord  @relation("LandlordRentalUnits", fields: [landlordId], references: [userId])
+  incomes  Income[]
+  expenses Expense[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([landlordId])
+  @@map("rental_unit")
+}
+
+// Income: Dòng THU (theo tiền thực nhận - receivedAt)
+model Income {
+  id           String  @id @default(uuid()) @db.Uuid
+  rentalUnitId String  @map("rental_unit_id") @db.Uuid
+  tenantId     String? @map("tenant_id") @db.Uuid
+
+  amount   Decimal @db.Decimal(16, 2)
+  currency String  @default("VND") @db.VarChar(3)
+
+  // Tax classification
+  incomeType  IncomeType  @map("income_type")
+  taxCategory TaxCategory @default(TAXABLE) @map("tax_category")
+
+  // Type-safe period tracking
+  periodYear     Int    @map("period_year")
+  periodMonth    Int    @map("period_month")
+  periodMonthStr String @map("period_month_str") @db.VarChar(7) // "2026-05"
+
+  receivedAt    DateTime      @map("received_at")
+  paymentMethod PaymentMethod @map("payment_method")
+
+  snapshotId    String  @map("snapshot_id") @db.Uuid
+  receiptNumber String? @map("receipt_number") @db.VarChar(50)
+  invoiceId     String? @unique @map("invoice_id") @db.Uuid // Link to invoice
+
+  // Relations
+  rentalUnit RentalUnit    @relation(fields: [rentalUnitId], references: [id])
+  tenant     Tenant?       @relation(fields: [tenantId], references: [userId])
+  snapshot   LegalSnapshot @relation("IncomeSnapshot", fields: [snapshotId], references: [id])
+  invoice    Invoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+
+  note String? @db.Text
+
+  // Soft delete
+  deletedAt    DateTime? @map("deleted_at")
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  deleteReason String?   @map("delete_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([rentalUnitId, periodYear, periodMonth])
+  @@index([receivedAt])
+  @@index([snapshotId])
+  @@index([deletedAt])
+  @@index([invoiceId])
+  @@map("income")
+}
+
+// Expense: Dòng CHI (để giải trình)
+model Expense {
+  id           String @id @default(uuid()) @db.Uuid
+  rentalUnitId String @map("rental_unit_id") @db.Uuid
+
+  amount   Decimal @db.Decimal(16, 2)
+  currency String  @default("VND") @db.VarChar(3)
+
+  expenseType ExpenseType @map("expense_type")
+
+  // Type-safe period
+  periodYear     Int    @map("period_year")
+  periodMonth    Int    @map("period_month")
+  periodMonthStr String @map("period_month_str") @db.VarChar(7)
+
+  paidAt DateTime @map("paid_at")
+
+  rentalUnit RentalUnit @relation(fields: [rentalUnitId], references: [id])
+
+  note          String?  @db.Text
+  receiptNumber String?  @map("receipt_number") @db.VarChar(50)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Soft delete
+  deletedAt    DateTime? @map("deleted_at")
+  deletedBy    String?   @map("deleted_by") @db.Uuid
+  deleteReason String?   @map("delete_reason") @db.Text
+
+  snapshotId String?        @map("snapshot_id") @db.Uuid
+  snapshot   LegalSnapshot? @relation("ExpenseSnapshot", fields: [snapshotId], references: [id])
+
+  @@index([rentalUnitId, periodYear, periodMonth])
+  @@index([rentalUnitId, paidAt]) // Optimized for date range reporting
+  @@index([deletedAt])
+  @@index([snapshotId])
+  @@map("expense")
+}
+
+// Tax Year Summary: Chốt năm thuế (frozen after close)
+model TaxYearSummary {
+  id         String @id @default(uuid()) @db.Uuid
+  landlordId String @map("landlord_id") @db.Uuid
+  year       Int
+
+  // Frozen totals
+  totalIncome      Decimal @map("total_income") @db.Decimal(16, 2)
+  taxableIncome    Decimal @map("taxable_income") @db.Decimal(16, 2)
+  nonTaxableIncome Decimal @map("non_taxable_income") @db.Decimal(16, 2)
+
+  regulationId String   @map("regulation_id") @db.Uuid
+  threshold    Decimal  @db.Decimal(16, 2)
+  taxRate      Decimal? @map("tax_rate") @db.Decimal(5, 2)
+
+  status TaxStatus
+
+  snapshotId String @map("snapshot_id") @db.Uuid
+
+  // Lock after closing
+  isFrozen Boolean   @default(false) @map("is_frozen")
+  closedAt DateTime? @map("closed_at")
+  closedBy String?   @map("closed_by") @db.Uuid
+
+  // Relations
+  landlord   Landlord          @relation("LandlordTaxSummaries", fields: [landlordId], references: [userId])
+  regulation RegulationVersion @relation("TaxRegulations", fields: [regulationId], references: [id])
+  snapshot   LegalSnapshot     @relation("TaxYearSnapshot", fields: [snapshotId], references: [id])
+
+  note      String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([landlordId, year])
+  @@map("tax_year_summary")
+}
+
+// ============================================================================
+// LEGAL DOCUMENTS MANAGEMENT SYSTEM (CRITICAL - MAXIMUM SECURITY)
+// ============================================================================
+// IMPORTANT: These models handle legal documents with strict compliance requirements
+// - Immutable audit logs (NEVER delete)
+// - Version control with cryptographic signatures
+// - 10-year retention policy (Vietnamese law)
+// - Full audit trail for compliance
+
+enum DocumentType {
+  CONTRACT_TEMPLATE // Rental contract templates
+  PRIVACY_POLICY // Privacy policy
+  TERMS_OF_SERVICE // Terms of service  
+  RENTAL_POLICY // Rental policies
+  LEGAL_NOTICE // Legal notices (eviction, rent increase)
+  REGULATION // Government regulations
+  OTHER
+}
+
+enum VersionStatus {
+  DRAFT // Being edited
+  REVIEW // Under review
+  APPROVED // Approved but not published
+  PUBLISHED // Live and active
+  ARCHIVED // Superseded by newer version
+  DEPRECATED // No longer valid
+}
+
+enum AuditAction {
+  CREATED
+  UPDATED
+  PUBLISHED
+  ARCHIVED
+  DELETED // Soft delete only
+  VERSION_CREATED
+  VERSION_PUBLISHED
+  VERSION_APPROVED
+  VERSION_ARCHIVED
+  CONTENT_MODIFIED
+  METADATA_MODIFIED
+}
+
+// Main Legal Document
+model LegalDocument {
+  id          String       @id @default(uuid()) @db.Uuid
+  title       String       @db.VarChar(200)
+  slug        String       @unique @db.VarChar(100) // URL-friendly identifier
+  type        DocumentType
+  category    String?      @db.VarChar(50) // Optional categorization
+  description String?      @db.Text
+
+  // Current active version (points to latest published version)
+  currentVersionId String?          @map("current_version_id") @db.Uuid
+  currentVersion   DocumentVersion? @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  // All versions (immutable history)
+  versions DocumentVersion[] @relation("DocumentVersions")
+
+  // Metadata
+  isActive    Boolean @default(true) @map("is_active") // Can be used
+  isPublished Boolean @default(false) @map("is_published") // Has published version
+  isPublic    Boolean @default(false) @map("is_public") // Visible to public (privacy policy, ToS)
+
+  // Retention policy (Vietnamese law: minimum 5-10 years)
+  retentionYears Int @default(10) @map("retention_years")
+
+  // Audit trail
+  createdBy String   @map("created_by") @db.Uuid // User ID
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Soft delete (NEVER hard delete legal documents)
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy String?   @map("deleted_by") @db.Uuid
+
+  // Relations
+  auditLogs DocumentAuditLog[]
+
+  @@index([type, isActive])
+  @@index([slug])
+  @@index([isPublished])
+  @@index([deletedAt])
+  @@map("legal_document")
+}
+
+// Document Version (Immutable after publishing)
+model DocumentVersion {
+  id         String        @id @default(uuid()) @db.Uuid
+  documentId String        @map("document_id") @db.Uuid
+  document   LegalDocument @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Version info
+  version       String @db.VarChar(20) // Semantic version: "1.0.0", "1.1.0", "2.0.0"
+  versionNumber Int    @map("version_number") // Auto-increment: 1, 2, 3...
+
+  // Content (IMMUTABLE after publish)
+  content     String @db.Text // Markdown or HTML
+  contentType String @default("markdown") @map("content_type") @db.VarChar(20)
+
+  // Cryptographic hash for integrity verification
+  contentHash String @map("content_hash") @db.VarChar(64) // SHA-256 hash
+
+  // Digital signature (optional, for critical documents)
+  signature       String?   @db.Text // Cryptographic signature
+  signatureMethod String?   @map("signature_method") @db.VarChar(50) // e.g., "RSA-SHA256"
+  signedBy        String?   @map("signed_by") @db.Uuid
+  signedAt        DateTime? @map("signed_at")
+
+  // Metadata
+  title     String? @db.VarChar(200)
+  summary   String? @db.Text // What changed in this version
+  changelog String? @db.Text // Detailed changelog
+
+  // Status (workflow: DRAFT → REVIEW → APPROVED → PUBLISHED → ARCHIVED)
+  status VersionStatus @default(DRAFT)
+
+  // Effective dates (when this version is/was active)
+  effectiveFrom DateTime? @map("effective_from") // When it becomes active
+  effectiveTo   DateTime? @map("effective_to") // When it expires (null = indefinite)
+
+  // Approval workflow
+  reviewedBy String?   @map("reviewed_by") @db.Uuid
+  reviewedAt DateTime? @map("reviewed_at")
+  approvedBy String?   @map("approved_by") @db.Uuid
+  approvedAt DateTime? @map("approved_at")
+
+  // Publishing
+  publishedBy String?   @map("published_by") @db.Uuid
+  publishedAt DateTime? @map("published_at")
+
+  // Archival
+  archivedBy    String?   @map("archived_by") @db.Uuid
+  archivedAt    DateTime? @map("archived_at")
+  archiveReason String?   @map("archive_reason") @db.Text
+
+  // Audit
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // IMMUTABILITY LOCK (prevent edits after publish)
+  isLocked Boolean   @default(false) @map("is_locked")
+  lockedAt DateTime? @map("locked_at")
+
+  // Relations
+  currentForDocuments LegalDocument[]      @relation("CurrentDocumentVersion")
+  auditLogs           DocumentAuditLog[]
+  attachments         DocumentAttachment[] // PDF files
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId])
+  @@index([status])
+  @@index([effectiveFrom, effectiveTo])
+  @@index([publishedAt])
+  @@map("document_version")
+}
+
+// Immutable Audit Log (NEVER delete, NEVER update)
+model DocumentAuditLog {
+  id         String  @id @default(uuid()) @db.Uuid
+  documentId String  @map("document_id") @db.Uuid
+  versionId  String? @map("version_id") @db.Uuid
+
+  // Action performed
+  action AuditAction
+
+  // What changed (JSON with before/after values)
+  changes Json? // { before: {...}, after: {...} }
+
+  // Who performed the action
+  userId    String  @map("user_id") @db.Uuid
+  ipAddress String? @map("ip_address") @db.VarChar(45) // IPv6 support
+  userAgent String? @map("user_agent") @db.Text
+
+  // When (immutable timestamp)
+  timestamp DateTime @default(now()) @db.Timestamptz(6) // High precision with timezone
+
+  // Additional context
+  reason   String? @db.Text
+  metadata Json? // Additional metadata
+
+  // Relations
+  document LegalDocument?   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  version  DocumentVersion? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([versionId])
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+  @@map("document_audit_log")
+}
+
+// Legal Compliance Checklist (Track compliance requirements)
+model ComplianceRequirement {
+  id          String @id @default(uuid()) @db.Uuid
+  name        String @db.VarChar(200)
+  description String @db.Text
+  category    String @db.VarChar(50) // GDPR, PDPL, Vietnamese Law
+
+  // Requirements
+  isRequired Boolean @default(true) @map("is_required")
+  frequency  String? @db.VarChar(50) // ANNUAL, QUARTERLY, ON_CHANGE
+
+  // Related documents
+  relatedDocumentTypes String[] @default([]) @map("related_document_types") // Array of DocumentType
+
+  // Metadata
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@map("compliance_requirement")
+}
+
+// PDF Attachments for Legal Documents
+// CRITICAL: Store original PDF files as proof of legal documents
+model DocumentAttachment {
+  id        String @id @default(uuid()) @db.Uuid
+  versionId String @map("version_id") @db.Uuid
+
+  // File information
+  fileName String @map("file_name") @db.VarChar(255)
+  fileSize Int    @map("file_size") // in bytes
+  mimeType String @map("mime_type") @db.VarChar(50) // application/pdf
+
+  // Storage path (relative to upload directory)
+  filePath String @map("file_path") @db.Text
+
+  // Cryptographic hash for integrity (CRITICAL)
+  fileHash String @map("file_hash") @db.VarChar(64) // SHA-256 hash
+
+  // Metadata
+  description String? @db.Text
+
+  // Upload audit
+  uploadedBy String   @map("uploaded_by") @db.Uuid
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+
+  // Soft delete (NEVER hard delete)
+  deletedAt DateTime? @map("deleted_at")
+  deletedBy String?   @map("deleted_by") @db.Uuid
+
+  // Relations
+  version DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId])
+  @@index([fileHash])
+  @@map("document_attachment")
+}
+
+// ============================================================================
+// PCCC (FIRE SAFETY COMPLIANCE) - Luật 55/2024/QH15
+// ============================================================================
+
+enum PCCCPropertyType {
+  NHA_TRO           // Nhà trọ
+  CHUNG_CU_MINI     // Chung cư mini
+  KINH_DOANH        // Nhà ở kết hợp kinh doanh
+}
+
+enum PCCCStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+model PCCCReport {
+  id              String            @id @default(uuid()) @db.Uuid
+  propertyId      String            @map("property_id") @db.Uuid
+  landlordId      String            @map("landlord_id") @db.Uuid
+  
+  // Property specifications
+  propertyType    PCCCPropertyType  @map("property_type")
+  floors          Int
+  area            Decimal           @db.Decimal(10, 2)
+  volume          Decimal?          @db.Decimal(10, 2)
+  laneWidth       Decimal?          @map("lane_width") @db.Decimal(5, 2)
+  hasCage         Boolean           @default(false) @map("has_cage")
+  
+  // Generated requirements (JSON)
+  requirements    Json              // Fire extinguishers, alarms, etc.
+  
+  // Compliance
+  complianceScore Int               @map("compliance_score") // 0-100
+  status          PCCCStatus        @default(DRAFT)
+  
+  // Generated files
+  pdfUrl          String?           @map("pdf_url") @db.Text
+  qrCode          String?           @map("qr_code") @db.Text
+  
+  // Validity
+  expiryDate      DateTime          @map("expiry_date") // Valid for 6 months
+  
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  
+  // Relations
+  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  landlord        Landlord          @relation(fields: [landlordId], references: [userId])
+  realSurvey      PCCCRealSurvey? 
+  @@index([propertyId])
+  @@index([landlordId])
+  @@index([status])
+  @@index([expiryDate])
+  @@map("pccc_report")
+}
+
+model FireHydrant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  lat       Float
+  lng       Float
+  city      String
+  address   String?
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("fire_hydrants")
+}
+
+model PCCCRealSurvey {
+  id                String   @id @default(uuid()) @db.Uuid
+  reportId          String   @map("report_id") @db.Uuid
+  laneWidth         Decimal  @map("lane_width") @db.Decimal(5, 2)
+  exitWidth         Decimal  @map("exit_width") @db.Decimal(5, 2)
+  extinguisherCount Int      @map("extinguisher_count")
+  photos            String[]
+  surveyorNote      String?  @map("surveyor_note")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  report PCCCReport @relation(fields: [reportId], references: [id])
+
+  @@unique([reportId])
+  @@map("pccc_real_surveys")
+}

@@ -57,7 +57,7 @@ NEXTAUTH_SECRET=xxx
 
 ### 1. Database Migration
 ```bash
-cd be-rental-room
+cd rentalroom-be
 DATABASE_URL="postgresql://..." npx prisma migrate deploy
 ```
 
@@ -72,7 +72,7 @@ git push origin main
 
 ### 3. Frontend Deployment
 ```bash
-cd fe-rental-room
+cd rentalroom-fe
 vercel --prod
 ```
 

@@ -43,7 +43,7 @@ PORT=3000
 
 ### ✅ Cache Config Already Updated
 
-File: `be-rental-room/src/config/cache.config.ts` - Already has TLS support for Upstash!
+File: `rentalroom-be/src/config/cache.config.ts` - Already has TLS support for Upstash!
 
 ```typescript
 export const getCacheConfig = (
@@ -85,7 +85,7 @@ Add these variables:
 
 ### API Client Already Configured ✅
 
-File: `fe-rental-room/src/lib/api/client.ts` - Already handles env vars correctly!
+File: `rentalroom-fe/src/lib/api/client.ts` - Already handles env vars correctly!
 
 ```typescript
 const baseURL = typeof window === 'undefined'
@@ -127,7 +127,7 @@ REDIS_TLS=true
 #### Step 1: Build & Push Docker Image
 
 ```bash
-cd /home/diphungthinh/Desktop/rental-room/be-rental-room
+cd /home/diphungthinh/Desktop/rental-room/rentalroom-be
 
 # Login to Azure Container Registry
 az acr login --name rentalroomacr
@@ -229,7 +229,7 @@ CORS_ORIGIN=https://diphungthinh.io.vn,https://rental-room-project-git-main-diph
 #### Step 2: Via Vercel CLI
 
 ```bash
-cd fe-rental-room
+cd rentalroom-fe
 
 # Add environment variables
 vercel env add NEXT_PUBLIC_API_URL
