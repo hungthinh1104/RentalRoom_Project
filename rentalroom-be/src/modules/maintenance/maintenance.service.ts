@@ -17,7 +17,7 @@ import {
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
 import { MaintenanceStatus } from './entities';
-import { User, UserRole } from '@prisma/client';
+import { User, UserRole, NotificationType } from '@prisma/client';
 
 @Injectable()
 export class MaintenanceService {
@@ -77,7 +77,7 @@ export class MaintenanceService {
         userId: request.room.property.landlordId,
         title: '🔧 Yêu cầu bảo trì mới',
         content: `Yêu cầu bảo trì mới cho phòng ${request.room.roomNumber}: ${request.title}`,
-        notificationType: 'MAINTENANCE' as any,
+        notificationType: NotificationType.MAINTENANCE,
         relatedEntityId: request.id,
       });
       this.logger.log(
@@ -287,7 +287,7 @@ export class MaintenanceService {
         userId: updated.tenantId,
         title: '✅ Bảo trì hoàn tất',
         content: `Yêu cầu bảo trì "${updated.title}" cho phòng ${updated.room.roomNumber} đã được hoàn tất.`,
-        notificationType: 'MAINTENANCE' as any,
+        notificationType: NotificationType.MAINTENANCE,
         relatedEntityId: updated.id,
       });
       this.logger.log(

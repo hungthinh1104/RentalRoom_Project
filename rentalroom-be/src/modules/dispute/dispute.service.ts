@@ -41,7 +41,7 @@ export class DisputeService {
         contract: {
           select: {
             id: true,
-            room: { select: { name: true, propertyId: true } },
+            room: { select: { roomNumber: true, propertyId: true } },
             tenantId: true,
             landlordId: true,
           },
