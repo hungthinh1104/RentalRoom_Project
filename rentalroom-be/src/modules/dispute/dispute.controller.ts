@@ -19,6 +19,15 @@ export class DisputeController {
   constructor(private disputeService: DisputeService) {}
 
   /**
+   * GET /disputes
+   * List disputes for admin or related parties
+   */
+  @Get()
+  async listDisputes(@Req() req: any) {
+    return this.disputeService.listDisputes(req.user.id, req.user.role);
+  }
+
+  /**
    * POST /disputes
    * Create new dispute from tenant or landlord
    */

@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { MessageSquareWarning, Plus, Send, Image as ImageIcon, CheckCircle, Clock, XCircle } from "lucide-react";
+import { MessageSquareWarning, Plus, Send, Image as ImageIcon, CheckCircle, Clock, XCircle, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -25,25 +26,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api/client";
+import { useDisputes, useCreateDispute } from "@/features/disputes/hooks/use-disputes";
+import { useContracts } from "@/features/contracts/hooks/use-contracts";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-interface Complaint {
+interface DisputeItem {
   id: string;
-  title: string;
   description: string;
-  category: string;
-  status: string;
+  category?: string;
+  status: "OPEN" | "APPROVED" | "REJECTED" | "PARTIAL" | "ESCALATED";
+  claimAmount: number;
+  approvedAmount?: number | null;
+  contractId: string;
+  evidence?: Array<{ id: string; url: string }>;
   createdAt: string;
-  resolvedAt?: string;
-  response?: string;
+  resolvedAt?: string | null;
+  resolutionReason?: string | null;
 }
 
-const COMPLAINT_CATEGORIES = [
+const DISPUTE_CATEGORIES = [
   { value: "MAINTENANCE", label: "Bảo trì / Sửa chữa" },
   { value: "PAYMENT", label: "Vấn đề thanh toán" },
   { value: "LANDLORD", label: "Khiếu nại chủ nhà" },
@@ -55,68 +59,84 @@ const COMPLAINT_CATEGORIES = [
 
 export default function TenantComplaintsPage() {
   const { data: session } = useSession();
-  const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
-    title: "",
+    contractId: "",
+    claimAmount: 0,
     description: "",
     category: "MAINTENANCE",
+    evidenceUrlsText: "",
   });
 
-  // Fetch complaints
-  const { data: complaintsData, isLoading } = useQuery({
-    queryKey: ["tenant-complaints", session?.user?.id],
-    queryFn: async () => {
-      const { data } = await api.get("/feedback");
-      return data;
-    },
-    enabled: !!session?.user?.id,
-  });
+  const { data: disputesData, isLoading } = useDisputes();
+  const disputes: DisputeItem[] = disputesData || [];
 
-  const complaints: Complaint[] = complaintsData?.items || complaintsData || [];
+  const { data: contractsData } = useContracts({ tenantId: session?.user?.id });
+  const contractOptions = contractsData?.data || contractsData || [];
 
-  // Create complaint mutation
-  const createComplaint = useMutation({
-    mutationFn: async (data: { title: string; description: string; category: string }) => {
-      const response = await api.post("/feedback", {
-        type: "COMPLAINT",
-        ...data,
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tenant-complaints"] });
-      toast.success("Đã gửi khiếu nại thành công");
-      setDialogOpen(false);
-      setFormData({ title: "", description: "", category: "MAINTENANCE" });
-    },
-    onError: () => {
-      toast.error("Không thể gửi khiếu nại");
-    },
-  });
+  const createDispute = useCreateDispute();
 
   const handleSubmit = () => {
-    if (!formData.title.trim() || !formData.description.trim()) {
-      toast.error("Vui lòng điền đầy đủ thông tin");
+    if (!formData.contractId) {
+      toast.error("Chọn hợp đồng cần khiếu nại");
       return;
     }
-    createComplaint.mutate(formData);
+    if (!formData.description.trim()) {
+      toast.error("Mô tả chi tiết vấn đề");
+      return;
+    }
+    if (!formData.claimAmount || formData.claimAmount <= 0) {
+      toast.error("Nhập số tiền yêu cầu bồi hoàn");
+      return;
+    }
+    const evidenceList = formData.evidenceUrlsText
+      .split(/\n|,/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (evidenceList.length === 0) {
+      toast.error("Cần ít nhất 1 bằng chứng (link ảnh/tài liệu)");
+      return;
+    }
+
+    createDispute.mutate(
+      {
+        contractId: formData.contractId,
+        claimantRole: "TENANT",
+        claimAmount: Number(formData.claimAmount),
+        description: formData.description,
+        evidenceUrls: evidenceList,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Đã gửi khiếu nại (dispute) thành công");
+          setDialogOpen(false);
+          setFormData({
+            contractId: "",
+            claimAmount: 0,
+            description: "",
+            category: "MAINTENANCE",
+            evidenceUrlsText: "",
+          });
+        },
+        onError: () => toast.error("Không thể gửi dispute"),
+      },
+    );
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: DisputeItem["status"]) => {
     switch (status) {
-      case "RESOLVED":
+      case "APPROVED":
         return (
           <Badge className="bg-success/10 text-success border-success/20">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Đã giải quyết
+            Chấp nhận
           </Badge>
         );
-      case "IN_PROGRESS":
+      case "PARTIAL":
         return (
           <Badge className="bg-blue/10 text-blue border-blue/20">
             <Clock className="h-3 w-3 mr-1" />
-            Đang xử lý
+            Chấp nhận một phần
           </Badge>
         );
       case "REJECTED":
@@ -126,18 +146,25 @@ export default function TenantComplaintsPage() {
             Từ chối
           </Badge>
         );
+      case "ESCALATED":
+        return (
+          <Badge className="bg-warning/10 text-warning border-warning/20">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            Đã chuyển cấp
+          </Badge>
+        );
       default:
         return (
           <Badge className="bg-warning/10 text-warning border-warning/20">
             <Clock className="h-3 w-3 mr-1" />
-            Chờ xử lý
+            Đang mở
           </Badge>
         );
     }
   };
 
-  const pendingCount = complaints.filter((c: Complaint) => c.status === "PENDING").length;
-  const resolvedCount = complaints.filter((c: Complaint) => c.status === "RESOLVED").length;
+  const pendingCount = disputes.filter((d: DisputeItem) => d.status === "OPEN").length;
+  const resolvedCount = disputes.filter((d: DisputeItem) => d.status === "APPROVED" || d.status === "PARTIAL").length;
 
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-8 max-w-7xl animate-in fade-in duration-500">
@@ -170,33 +197,54 @@ export default function TenantComplaintsPage() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Loại khiếu nại</Label>
+                <Label>Hợp đồng</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  value={formData.contractId}
+                  onValueChange={(value) => setFormData({ ...formData, contractId: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Chọn loại" />
+                    <SelectValue placeholder="Chọn hợp đồng" />
                   </SelectTrigger>
                   <SelectContent>
-                    {COMPLAINT_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
+                    {contractOptions?.length === 0 && <SelectItem value="" disabled>Chưa có hợp đồng</SelectItem>}
+                    {contractOptions?.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.code || c.id.substring(0, 8)} - {c.room?.name || "Phòng"}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="title">Tiêu đề</Label>
-                <Textarea
-                  id="title"
-                  placeholder="Tóm tắt vấn đề (vd: Điều hòa không hoạt động)"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  rows={2}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Số tiền yêu cầu (VND)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={formData.claimAmount || ""}
+                    onChange={(e) => setFormData({ ...formData, claimAmount: Number(e.target.value) })}
+                    placeholder="Ví dụ: 500000"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Loại tranh chấp</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn loại" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISPUTE_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -210,28 +258,32 @@ export default function TenantComplaintsPage() {
                 />
               </div>
 
-              <div className="rounded-lg border border-dashed border-border p-4 text-center">
-                <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Tính năng upload ảnh đang phát triển
-                </p>
+              <div className="space-y-2">
+                <Label>Bằng chứng (mỗi dòng một link)</Label>
+                <Textarea
+                  placeholder="https://...\nhttps://..."
+                  value={formData.evidenceUrlsText}
+                  onChange={(e) => setFormData({ ...formData, evidenceUrlsText: e.target.value })}
+                  rows={4}
+                />
+                <p className="text-xs text-muted-foreground">Dán link ảnh/tài liệu (Google Drive, S3, Imgur...). Tối đa 10 link.</p>
               </div>
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
                 onClick={() => setDialogOpen(false)}
-                disabled={createComplaint.isPending}
+                disabled={createDispute.isPending}
               >
                 Hủy
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={createComplaint.isPending}
+                disabled={createDispute.isPending}
                 className="gap-2"
               >
                 <Send className="h-4 w-4" />
-                {createComplaint.isPending ? "Đang gửi..." : "Gửi khiếu nại"}
+                {createDispute.isPending ? "Đang gửi..." : "Gửi khiếu nại"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -247,7 +299,7 @@ export default function TenantComplaintsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{complaints.length}</p>
+            <p className="text-3xl font-bold">{disputes.length}</p>
           </CardContent>
         </Card>
 
@@ -292,7 +344,7 @@ export default function TenantComplaintsPage() {
                 <Skeleton key={i} className="h-32 w-full" />
               ))}
             </div>
-          ) : complaints.length === 0 ? (
+          ) : disputes.length === 0 ? (
             <div className="text-center py-12">
               <MessageSquareWarning className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground font-medium">Chưa có khiếu nại nào</p>
@@ -302,39 +354,58 @@ export default function TenantComplaintsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {complaints.map((complaint: Complaint) => (
-                <Card key={complaint.id} className="border shadow-sm hover:shadow-md transition-shadow">
+              {disputes.map((dispute: DisputeItem) => (
+                <Card key={dispute.id} className="border shadow-sm hover:shadow-md transition-shadow">
                   <CardContent className="pt-6">
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-lg">{complaint.title}</h3>
-                            {getStatusBadge(complaint.status)}
+                            <h3 className="font-semibold text-lg">
+                              {DISPUTE_CATEGORIES.find((c) => c.value === dispute.category)?.label || dispute.category || "Không xác định"}
+                            </h3>
+                            {getStatusBadge(dispute.status)}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            {COMPLAINT_CATEGORIES.find((c) => c.value === complaint.category)?.label || complaint.category}
+                            Yêu cầu: {dispute.claimAmount.toLocaleString('vi-VN')} VND
+                            {dispute.approvedAmount && ` • Chấp nhận: ${dispute.approvedAmount.toLocaleString('vi-VN')} VND`}
                           </p>
                         </div>
                         <p className="text-xs text-muted-foreground whitespace-nowrap">
-                          {format(new Date(complaint.createdAt), "dd/MM/yyyy HH:mm", { locale: vi })}
+                          {format(new Date(dispute.createdAt), "dd/MM/yyyy HH:mm", { locale: vi })}
                         </p>
                       </div>
 
                       <p className="text-sm text-foreground whitespace-pre-wrap">
-                        {complaint.description}
+                        {dispute.description}
                       </p>
 
-                      {complaint.response && (
+                      {dispute.evidence && dispute.evidence.length > 0 && (
+                        <div className="mt-4 p-4 bg-muted/50 rounded-lg border-l-4 border-primary">
+                          <p className="text-sm font-semibold mb-2 flex items-center gap-2">
+                            <ImageIcon className="h-4 w-4 text-info" />
+                            Bằng chứng ({dispute.evidence.length}):
+                          </p>
+                          <div className="space-y-2">
+                            {dispute.evidence.map((ev, idx) => (
+                              <a key={ev.id} href={ev.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline block">
+                                Bằng chứng {idx + 1}: {ev.url.substring(0, 50)}...
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {dispute.resolutionReason && (
                         <div className="mt-4 p-4 bg-muted/50 rounded-lg border-l-4 border-primary">
                           <p className="text-sm font-semibold mb-2 flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-success" />
-                            Phản hồi từ quản lý:
+                            Lý do giải quyết:
                           </p>
-                          <p className="text-sm text-muted-foreground">{complaint.response}</p>
-                          {complaint.resolvedAt && (
+                          <p className="text-sm text-muted-foreground">{dispute.resolutionReason}</p>
+                          {dispute.resolvedAt && (
                             <p className="text-xs text-muted-foreground mt-2">
-                              Giải quyết lúc: {format(new Date(complaint.resolvedAt), "dd/MM/yyyy HH:mm", { locale: vi })}
+                              Giải quyết lúc: {format(new Date(dispute.resolvedAt), "dd/MM/yyyy HH:mm", { locale: vi })}
                             </p>
                           )}
                         </div>

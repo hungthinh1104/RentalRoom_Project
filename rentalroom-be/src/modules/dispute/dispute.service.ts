@@ -20,6 +20,38 @@ export class DisputeService {
   ) {}
 
   /**
+   * List disputes based on role (admin = all, else related)
+   */
+  async listDisputes(userId: string, role: string) {
+    const isAdmin = role === 'ADMIN';
+    const where = isAdmin
+      ? {}
+      : {
+          OR: [
+            { claimantId: userId },
+            { contract: { tenantId: userId } },
+            { contract: { landlordId: userId } },
+          ],
+        };
+
+    return this.prisma.dispute.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        contract: {
+          select: {
+            id: true,
+            room: { select: { name: true, propertyId: true } },
+            tenantId: true,
+            landlordId: true,
+          },
+        },
+        evidence: true,
+      },
+    });
+  }
+
+  /**
    * UC_DISPUTE_01: Create dispute record from tenant or landlord
    * Validates evidence count, assigns 14-day deadline
    */
