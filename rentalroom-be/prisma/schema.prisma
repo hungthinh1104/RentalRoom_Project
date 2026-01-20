@@ -167,6 +167,43 @@ enum TerminationType {
 }
 
 // ============================================================================
+// ALERTING & MONITORING (UC_SEC_05 - Critical Event Detection)
+// ============================================================================
+
+enum AlertSeverity {
+  CRITICAL // Immediate action required
+  HIGH // Urgent action needed
+  MEDIUM // Should be addressed soon
+  LOW // Informational
+}
+
+enum AlertType {
+  // Payment Alerts (P*)
+  PAYMENT_FAILED_PERSISTENT // Multiple failures
+  PAYMENT_OVERDUE // Invoice overdue by 3+ days
+  PAYMENT_RETRY_EXHAUSTED // Auto-payment retry limit exceeded
+
+  // Contract Alerts (C*)
+  CONTRACT_EXPIRING_SOON // Expiring in <30 days
+  CONTRACT_EXPIRED // Contract ended
+  CONTRACT_TERMINATION_PENDING // Termination initiated
+
+  // Verification Alerts (V*)
+  CONTRACT_SIGNATURE_TAMPER // Signature verification failed
+  IDENTITY_VERIFICATION_FAILED // KYC check failed
+  DOCUMENT_EXPIRATION_SOON // ID/passport expiring
+
+  // Dispute Alerts (D*)
+  DISPUTE_ESCALATED // Dispute moved to escalation
+  DISPUTE_RESOLUTION_OVERDUE // Dispute pending >14 days
+
+  // Risk Alerts (R*)
+  BAD_DEBT_DETECTED // Invoice marked as bad debt
+  TENANT_RISK_SCORE_HIGH // Risk score >70
+  LANDLORD_MULTIPLE_DISPUTES // 3+ active disputes
+}
+
+// ============================================================================
 // CONTRACT MANAGEMENT (Added Phase 3)
 // ============================================================================
 
@@ -340,6 +377,8 @@ model User {
   badDebtInvoices         BadDebtInvoice[]        @relation("TenantBadDebt") // UC_COT_03
   disputesCreated         Dispute[]               @relation("DisputeClaimant")
   disputesResolved        Dispute[]               @relation("DisputeResolver")
+  alertsReceived          Alert[]                 @relation("AlertRecipient") // UC_SEC_05
+  alertsAcknowledged      Alert[]                 @relation("AlertAcknowledgedBy") // Alerts acknowledged by user
 
   @@index([email])
   @@index([ekycVerified])
@@ -1933,4 +1972,48 @@ model BadDebtInvoice {
   @@index([status])
   @@index([dueDate])
   @@map("bad_debt_invoice")
+}
+
+// UC_SEC_05: Critical Event Alerts
+// Monitors and notifies about critical events requiring landlord/admin intervention
+// Email delivery via NotificationOutboxService for guaranteed delivery
+model Alert {
+  id                String        @id @default(uuid()) @db.Uuid
+  type              AlertType     @map("type")
+  severity          AlertSeverity @map("severity")
+  title             String        @map("title") @db.VarChar(200)
+  description       String        @map("description") @db.Text
+  
+  // Resource tracking
+  resourceType      String        @map("resource_type") @db.VarChar(50) // CONTRACT | INVOICE | PAYMENT | DISPUTE | USER
+  resourceId        String        @map("resource_id") @db.Uuid
+  
+  // Alert recipient
+  affectedUserId    String        @map("affected_user_id") @db.Uuid
+  
+  // Alert metadata (JSON: details specific to alert type)
+  metadata          Json?         @map("metadata")
+  
+  // Acknowledgment tracking
+  acknowledged      Boolean       @default(false) @map("acknowledged")
+  acknowledgedAt    DateTime?     @map("acknowledged_at")
+  acknowledgedBy    String?       @map("acknowledged_by") @db.Uuid
+  
+  // Resolution
+  resolvedAt        DateTime?     @map("resolved_at")
+  
+  // Audit
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  
+  // Relations
+  affectedUser      User          @relation("AlertRecipient", fields: [affectedUserId], references: [id], onDelete: Cascade)
+  acknowledgedByUser User?        @relation("AlertAcknowledgedBy", fields: [acknowledgedBy], references: [id], onDelete: SetNull)
+  
+  @@index([affectedUserId])
+  @@index([type])
+  @@index([severity])
+  @@index([resolvedAt])
+  @@index([resourceType, resourceId])
+  @@map("alert")
 }
