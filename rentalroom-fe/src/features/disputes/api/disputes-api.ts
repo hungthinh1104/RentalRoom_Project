@@ -27,6 +27,7 @@ export interface Dispute {
   claimantRole: "TENANT" | "LANDLORD";
   claimAmount: number;
   description: string;
+  category?: string;
   status: DisputeStatus;
   approvedAmount?: number | null;
   deadline: string;
@@ -41,6 +42,9 @@ export interface Dispute {
   updatedAt: string;
   contract?: DisputeContractLite | null;
 }
+
+// Type alias for convenience
+export type DisputeItem = Dispute;
 
 export interface CreateDisputeDto {
   contractId: string;
