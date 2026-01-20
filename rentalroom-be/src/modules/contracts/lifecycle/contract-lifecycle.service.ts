@@ -129,26 +129,54 @@ export class ContractLifecycleService {
   }
 
   /**
-   * Auto-generate unique contract number with transaction safety
+   * Auto-generate unique contract number with transaction safety + retry
+   * 🔒 CRITICAL: Handles race conditions with advisory lock + DB unique constraint
    */
   private async generateContractNumber(landlordId: string): Promise<string> {
     const landlordPrefix = landlordId.slice(0, 4).toUpperCase();
     const date = new Date();
     const yearMonth = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}`;
-    return await this.prisma.$transaction(async (tx) => {
-      // Serialize per landlord+month to avoid duplicate numbers under concurrency
-      await this.acquireLock(tx, `contract-number:${landlordId}:${yearMonth}`);
+    const lockKey = `contract-number:${landlordId}:${yearMonth}`;
 
-      const count = await tx.contract.count({
-        where: {
-          landlordId,
-          contractNumber: { startsWith: `HD-${landlordPrefix}-${yearMonth}` },
-        },
-      });
+    // Retry up to 3 times if unique constraint fails
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          // Serialize per landlord+month to avoid duplicate numbers under concurrency
+          await this.acquireLock(tx, lockKey);
 
-      const sequence = String(count + 1).padStart(4, '0');
-      return `HD-${landlordPrefix}-${yearMonth}-${sequence}`;
-    });
+          const count = await tx.contract.count({
+            where: {
+              landlordId,
+              contractNumber: { startsWith: `HD-${landlordPrefix}-${yearMonth}` },
+            },
+          });
+
+          const sequence = String(count + 1).padStart(4, '0');
+          return `HD-${landlordPrefix}-${yearMonth}-${sequence}`;
+        });
+      } catch (error) {
+        // If unique constraint violation, retry with exponential backoff
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          if (attempt < 3) {
+            // Wait before retry: 10ms, 20ms, 40ms
+            await new Promise((r) =>
+              setTimeout(r, Math.pow(2, attempt - 1) * 10),
+            );
+            continue;
+          }
+        }
+        throw error;
+      }
+    }
+
+    // Fallback (should not reach here)
+    throw new Error(
+      `Failed to generate unique contract number after 3 attempts`,
+    );
   }
 
   async findOne(id: string) {
