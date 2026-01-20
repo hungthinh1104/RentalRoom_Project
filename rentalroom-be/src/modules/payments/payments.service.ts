@@ -17,18 +17,87 @@ import { PaymentStatus } from './entities';
 import { PaymentService } from './payment.service';
 import { PaymentVerificationResult } from './interfaces';
 import { User, UserRole } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
+import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
+import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
+import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
 
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly paymentFacade: PaymentService,
+    private readonly eventStore: EventStoreService,
+    private readonly stateMachine: StateMachineGuard,
+    private readonly immutability: ImmutabilityGuard,
+    private readonly idempotency: IdempotencyGuard,
   ) {}
 
-  async create(createPaymentDto: CreatePaymentDto) {
-    const payment = await this.prisma.payment.create({
-      data: createPaymentDto,
-    });
+  async create(
+    createPaymentDto: CreatePaymentDto,
+    user?: User,
+    idempotencyKey?: string,
+  ) {
+    const actorId = user?.id || createPaymentDto.tenantId;
+    const key =
+      idempotencyKey ||
+      createPaymentDto.transactionId ||
+      `${createPaymentDto.invoiceId}:${createPaymentDto.tenantId}:${createPaymentDto.amount}:${createPaymentDto.paymentDate || 'na'}`;
+
+    const payment = await this.idempotency.executeIdempotent(
+      key,
+      'CREATE_PAYMENT',
+      actorId,
+      async () => {
+        const invoice = await this.prisma.invoice.findUnique({
+          where: { id: createPaymentDto.invoiceId },
+        });
+
+        if (!invoice) {
+          throw new BadRequestException('Invoice not found');
+        }
+
+        if (this.stateMachine.isTerminalState('INVOICE', invoice.status)) {
+          throw new BadRequestException(
+            `Invoice is in terminal state (${invoice.status}); cannot create payment`,
+          );
+        }
+
+        const correlationId = uuidv4();
+
+        return this.prisma.$transaction(async (tx) => {
+          const paymentRecord = await tx.payment.create({
+            data: {
+              ...createPaymentDto,
+              status: PaymentStatus.PENDING,
+            },
+          });
+
+          await this.eventStore.append({
+            eventId: uuidv4(),
+            eventType: 'PAYMENT_INITIATED',
+            correlationId,
+            aggregateId: paymentRecord.id,
+            aggregateType: 'PAYMENT',
+            aggregateVersion: 1,
+            payload: {
+              paymentId: paymentRecord.id,
+              invoiceId: paymentRecord.invoiceId,
+              amount: paymentRecord.amount,
+              method: paymentRecord.paymentMethod,
+            },
+            metadata: {
+              userId: actorId,
+              userRole: user?.role || 'SYSTEM',
+              timestamp: new Date(),
+              source: 'API',
+            },
+          });
+
+          return paymentRecord;
+        });
+      },
+    );
 
     // Convert Decimal to Number
     const cleaned = {
@@ -187,6 +256,28 @@ export class PaymentsService {
       }
     }
 
+    await this.immutability.enforceImmutability(
+      'PAYMENT',
+      id,
+      payment.status,
+      updatePaymentDto,
+      user?.id || 'SYSTEM',
+    );
+
+    if (
+      updatePaymentDto.status &&
+      updatePaymentDto.status !== payment.status
+    ) {
+      this.stateMachine.validateTransition(
+        'PAYMENT',
+        id,
+        payment.status,
+        updatePaymentDto.status,
+        user?.id || 'SYSTEM',
+        'Manual status update',
+      );
+    }
+
     const updated = await this.prisma.payment.update({
       where: { id },
       data: updatePaymentDto,
@@ -203,21 +294,116 @@ export class PaymentsService {
     });
   }
 
-  async confirmPayment(id: string) {
-    await this.findOne(id);
-
-    const payment = await this.prisma.payment.update({
+  async confirmPayment(id: string, user?: User) {
+    const payment = await this.prisma.payment.findUnique({
       where: { id },
-      data: {
-        status: PaymentStatus.COMPLETED,
-        paidAt: new Date(),
-      },
+      include: { invoice: true },
     });
 
-    // Convert Decimal to Number
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    this.stateMachine.validateTransition(
+      'PAYMENT',
+      id,
+      payment.status,
+      PaymentStatus.COMPLETED,
+      user?.id || 'SYSTEM',
+      'Manual confirmation',
+    );
+
+    if (payment.invoice) {
+      this.stateMachine.validateTransition(
+        'INVOICE',
+        payment.invoiceId,
+        payment.invoice.status,
+        'PAID',
+        user?.id || 'SYSTEM',
+        'Payment confirmed',
+      );
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const previousEvents = await this.eventStore.getEventStream(
+        id,
+        'PAYMENT',
+      );
+      const correlationId = previousEvents[0]?.correlationId || uuidv4();
+      const causationId = previousEvents[previousEvents.length - 1]?.eventId;
+
+      const paymentRecord = await tx.payment.update({
+        where: { id },
+        data: {
+          status: PaymentStatus.COMPLETED,
+          paidAt: new Date(),
+        },
+      });
+
+      await this.eventStore.append({
+        eventId: uuidv4(),
+        eventType: 'PAYMENT_COMPLETED',
+        correlationId,
+        causationId,
+        aggregateId: id,
+        aggregateType: 'PAYMENT',
+        aggregateVersion: previousEvents.length + 1,
+        payload: {
+          paymentId: id,
+          previousStatus: payment.status,
+          newStatus: PaymentStatus.COMPLETED,
+          paidAt: paymentRecord.paidAt,
+        },
+        metadata: {
+          userId: user?.id || 'SYSTEM',
+          userRole: user?.role || 'SYSTEM',
+          timestamp: new Date(),
+          source: 'API',
+        },
+      });
+
+      if (payment.invoice) {
+        const invoiceEvents = await this.eventStore.getEventStream(
+          payment.invoiceId,
+          'INVOICE',
+        );
+
+        await tx.invoice.update({
+          where: { id: payment.invoiceId },
+          data: {
+            status: 'PAID',
+            paidAt: new Date(),
+          },
+        });
+
+        await this.eventStore.append({
+          eventId: uuidv4(),
+          eventType: 'INVOICE_PAID',
+          correlationId,
+          causationId: invoiceEvents[invoiceEvents.length - 1]?.eventId,
+          aggregateId: payment.invoiceId,
+          aggregateType: 'INVOICE',
+          aggregateVersion: invoiceEvents.length + 1,
+          payload: {
+            invoiceId: payment.invoiceId,
+            amount: payment.amount,
+            paidAt: new Date().toISOString(),
+          },
+          metadata: {
+            userId: user?.id || 'SYSTEM',
+            userRole: user?.role || 'SYSTEM',
+            timestamp: new Date(),
+            source: 'API',
+          },
+        });
+      }
+
+      return paymentRecord;
+    });
+
     const cleaned = {
-      ...payment,
-      amount: payment.amount ? Number(payment.amount) : 0,
+      ...updated,
+      amount: updated.amount ? Number(updated.amount) : 0,
     };
 
     return plainToClass(PaymentResponseDto, cleaned, {
@@ -261,6 +447,12 @@ export class PaymentsService {
       }
     }
 
+    if (this.immutability.isFrozen('PAYMENT', payment.status)) {
+      throw new BadRequestException(
+        'Completed/refunded payments cannot be deleted. Create a reversal instead.',
+      );
+    }
+
     await this.prisma.payment.delete({
       where: { id },
     });
@@ -268,7 +460,7 @@ export class PaymentsService {
     return { message: 'Payment deleted successfully' };
   }
 
-  async checkPaymentStatus(id: string): Promise<PaymentVerificationResult> {
+  async checkPaymentStatus(id: string, user?: User): Promise<PaymentVerificationResult> {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
       include: {
@@ -313,25 +505,100 @@ export class PaymentsService {
     const result = await this.paymentFacade.verifyPayment(contract, amount);
 
     if (result.success) {
-      // Update status
-      await this.prisma.payment.update({
-        where: { id },
-        data: {
-          status: PaymentStatus.COMPLETED,
-          paidAt: new Date(),
-        },
-      });
+      if (payment.invoice) {
+        this.stateMachine.validateTransition(
+          'INVOICE',
+          payment.invoiceId,
+          payment.invoice.status,
+          'PAID',
+          user?.id || 'SYSTEM',
+          'Gateway verification',
+        );
+      }
 
-      // Update Invoice status too if needed
-      if (payment.invoiceId) {
-        await this.prisma.invoice.update({
-          where: { id: payment.invoiceId },
+      this.stateMachine.validateTransition(
+        'PAYMENT',
+        id,
+        payment.status,
+        PaymentStatus.COMPLETED,
+        user?.id || 'SYSTEM',
+        'Gateway verification',
+      );
+
+      await this.prisma.$transaction(async (tx) => {
+        const previousEvents = await this.eventStore.getEventStream(
+          id,
+          'PAYMENT',
+        );
+        const correlationId = previousEvents[0]?.correlationId || uuidv4();
+        const causationId = previousEvents[previousEvents.length - 1]?.eventId;
+
+        await tx.payment.update({
+          where: { id },
           data: {
-            status: 'PAID',
+            status: PaymentStatus.COMPLETED,
             paidAt: new Date(),
           },
         });
-      }
+
+        await this.eventStore.append({
+          eventId: uuidv4(),
+          eventType: 'PAYMENT_COMPLETED',
+          correlationId,
+          causationId,
+          aggregateId: id,
+          aggregateType: 'PAYMENT',
+          aggregateVersion: previousEvents.length + 1,
+          payload: {
+            paymentId: id,
+            previousStatus: payment.status,
+            newStatus: PaymentStatus.COMPLETED,
+            paidAt: new Date().toISOString(),
+          },
+          metadata: {
+            userId: user?.id || 'SYSTEM',
+            userRole: user?.role || 'SYSTEM',
+            timestamp: new Date(),
+            source: 'API',
+          },
+        });
+
+        if (payment.invoiceId) {
+          const invoiceEvents = await this.eventStore.getEventStream(
+            payment.invoiceId,
+            'INVOICE',
+          );
+
+          await tx.invoice.update({
+            where: { id: payment.invoiceId },
+            data: {
+              status: 'PAID',
+              paidAt: new Date(),
+            },
+          });
+
+          await this.eventStore.append({
+            eventId: uuidv4(),
+            eventType: 'INVOICE_PAID',
+            correlationId,
+            causationId: invoiceEvents[invoiceEvents.length - 1]?.eventId,
+            aggregateId: payment.invoiceId,
+            aggregateType: 'INVOICE',
+            aggregateVersion: invoiceEvents.length + 1,
+            payload: {
+              invoiceId: payment.invoiceId,
+              amount: payment.amount,
+              paidAt: new Date().toISOString(),
+            },
+            metadata: {
+              userId: user?.id || 'SYSTEM',
+              userRole: user?.role || 'SYSTEM',
+              timestamp: new Date(),
+              source: 'API',
+            },
+          });
+        }
+      });
     }
 
     return result;

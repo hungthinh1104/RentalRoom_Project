@@ -30,6 +30,10 @@ import {
   PaymentMethod,
   PaymentStatus,
 } from '../payments/entities/payment.entity';
+import { v4 as uuidv4 } from 'uuid';
+import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
+import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
+import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
 
 @Injectable()
 export class BillingService {
@@ -42,6 +46,10 @@ export class BillingService {
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
     private readonly stateLogger: StateTransitionLogger,
+    private readonly eventStore: EventStoreService,
+    private readonly stateMachine: StateMachineGuard,
+    private readonly immutability: ImmutabilityGuard,
+    private readonly idempotency: IdempotencyGuard,
   ) {}
 
   /**
@@ -375,17 +383,38 @@ export class BillingService {
     user: { id: string; role: UserRole },
   ) {
     // 🔒 CRITICAL: Verify ownership before mutation
-    await this.assertInvoiceOwnership(id, user.id, user.role);
+    const invoice = await this.assertInvoiceOwnership(id, user.id, user.role);
 
-    const invoice = await this.prisma.invoice.update({
+    // 🔒 IMMUTABILITY: Check if invoice is frozen
+    await this.immutability.enforceImmutability(
+      'INVOICE',
+      id,
+      invoice.status,
+      updateDto,
+      user.id,
+    );
+
+    // If status is being changed, validate transition
+    if (updateDto.status && updateDto.status !== invoice.status) {
+      this.stateMachine.validateTransition(
+        'INVOICE',
+        id,
+        invoice.status,
+        updateDto.status,
+        user.id,
+        'Manual status update',
+      );
+    }
+
+    const updated = await this.prisma.invoice.update({
       where: { id },
       data: updateDto,
     });
 
     // Convert Decimal to Number
     const cleaned = {
-      ...invoice,
-      totalAmount: invoice.totalAmount ? Number(invoice.totalAmount) : 0,
+      ...updated,
+      totalAmount: updated.totalAmount ? Number(updated.totalAmount) : 0,
     };
 
     return plainToClass(InvoiceResponseDto, cleaned, {

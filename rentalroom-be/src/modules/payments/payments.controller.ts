@@ -10,6 +10,7 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
+  Headers,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import {
@@ -39,8 +40,12 @@ export class PaymentsController {
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  create(@Body() createPaymentDto: CreatePaymentDto) {
-    return this.paymentsService.create(createPaymentDto);
+  create(
+    @Body() createPaymentDto: CreatePaymentDto,
+    @CurrentUser() user: User,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.paymentsService.create(createPaymentDto, user, idempotencyKey);
   }
 
   @Get()
@@ -140,14 +145,14 @@ export class PaymentsController {
 
   @Post(':id/check')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
-  checkStatus(@Param('id') id: string) {
-    return this.paymentsService.checkPaymentStatus(id);
+  checkStatus(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.paymentsService.checkPaymentStatus(id, user);
   }
 
   @Patch(':id/confirm')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  confirmPayment(@Param('id') id: string) {
-    return this.paymentsService.confirmPayment(id);
+  confirmPayment(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.paymentsService.confirmPayment(id, user);
   }
 
   @Delete(':id')

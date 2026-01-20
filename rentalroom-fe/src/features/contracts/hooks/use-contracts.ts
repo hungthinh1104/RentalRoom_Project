@@ -1,20 +1,23 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contractsApi } from '../api/contracts-api';
 import type { CreateContractDto, PaginationParams, Contract } from '@/types';
+import { queryKeys } from '@/lib/api/query-keys';
 
 // Application hooks have been moved to features/rental-applications/hooks/use-rental-applications.ts
 
 // Contract hooks
 export function useContracts(params?: PaginationParams & { tenantId?: string; landlordId?: string; status?: string }) {
+	// Cast strict params to Record<string, unknown> for queryKey compatibility if needed
+	const safeParams = params as unknown as Record<string, unknown>;
 	return useQuery({
-		queryKey: ['contracts', params],
+		queryKey: queryKeys.contracts.list(safeParams),
 		queryFn: () => contractsApi.getContracts(params),
 	});
 }
 
 export function useContract(id: string) {
 	return useQuery({
-		queryKey: ['contracts', id],
+		queryKey: queryKeys.contracts.detail(id),
 		queryFn: () => contractsApi.getContractById(id),
 		enabled: !!id,
 	});
@@ -26,7 +29,8 @@ export function useCreateContract() {
 	return useMutation({
 		mutationFn: (dto: CreateContractDto) => contractsApi.createContract(dto),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['contracts'] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
+			// Invalidate rooms as availability changes
 			queryClient.invalidateQueries({ queryKey: ['rooms'] });
 		},
 	});
@@ -39,8 +43,8 @@ export function useUpdateContract() {
 		mutationFn: ({ id, dto }: { id: string; dto: Partial<CreateContractDto> }) =>
 			contractsApi.updateContract(id, dto),
 		onSuccess: (_data: Contract, variables: { id: string }) => {
-			queryClient.invalidateQueries({ queryKey: ['contracts'] });
-			queryClient.invalidateQueries({ queryKey: ['contracts', variables.id] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.detail(variables.id) });
 		},
 	});
 }
@@ -52,7 +56,7 @@ export function useTerminateContract() {
 		mutationFn: ({ id, data }: { id: string; data: { reason: string; noticeDays?: number; terminationType?: string; refundAmount?: number } }) =>
 			contractsApi.terminateContract(id, data),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['contracts'] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
 			queryClient.invalidateQueries({ queryKey: ['rooms'] });
 		},
 	});
@@ -65,7 +69,7 @@ export function useRenewContract() {
 		mutationFn: ({ id, data }: { id: string; data: { newEndDate: string; newRentPrice?: number; increasePercentage?: number } }) =>
 			contractsApi.renewContract(id, data),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['contracts'] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.all });
 		},
 	});
 }
@@ -77,7 +81,7 @@ export function useAddResident() {
 		mutationFn: ({ contractId, data }: { contractId: string; data: { fullName: string; phoneNumber?: string; citizenId?: string; relationship?: string } }) =>
 			contractsApi.addResident(contractId, data),
 		onSuccess: (_data: any, variables: { contractId: string }) => {
-			queryClient.invalidateQueries({ queryKey: ['contracts', variables.contractId] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.detail(variables.contractId) });
 		},
 	});
 }
@@ -89,7 +93,7 @@ export function useUpdateResident() {
 		mutationFn: ({ contractId, residentId, data }: { contractId: string; residentId: string; data: { fullName?: string; phoneNumber?: string; citizenId?: string; relationship?: string } }) =>
 			contractsApi.updateResident(contractId, residentId, data),
 		onSuccess: (_data: any, variables: { contractId: string }) => {
-			queryClient.invalidateQueries({ queryKey: ['contracts', variables.contractId] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.detail(variables.contractId) });
 		},
 	});
 }
@@ -101,7 +105,7 @@ export function useRemoveResident() {
 		mutationFn: ({ contractId, residentId }: { contractId: string; residentId: string }) =>
 			contractsApi.removeResident(contractId, residentId),
 		onSuccess: (_data: any, variables: { contractId: string }) => {
-			queryClient.invalidateQueries({ queryKey: ['contracts', variables.contractId] });
+			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.detail(variables.contractId) });
 		},
 	});
 }

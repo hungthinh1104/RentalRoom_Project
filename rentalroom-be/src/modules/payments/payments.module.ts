@@ -13,6 +13,11 @@ import { SepayAdapter } from './adapters';
 import { PaymentGatewayFactory } from './factories';
 import { PaymentService } from './payment.service';
 
+// Legal infrastructure
+import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
+import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
+import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
+
 @Module({
   imports: [HttpModule],
   controllers: [PaymentsController],
@@ -27,6 +32,12 @@ import { PaymentService } from './payment.service';
     SepayAdapter,
     PaymentGatewayFactory,
     PaymentService,
+
+    // Legal infrastructure
+    EventStoreService,
+    StateMachineGuard,
+    ImmutabilityGuard,
+    IdempotencyGuard,
   ],
   exports: [
     PaymentsService,

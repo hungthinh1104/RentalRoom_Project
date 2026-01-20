@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { reportsApi, LandlordDashboardSummary } from "@/lib/api/reportsApi";
+import { reportsApi, LandlordDashboardSummary, CashFlowSummary, CashFlowAlert } from "@/lib/api/reportsApi";
+import { useLandlordDashboard, useCashFlow } from "@/features/reports/hooks/use-dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,11 @@ import {
   Users,
   LayoutDashboard,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  TrendingDown
 } from "lucide-react";
 import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
 import { cn } from "@/lib/utils";
@@ -51,31 +56,11 @@ export default function LandlordOverviewPage() {
   const landlordId = session?.user?.id;
   const name = session?.user?.fullName || session?.user?.name || "Bạn";
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [summary, setSummary] = useState<LandlordDashboardSummary | null>(null);
+  const { data: summary, isLoading: isLoadingSummary, error: summaryError } = useLandlordDashboard(landlordId);
+  const { data: cashFlow, isLoading: isLoadingCashFlow, error: cashFlowError } = useCashFlow();
 
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
-      if (!landlordId) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await reportsApi.getLandlordSummary(landlordId);
-        if (mounted) setSummary(data);
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (mounted) setError(msg || "Có lỗi xảy ra");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [landlordId]);
+  const loading = isLoadingSummary || isLoadingCashFlow;
+  const error = summaryError?.message || cashFlowError?.message || null;
 
   const container = {
     hidden: { opacity: 0 },
@@ -157,6 +142,37 @@ export default function LandlordOverviewPage() {
           <Alert variant="destructive" className="glass-card border-destructive/20 text-destructive bg-destructive/5 rounded-2xl">
             <AlertDescription className="font-medium">{error}</AlertDescription>
           </Alert>
+        </motion.div>
+      )}
+
+      {/* Financial Health Alerts */}
+      {!loading && cashFlow?.alerts && cashFlow.alerts.length > 0 && (
+        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cashFlow.alerts.map((alert: CashFlowAlert, idx: number) => (
+            <Alert
+              key={idx}
+              className={cn(
+                "border-l-4 shadow-sm",
+                alert.type === 'overdue' ? "border-l-destructive bg-destructive/5" :
+                  alert.type === 'forecast' ? "border-l-orange-500 bg-orange-500/5" :
+                    alert.type === 'upcoming' ? "border-l-blue-500 bg-blue-500/5" :
+                      "border-l-emerald-500 bg-emerald-500/5"
+              )}
+            >
+              {alert.type === 'overdue' ? <AlertCircle className="h-4 w-4 text-destructive" /> :
+                alert.type === 'forecast' ? <TrendingDown className="h-4 w-4 text-orange-500" /> :
+                  alert.type === 'upcoming' ? <AlertTriangle className="h-4 w-4 text-blue-500" /> :
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+              <AlertDescription className="flex items-center justify-between w-full">
+                <span className="font-medium text-sm">{alert.message}</span>
+                {alert.amount && (
+                  <Badge variant="outline" className="ml-2 bg-background/50 whitespace-nowrap">
+                    <Vnd value={alert.amount} />
+                  </Badge>
+                )}
+              </AlertDescription>
+            </Alert>
+          ))}
         </motion.div>
       )}
 

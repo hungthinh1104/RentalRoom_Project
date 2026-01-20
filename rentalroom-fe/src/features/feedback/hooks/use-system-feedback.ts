@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { systemFeedbackApi } from '../api';
 import type { CreateSystemFeedbackDto, UpdateFeedbackStatusDto } from '../types';
 import { toast } from 'sonner';
+import { queryKeys } from '@/lib/api/query-keys';
 
 export function useSystemFeedback() {
     const queryClient = useQueryClient();
@@ -10,7 +11,7 @@ export function useSystemFeedback() {
         mutationFn: (data: CreateSystemFeedbackDto) => systemFeedbackApi.submit(data),
         onSuccess: () => {
             toast.success('Gửi phản hồi thành công!');
-            queryClient.invalidateQueries({ queryKey: ['feedback'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.feedback.all });
         },
         onError: () => {
             toast.error('Không thể gửi phản hồi. Vui lòng thử lại.');
@@ -22,7 +23,7 @@ export function useSystemFeedback() {
             systemFeedbackApi.updateStatus(id, data),
         onSuccess: () => {
             toast.success('Cập nhật trạng thái thành công!');
-            queryClient.invalidateQueries({ queryKey: ['feedback'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.feedback.all });
         },
         onError: () => {
             toast.error('Không thể cập nhật trạng thái.');
@@ -34,7 +35,7 @@ export function useSystemFeedback() {
             systemFeedbackApi.addResponse(id, response),
         onSuccess: () => {
             toast.success('Gửi phản hồi thành công!');
-            queryClient.invalidateQueries({ queryKey: ['feedback'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.feedback.all });
         },
         onError: () => {
             toast.error('Không thể gửi phản hồi.');
@@ -53,7 +54,7 @@ export function useSystemFeedback() {
 
 export function useMyFeedback() {
     return useQuery({
-        queryKey: ['feedback', 'my'],
+        queryKey: [...queryKeys.feedback.all, 'my'],
         queryFn: () => systemFeedbackApi.getMine(),
     });
 }
@@ -64,8 +65,10 @@ export function useAdminFeedback(params?: {
     page?: number;
     limit?: number;
 }) {
+    // Cast params to Record<string, unknown> to satisfy type checker or just use 'any' if strict
+    const safeParams = params as unknown as Record<string, unknown>;
     return useQuery({
-        queryKey: ['feedback', 'admin', params],
+        queryKey: queryKeys.feedback.list(safeParams),
         queryFn: () => systemFeedbackApi.getAll(params),
     });
 }

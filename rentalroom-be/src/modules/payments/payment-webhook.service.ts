@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import * as crypto from 'crypto';
+import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
+import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
+import { IdempotencyGuard } from 'src/shared/guards/immutability.guard';
+import { v4 as uuidv4 } from 'uuid';
 
 interface WebhookPayload {
   transactionId: string;
