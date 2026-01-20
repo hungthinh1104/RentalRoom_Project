@@ -639,13 +639,25 @@ export class BillingService {
   }
 
   /**
-   * Submit meter readings for utilities (LANDLORD)
+   * Submit meter readings for utilities (LANDLORD ONLY)
+   * ⚠️ CRITICAL: Tenants CANNOT submit meter readings
+   * Only landlords can record utility consumption for billing
    */
-  async submitMeterReadingsForLandlord(dto: {
-    contractId: string;
-    month: string;
-    readings: Array<{ serviceId: string; currentReading: number }>;
-  }) {
+  async submitMeterReadingsForLandlord(
+    dto: {
+      contractId: string;
+      month: string;
+      readings: Array<{ serviceId: string; currentReading: number }>;
+    },
+    actor?: { id: string; role: UserRole }, // Optional: enforce landlord role
+  ) {
+    // 🔒 AUTHORIZATION: If actor provided, verify landlord role
+    if (actor && actor.role !== UserRole.LANDLORD && actor.role !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Only landlords can submit meter readings. Tenants may provide readings but landlord must confirm.',
+      );
+    }
+
     // Verify contract exists
     const contract = await this.prisma.contract.findUnique({
       where: { id: dto.contractId },
@@ -795,33 +807,12 @@ export class BillingService {
   }
 
   /**
-   * Submit meter readings for utilities (TENANT - deprecated in favor of landlord submission)
+   * ⚠️ DEPRECATED: Tenants cannot submit meter readings
+   * All meter reading submissions must go through landlord
+   * This method is REMOVED to prevent tenant meter submission
+   * Use submitMeterReadingsForLandlord() instead with role check
    */
-  async submitMeterReadings(
-    tenantId: string,
-    dto: {
-      month: string;
-      readings: Array<{ serviceId: string; currentReading: number }>;
-    },
-  ) {
-    // Find tenant's active contract
-    const contract = await this.prisma.contract.findFirst({
-      where: {
-        tenantId,
-        status: 'ACTIVE',
-      },
-    });
-
-    if (!contract) {
-      throw new NotFoundException('No active contract found for this tenant');
-    }
-
-    return this.submitMeterReadingsForLandlord({
-      contractId: contract.id,
-      month: dto.month,
-      readings: dto.readings,
-    });
-  }
+  // async submitMeterReadings(...) { } // REMOVED - Tenants cannot submit meters
 
   /**
    * Generate utility invoice from meter readings

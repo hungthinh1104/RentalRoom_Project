@@ -25,6 +25,7 @@ import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
 import type { Payment, RoomSummary, Contract } from "@/features/tenant/api/dashboard-api";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { RecommendationList } from "@/features/recommendations/components/recommendation-list";
 import {
     BarChart,
     Bar,
@@ -243,28 +244,7 @@ export function TenantDashboardView({ user, data }: TenantDashboardViewProps) {
                         title={<span className="text-xl font-bold">Gợi ý cho bạn</span>}
                         description="Dựa trên tìm kiếm gần đây"
                         header={
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                                {recommendations.items.slice(0, 2).map((item: RoomSummary) => (
-                                    <div
-                                        key={item.id}
-                                        className="flex gap-4 p-4 rounded-3xl bg-background/40 hover:bg-background/60 transition-all border border-white/5 cursor-pointer group/card"
-                                    >
-                                        <div className="w-24 h-24 bg-muted/20 rounded-2xl flex-shrink-0 relative overflow-hidden">
-                                            {/* Placeholder for image */}
-                                            <div className="absolute inset-0 bg-gradient-to-br from-neutral-200 to-neutral-300 dark:from-neutral-800 dark:to-neutral-900" />
-                                            <Home className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-muted-foreground w-8 h-8 opacity-50" />
-                                        </div>
-                                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                            <p className="font-bold text-sm truncate mb-1 group-hover/card:text-primary transition-colors">{item.name}</p>
-                                            <p className="text-primary font-black text-lg">{(item.pricePerMonth || 0).toLocaleString('vi-VN')}đ</p>
-                                            <div className="flex items-center gap-2 mt-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                                <MapPin className="w-3 h-3" /> {item.district || 'N/A'} • {item.roomType || 'N/A'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {recommendations.items.length === 0 && <p className="text-sm text-muted-foreground pl-1 italic">Chưa có gợi ý phù hợp.</p>}
-                            </div>
+                            <RecommendationList />
                         }
                         icon={<Sparkles className="h-5 w-5 text-purple-500" />}
                         className="glass-card border-none hover:shadow-2xl transition-all duration-500"

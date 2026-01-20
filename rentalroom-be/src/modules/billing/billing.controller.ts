@@ -122,7 +122,8 @@ export class BillingController {
   }
 
   /**
-   * Submit meter readings for utilities (for Landlord)
+   * Submit meter readings for utilities (LANDLORD ONLY)
+   * ⚠️ CRITICAL: Tenants cannot submit meter readings
    */
   @Post('meter-readings')
   @Auth(UserRole.LANDLORD)
@@ -133,8 +134,12 @@ export class BillingController {
       month: string;
       readings: Array<{ serviceId: string; currentReading: number }>;
     },
+    @CurrentUser() user: any,
   ) {
-    return this.billingService.submitMeterReadingsForLandlord(dto);
+    return this.billingService.submitMeterReadingsForLandlord(dto, {
+      id: user.id,
+      role: user.role,
+    });
   }
 
   /**
