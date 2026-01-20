@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { ContractsController } from './contracts.controller';
 import { ContractTemplatesController } from './controllers/contract-templates.controller';
@@ -10,6 +11,7 @@ import {
   PdfQueueService,
   ContractPdfService,
 } from './signing';
+import { ContractHashService } from './contract-hash.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from 'src/common/common.module';
 
@@ -22,6 +24,7 @@ import { ContractLifecycleService } from './lifecycle/contract-lifecycle.service
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    ConfigModule,
     NotificationsModule,
     CommonModule,
     PaymentsModule,
@@ -34,6 +37,7 @@ import { ContractLifecycleService } from './lifecycle/contract-lifecycle.service
     ContractSigningService,
     PdfQueueService,
     ContractPdfService,
+    ContractHashService,
     PrismaService,
     ContractApplicationService,
     ContractLifecycleService,
@@ -43,6 +47,7 @@ import { ContractLifecycleService } from './lifecycle/contract-lifecycle.service
     ContractSigningService,
     ContractApplicationService,
     ContractLifecycleService,
+    ContractHashService,
   ],
 })
 export class ContractsModule {}
