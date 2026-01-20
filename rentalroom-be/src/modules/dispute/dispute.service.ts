@@ -4,19 +4,24 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SnapshotService } from '../snapshots/snapshot.service';
+import { StateTransitionLogger } from '../../shared/state-machines/transition-logger.service';
 // import { AuditLogger } from '../../shared/audit/audit-logger';
 import { DisputeStatus, DisputeResolution } from './dispute.types';
 import { Decimal } from 'decimal.js';
 
 @Injectable()
 export class DisputeService {
+  private readonly logger = new Logger(DisputeService.name);
+
   constructor(
     private prisma: PrismaService,
     private snapshotService: SnapshotService,
+    private stateLogger: StateTransitionLogger,
     // private audit: AuditLogger,
   ) {}
 
@@ -267,7 +272,22 @@ export class DisputeService {
       // Process financial outcome atomically
       await this.processDisputeOutcomeTx(tx, updated);
 
-      // 📸 CREATE SNAPSHOT: Dispute Resolved (MANDATORY - fail-fast)
+      // � LOG STATE TRANSITION: Dispute OPEN → resolution (APPROVED/REJECTED/PARTIAL)
+      await this.stateLogger.logTransitionSafe({
+        entityType: 'dispute',
+        entityId: disputeId,
+        oldStatus: 'OPEN',
+        newStatus: dto.resolution,
+        actorId: adminId,
+        actorRole: 'ADMIN',
+        reason: dto.reason,
+        metadata: {
+          approvedAmount: parseFloat(new Decimal(dto.approvedAmount).toString()),
+          claimAmount: parseFloat(new Decimal(dispute.claimAmount).toString()),
+        },
+      });
+
+      // �📸 CREATE SNAPSHOT: Dispute Resolved (MANDATORY - fail-fast)
       await this.snapshotService.create(
         {
           actorId: adminId,

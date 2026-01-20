@@ -13,6 +13,7 @@ import { NotificationType } from '../notifications/entities';
 import { IncomeService } from '../income/income.service';
 import { IncomeType } from '../income/entities/income.entity';
 import { SnapshotService } from '../snapshots/snapshot.service';
+import { StateTransitionLogger } from '../../shared/state-machines/transition-logger.service';
 import {
   CreateInvoiceDto,
   CreateInvoiceLineItemDto,
@@ -38,6 +39,7 @@ export class BillingService {
     private readonly notificationsService: NotificationsService,
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
+    private readonly stateLogger: StateTransitionLogger,
   ) {}
 
   /**
@@ -445,7 +447,18 @@ export class BillingService {
         },
       });
 
-      // 📸 CREATE SNAPSHOT: Invoice Paid (MANDATORY - fail-fast)
+      // � LOG STATE TRANSITION: Invoice PENDING → PAID
+      await this.stateLogger.logTransitionSafe({
+        entityType: 'invoice',
+        entityId: id,
+        oldStatus: InvoiceStatus.PENDING,
+        newStatus: InvoiceStatus.PAID,
+        actorId: user.id,
+        actorRole: user.role,
+        reason: `Payment received via ${idempotencyKey ? 'idempotent operation' : 'API'}`,
+      });
+
+      // �📸 CREATE SNAPSHOT: Invoice Paid (MANDATORY - fail-fast)
       const paymentSnapshotId = await this.snapshotService.create(
         {
           actorId: user.id,

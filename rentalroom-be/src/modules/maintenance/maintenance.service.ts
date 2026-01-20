@@ -7,6 +7,7 @@ import {
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SnapshotService } from '../snapshots/snapshot.service';
+import { StateTransitionLogger } from '../../shared/state-machines/transition-logger.service';
 import {
   CreateMaintenanceRequestDto,
   UpdateMaintenanceRequestDto,
@@ -27,6 +28,7 @@ export class MaintenanceService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly snapshotService: SnapshotService,
+    private readonly stateLogger: StateTransitionLogger,
   ) {}
 
   async create(createDto: CreateMaintenanceRequestDto) {
@@ -253,7 +255,18 @@ export class MaintenanceService {
         },
       });
 
-      // 📸 CREATE SNAPSHOT: Maintenance Completed (MANDATORY - fail-fast)
+      // � LOG STATE TRANSITION: Maintenance PENDING/IN_PROGRESS → COMPLETED
+      await this.stateLogger.logTransitionSafe({
+        entityType: 'maintenance',
+        entityId: id,
+        oldStatus: request.status,
+        newStatus: MaintenanceStatus.COMPLETED,
+        actorId: user?.id || request.room.property.landlordId,
+        actorRole: user?.role || UserRole.LANDLORD,
+        reason: `Work completed by system or landlord`,
+      });
+
+      // �📸 CREATE SNAPSHOT: Maintenance Completed (MANDATORY - fail-fast)
       await this.snapshotService.create(
         {
           actorId: user?.id || request.room.property.landlordId,

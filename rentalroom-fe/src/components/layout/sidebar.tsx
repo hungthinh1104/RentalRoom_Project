@@ -22,6 +22,7 @@ import {
     ShieldCheck,
     Wallet,
     MessageSquareWarning,
+    MessageSquare,
     Menu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,8 @@ export function SidebarContent({ role, isCollapsed = false }: SidebarContentProp
                     { title: 'Pháp lý', href: '/dashboard/admin/legal-documents', icon: Scale },
                     { title: 'Nhật ký', href: '/dashboard/admin/audit-logs', icon: ShieldCheck },
                     { title: 'Báo cáo', href: '/dashboard/admin/reports', icon: FileText },
+                    { title: 'Giám sát PCCC', href: '/dashboard/admin/pccc', icon: ShieldCheck },
+                    { title: 'Hỗ trợ hệ thống', href: '/dashboard/admin/feedback', icon: MessageSquare },
                 ];
             case 'LANDLORD':
                 return [
@@ -81,6 +84,8 @@ export function SidebarContent({ role, isCollapsed = false }: SidebarContentProp
                     { title: 'Thu Chi', href: '/dashboard/landlord/finance', icon: Coins },
                     { title: 'Bảo trì', href: '/dashboard/landlord/maintenance', icon: Wrench },
                     { title: 'Đánh giá', href: '/dashboard/landlord/reviews', icon: Star },
+                    { title: 'Thẩm định PCCC', href: '/dashboard/landlord/pccc', icon: ShieldCheck },
+                    { title: 'Hỗ trợ', href: '/dashboard/landlord/feedback', icon: MessageSquare },
                 ];
             case 'TENANT':
                 return [
@@ -92,6 +97,7 @@ export function SidebarContent({ role, isCollapsed = false }: SidebarContentProp
                     { title: 'Bảo trì', href: '/dashboard/tenant/maintenance', icon: Wrench },
                     { title: 'Đánh giá', href: '/dashboard/tenant/reviews', icon: Star },
                     { title: 'Yêu thích', href: '/dashboard/tenant/favorites', icon: Heart },
+                    { title: 'Hỗ trợ', href: '/dashboard/tenant/feedback', icon: MessageSquare },
                 ];
             default:
                 return [];
