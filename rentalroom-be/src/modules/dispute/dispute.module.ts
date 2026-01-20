@@ -11,4 +11,4 @@ import { SnapshotsModule } from '../snapshots/snapshots.module';
   providers: [DisputeService],
   exports: [DisputeService],
 })
-export class DisputeModule { }
+export class DisputeModule {}

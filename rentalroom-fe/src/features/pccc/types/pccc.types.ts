@@ -34,15 +34,24 @@ export interface PCCCChecklist {
 export interface PCCCReport {
     id: string;
     propertyId: string;
+    landlordId?: string; // Added
+    propertyType: PropertyType; // Added
+    floors: number; // Added
+    area: number; // Added
+    volume?: number; // Added
+    laneWidth?: number; // Added
+    hasCage: boolean; // Added
     requirements: PCCCRequirements;
     complianceScore: number;
     status: PCCCStatus;
     pdfUrl?: string; // PC17
-    pc19Url?: string;
+    pc19Url?: string; // Kept for compat, check if in schema? Schema has pdfUrl, qrCode. pc19Url might be derived or FE only?
     checklistUrl?: string;
+    pdfHash?: string;
     qrCode?: string;
     expiryDate: string;
     createdAt: string;
+    updatedAt?: string; // Added
 }
 
 export interface CreatePCCCReportDto {

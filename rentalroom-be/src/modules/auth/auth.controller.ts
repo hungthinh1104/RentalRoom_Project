@@ -31,7 +31,7 @@ import { Auth } from 'src/common/decorators/auth.decorator';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 registrations per hour

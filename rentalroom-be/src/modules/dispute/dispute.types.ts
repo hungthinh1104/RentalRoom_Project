@@ -1,4 +1,9 @@
-export type DisputeStatus = 'OPEN' | 'APPROVED' | 'REJECTED' | 'PARTIAL' | 'ESCALATED';
+export type DisputeStatus =
+  | 'OPEN'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PARTIAL'
+  | 'ESCALATED';
 export type DisputeResolution = 'APPROVED' | 'REJECTED' | 'PARTIAL';
 export type EvidenceType = 'CLAIMANT' | 'RESPONDENT';
 

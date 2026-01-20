@@ -16,7 +16,7 @@ interface WebhookPayload {
 export class PaymentWebhookService {
   private readonly logger = new Logger(PaymentWebhookService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Handle SePay webhook with idempotency

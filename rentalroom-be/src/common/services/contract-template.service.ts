@@ -11,7 +11,10 @@ import * as path from 'path';
 import { formatDate } from 'date-fns';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { ContractType } from '@prisma/client';
-import { CreateContractTemplateDto, UpdateContractTemplateDto } from '../../modules/contracts/dto/contract-template.dto';
+import {
+  CreateContractTemplateDto,
+  UpdateContractTemplateDto,
+} from '../../modules/contracts/dto/contract-template.dto';
 
 /**
  * ContractTemplateService
@@ -27,7 +30,7 @@ export class ContractTemplateService implements OnModuleInit, OnModuleDestroy {
   );
   private browser: puppeteer.Browser;
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
     // 1. Launch Puppeteer
@@ -418,7 +421,11 @@ export class ContractTemplateService implements OnModuleInit, OnModuleDestroy {
    * WAIT: The controller has PUT :id. This implies in-place update.
    * We will add audit log to it.
    */
-  async updateTemplate(userId: string, id: string, dto: UpdateContractTemplateDto) {
+  async updateTemplate(
+    userId: string,
+    id: string,
+    dto: UpdateContractTemplateDto,
+  ) {
     const oldTemplate = await this.prisma.contractTemplate.findUnique({
       where: { id },
     });

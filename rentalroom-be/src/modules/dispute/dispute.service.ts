@@ -9,10 +9,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { SnapshotService } from '../snapshots/snapshot.service';
 // import { AuditLogger } from '../../shared/audit/audit-logger';
-import {
-  DisputeStatus,
-  DisputeResolution,
-} from './dispute.types';
+import { DisputeStatus, DisputeResolution } from './dispute.types';
 
 @Injectable()
 export class DisputeService {
@@ -20,7 +17,7 @@ export class DisputeService {
     private prisma: PrismaService,
     private snapshotService: SnapshotService,
     // private audit: AuditLogger,
-  ) { }
+  ) {}
 
   /**
    * UC_DISPUTE_01: Create dispute record from tenant or landlord
@@ -130,9 +127,7 @@ export class DisputeService {
     }
 
     if (dispute.status !== 'OPEN') {
-      throw new ConflictException(
-        'Can only add evidence to open disputes',
-      );
+      throw new ConflictException('Can only add evidence to open disputes');
     }
 
     // Check deadline
@@ -146,17 +141,13 @@ export class DisputeService {
       userId === dispute.contract.landlordId;
 
     if (userId === dispute.claimantId || !isRespondent) {
-      throw new ForbiddenException(
-        'Not authorized to submit counter evidence',
-      );
+      throw new ForbiddenException('Not authorized to submit counter evidence');
     }
 
     // CRITICAL: Enforce evidence limit (max 20 total, max 10 per party)
     const existingCount = dispute.evidence.length;
     if (existingCount + dto.evidenceUrls.length > 20) {
-      throw new BadRequestException(
-        'Total evidence limit exceeded (max 20)',
-      );
+      throw new BadRequestException('Total evidence limit exceeded (max 20)');
     }
 
     const respondentCount = dispute.evidence.filter(
@@ -221,10 +212,7 @@ export class DisputeService {
     }
 
     // Validate approved amount
-    if (
-      dto.approvedAmount < 0 ||
-      dto.approvedAmount > dispute.claimAmount
-    ) {
+    if (dto.approvedAmount < 0 || dto.approvedAmount > dispute.claimAmount) {
       throw new BadRequestException(
         'Approved amount must be between 0 and claim amount',
       );
@@ -391,10 +379,7 @@ export class DisputeService {
     },
   ) {
     // resolution logic now maps to status
-    if (
-      dispute.status === 'APPROVED' ||
-      dispute.status === 'PARTIAL'
-    ) {
+    if (dispute.status === 'APPROVED' || dispute.status === 'PARTIAL') {
       // Note: DepositRefund model doesn't exist in schema yet
       // This is a placeholder - you need to create this model
       // For now, log to audit instead of creating DB record
@@ -409,11 +394,7 @@ export class DisputeService {
   /**
    * Escalate dispute to legal/offline handling
    */
-  async escalateDispute(
-    disputeId: string,
-    reason: string,
-    adminId: string,
-  ) {
+  async escalateDispute(disputeId: string, reason: string, adminId: string) {
     const dispute = await this.prisma.dispute.update({
       where: { id: disputeId },
       data: {

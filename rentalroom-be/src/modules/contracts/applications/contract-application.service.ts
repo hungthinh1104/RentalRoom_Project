@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, ContractStatus } from '@prisma/client';
+import { Prisma, ContractStatus, PrismaClient } from '@prisma/client';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreateRentalApplicationDto,
@@ -30,9 +30,12 @@ export class ContractApplicationService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
-  ) { }
+  ) {}
 
-  private async acquireLock(tx: Prisma.TransactionClient, key: string) {
+  private async acquireLock(
+    tx: any,
+    key: string,
+  ) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
   }
 
@@ -41,7 +44,7 @@ export class ContractApplicationService {
    * Format: HD-{landlordPrefix}-{YYYYMM}-{XXXX}
    */
   private async generateContractNumberTx(
-    tx: Prisma.TransactionClient,
+    tx: any,
     landlordId: string,
   ): Promise<string> {
     const landlordPrefix = landlordId.slice(0, 4).toUpperCase();
@@ -185,8 +188,8 @@ export class ContractApplicationService {
               tenantUser.phoneNumber || 'N/A',
               application.requestedMoveInDate
                 ? new Date(application.requestedMoveInDate).toLocaleDateString(
-                  'vi-VN',
-                )
+                    'vi-VN',
+                  )
                 : undefined,
               application.message || undefined,
             );
@@ -286,7 +289,9 @@ export class ContractApplicationService {
     const application = await this.findOneApplication(id);
 
     if (application.status !== ApplicationStatus.PENDING) {
-      throw new BadRequestException('Only pending applications can be approved');
+      throw new BadRequestException(
+        'Only pending applications can be approved',
+      );
     }
 
     // 🔒 SECURITY: Landlord ownership validation
@@ -306,7 +311,9 @@ export class ContractApplicationService {
     const result = await this.prisma.$transaction(async (tx) => {
       // 🔒 UC_APP_01: Prevent bulk-approve protection
       // Lock room and check for other approved/active applications
-      const roomLock = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+      const roomLock = await tx.$queryRaw<
+        Array<{ id: string; status: string }>
+      >`
         SELECT id, status FROM "room"
         WHERE id = ${application.roomId}::uuid
         FOR UPDATE
@@ -437,7 +444,9 @@ export class ContractApplicationService {
     const application = await this.findOneApplication(id);
 
     if (application.status !== ApplicationStatus.PENDING) {
-      throw new BadRequestException('Only pending applications can be rejected');
+      throw new BadRequestException(
+        'Only pending applications can be rejected',
+      );
     }
 
     // 🔒 SECURITY: Landlord ownership validation

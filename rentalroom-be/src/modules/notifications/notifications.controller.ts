@@ -63,7 +63,10 @@ export class NotificationsController {
 
   @Patch('user/:userId/mark-all-as-read')
   @Auth()
-  async markAllAsRead(@Param('userId') userId: string, @CurrentUser() user: any) {
+  async markAllAsRead(
+    @Param('userId') userId: string,
+    @CurrentUser() user: any,
+  ) {
     // 🔒 SECURITY: Users can only mark their own notifications as read
     if (user?.id !== userId) {
       throw new ForbiddenException(

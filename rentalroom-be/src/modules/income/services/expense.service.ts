@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma/prisma.service';
 import { ExpenseType, UserRole } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from 'decimal.js';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { NotificationType } from '../../notifications/entities';
 import { SnapshotService } from '../../snapshots/snapshot.service';
@@ -34,62 +34,64 @@ export class ExpenseService {
     const periodMonth = paidDate.getMonth() + 1;
     const periodMonthStr = `${periodYear}-${periodMonth.toString().padStart(2, '0')}`;
 
-    return await this.prisma.$transaction(async (tx) => {
-      const expense = await tx.expense.create({
-        data: {
-          rentalUnitId: dto.rentalUnitId,
-          amount: new Decimal(dto.amount),
-          currency: 'VND',
-          expenseType: dto.expenseType,
-          periodYear,
-          periodMonth,
-          periodMonthStr,
-          paidAt: paidDate,
-          note: dto.note,
-          receiptNumber: dto.receiptNumber,
-        },
-      });
-
-      // 📸 CREATE SNAPSHOT: Expense Recorded (MANDATORY - fail-fast)
-      const snapshotId = await this.snapshotService.create(
-        {
-          actorId: userId,
-          actorRole: UserRole.LANDLORD,
-          actionType: 'EXPENSE_RECORDED',
-          entityType: 'EXPENSE',
-          entityId: expense.id,
-          timestamp: new Date(),
-          metadata: {
-            amount: expense.amount.toString(),
-            expenseType: expense.expenseType,
-            receiptNumber: expense.receiptNumber,
+    return await this.prisma
+      .$transaction(async (tx) => {
+        const expense = await tx.expense.create({
+          data: {
+            rentalUnitId: dto.rentalUnitId,
+            amount: new Decimal(dto.amount),
+            currency: 'VND',
+            expenseType: dto.expenseType,
+            periodYear,
+            periodMonth,
+            periodMonthStr,
+            paidAt: paidDate,
+            note: dto.note,
+            receiptNumber: dto.receiptNumber,
           },
-        },
-        tx,
-      );
+        });
 
-      await tx.expense.update({
-        where: { id: expense.id },
-        data: { snapshotId },
-      });
-
-      return expense;
-    }).then((expense) => {
-      // Trigger Notification (ASYNC - outside transaction)
-      this.notificationsService
-        .create({
-          userId,
-          title: '💸 Chi phí mới',
-          content: `Đã ghi nhận chi ${Number(expense.amount).toLocaleString('vi-VN')} VND (${expense.expenseType})`,
-          notificationType: NotificationType.SYSTEM,
-          relatedEntityId: expense.id,
-        })
-        .catch((e) =>
-          this.logger.error(`Failed to send notification: ${e.message}`),
+        // 📸 CREATE SNAPSHOT: Expense Recorded (MANDATORY - fail-fast)
+        const snapshotId = await this.snapshotService.create(
+          {
+            actorId: userId,
+            actorRole: UserRole.LANDLORD,
+            actionType: 'EXPENSE_RECORDED',
+            entityType: 'EXPENSE',
+            entityId: expense.id,
+            timestamp: new Date(),
+            metadata: {
+              amount: expense.amount.toString(),
+              expenseType: expense.expenseType,
+              receiptNumber: expense.receiptNumber,
+            },
+          },
+          tx,
         );
 
-      return expense;
-    });
+        await tx.expense.update({
+          where: { id: expense.id },
+          data: { snapshotId },
+        });
+
+        return expense;
+      })
+      .then((expense) => {
+        // Trigger Notification (ASYNC - outside transaction)
+        this.notificationsService
+          .create({
+            userId,
+            title: '💸 Chi phí mới',
+            content: `Đã ghi nhận chi ${Number(expense.amount).toLocaleString('vi-VN')} VND (${expense.expenseType})`,
+            notificationType: NotificationType.SYSTEM,
+            relatedEntityId: expense.id,
+          })
+          .catch((e) =>
+            this.logger.error(`Failed to send notification: ${e.message}`),
+          );
+
+        return expense;
+      });
   }
 
   /**

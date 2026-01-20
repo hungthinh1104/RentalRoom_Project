@@ -137,7 +137,7 @@ export default function HomePage() {
             className="text-center mb-12"
           >
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Tại sao chọn Hestia?
+              Tại sao chọn RentalRoom?
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Nền tảng duy nhất được xây dựng riêng cho thị trường Việt Nam
@@ -186,7 +186,7 @@ export default function HomePage() {
               Sẵn sàng chuyển đổi số?
             </h2>
             <p className="text-lg mb-8 text-primary-foreground/90">
-              Tham gia cùng 5,000+ chủ nhà đang sử dụng Hestia hàng ngày
+              Tham gia cùng 5,000+ chủ nhà đang sử dụng RentalRoom hàng ngày
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
               <Button size="lg" variant="secondary" asChild className="shadow-lg">

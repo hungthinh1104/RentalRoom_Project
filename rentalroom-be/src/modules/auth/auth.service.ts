@@ -50,7 +50,10 @@ export class AuthService {
    * - At least 1 number
    * - At least 1 special character (!@#$%^&*)
    */
-  private validatePasswordPolicy(password: string): { valid: boolean; errors: string[] } {
+  private validatePasswordPolicy(password: string): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (password.length < 8) {
@@ -66,7 +69,9 @@ export class AuthService {
       errors.push('Password must contain at least 1 number');
     }
     if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push('Password must contain at least 1 special character (!@#$%^&*)');
+      errors.push(
+        'Password must contain at least 1 special character (!@#$%^&*)',
+      );
     }
 
     return {
@@ -157,7 +162,7 @@ export class AuthService {
       this.logger.error('Registration failed', error);
 
       // Check if it's a Prisma unique constraint error
-      if ((error as any).code === 'P2002') {
+      if (error.code === 'P2002') {
         throw new ConflictException('Email already registered');
       }
 
@@ -236,10 +241,17 @@ export class AuthService {
 
       // Optional: Validate token family for additional security
       // This helps prevent token reuse attacks across devices
-      if (user.lastRefreshTokenFamily && payload.family !== user.lastRefreshTokenFamily) {
+      if (
+        user.lastRefreshTokenFamily &&
+        payload.family !== user.lastRefreshTokenFamily
+      ) {
         // Token family mismatch - possible token reuse attack
-        this.logger.warn(`Possible token reuse attack detected for user ${user.id}`);
-        throw new UnauthorizedException('Token reuse detected. Please login again.');
+        this.logger.warn(
+          `Possible token reuse attack detected for user ${user.id}`,
+        );
+        throw new UnauthorizedException(
+          'Token reuse detected. Please login again.',
+        );
       }
 
       const access_token = await this.jwtService.signAsync(
@@ -257,7 +269,7 @@ export class AuthService {
 
       return { access_token };
     } catch (error) {
-      if ((error as any).name === 'TokenExpiredError') {
+      if (error.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Refresh token has expired');
       }
       throw new UnauthorizedException('Invalid refresh token');

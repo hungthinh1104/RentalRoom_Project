@@ -1,14 +1,10 @@
-import {
-  Injectable,
-  NestMiddleware,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, NestMiddleware, ConflictException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { PrismaService } from '../../database/prisma/prisma.service';
 
 /**
  * Payment Idempotency Middleware
- * 
+ *
  * UC_PAY_01: Prevent duplicate payment processing via TransactionID
  * Ensures same transaction cannot be processed twice
  * Returns cached response if duplicate detected
@@ -32,9 +28,10 @@ export class PaymentIdempotencyMiddleware implements NestMiddleware {
 
     try {
       // Check if transaction already processed
-      const existingTransaction = await this.prisma.paymentTransaction.findUnique({
-        where: { transactionId },
-      });
+      const existingTransaction =
+        await this.prisma.paymentTransaction.findUnique({
+          where: { transactionId },
+        });
 
       if (existingTransaction) {
         // Transaction already processed, return cached response

@@ -7,7 +7,7 @@ import { IeKycService } from '../ekyc.service.interface';
 /**
  * VNPT eKYC Provider
  * Vietnam Post & Telecom's government-backed KYC solution
- * 
+ *
  * Setup Instructions:
  * 1. Register at https://kycapi.vnpt.vn
  * 2. Get API Key + Client ID from VNPT
@@ -52,7 +52,7 @@ export class VnpteKycProvider implements IeKycService {
         },
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
           timeout: this.timeout,
@@ -70,7 +70,7 @@ export class VnpteKycProvider implements IeKycService {
         },
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
           timeout: this.timeout,
@@ -86,7 +86,7 @@ export class VnpteKycProvider implements IeKycService {
           },
           {
             headers: {
-              'Authorization': `Bearer ${this.apiKey}`,
+              Authorization: `Bearer ${this.apiKey}`,
               'Content-Type': 'application/json',
             },
             timeout: this.timeout,
@@ -99,7 +99,7 @@ export class VnpteKycProvider implements IeKycService {
         `${this.endpoint}/kyc/verify/${sessionId}/result`,
         {
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey}`,
           },
           timeout: this.timeout,
         },
@@ -171,9 +171,7 @@ export class VnpteKycProvider implements IeKycService {
   /**
    * Map VNPT document type
    */
-  private mapDocumentType(
-    vnptType: string,
-  ): 'CCCD' | 'CMND' | 'PASSPORT' {
+  private mapDocumentType(vnptType: string): 'CCCD' | 'CMND' | 'PASSPORT' {
     if (vnptType === '01' || vnptType === 'cccd') return 'CCCD';
     if (vnptType === '02' || vnptType === 'cmnd') return 'CMND';
     return 'PASSPORT';

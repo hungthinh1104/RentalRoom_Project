@@ -5,33 +5,33 @@ import { PrismaService } from '../../src/database/prisma/prisma.service';
 import cookieParser from 'cookie-parser';
 
 export interface TestingApp {
-    app: INestApplication;
-    prisma: PrismaService;
+  app: INestApplication;
+  prisma: PrismaService;
 }
 
 export async function createTestingApp(): Promise<TestingApp> {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-        imports: [AppModule],
-    }).compile();
+  const moduleFixture: TestingModule = await Test.createTestingModule({
+    imports: [AppModule],
+  }).compile();
 
-    const app = moduleFixture.createNestApplication();
+  const app = moduleFixture.createNestApplication();
 
-    // Replicate main.ts config
-    app.setGlobalPrefix('api/v1');
-    app.use(cookieParser());
-    app.useGlobalPipes(
-        new ValidationPipe({
-            whitelist: true,
-            forbidNonWhitelisted: false,
-            transform: true,
-            transformOptions: {
-                enableImplicitConversion: true,
-            },
-        }),
-    );
+  // Replicate main.ts config
+  app.setGlobalPrefix('api/v1');
+  app.use(cookieParser());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: false,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
 
-    await app.init();
-    const prisma = app.get(PrismaService);
+  await app.init();
+  const prisma = app.get(PrismaService);
 
-    return { app, prisma };
+  return { app, prisma };
 }

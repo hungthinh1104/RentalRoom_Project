@@ -1,8 +1,8 @@
 import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import * as crypto from 'crypto';
-import { Decimal } from '@prisma/client/runtime/library';
-import { UserRole, Prisma } from '@prisma/client';
+import { Decimal } from 'decimal.js';
+import { UserRole, Prisma, PrismaClient } from '@prisma/client';
 import { SnapshotService } from '../snapshots/snapshot.service';
 
 @Injectable()
@@ -13,7 +13,7 @@ export class TaxService {
   constructor(
     private prisma: PrismaService,
     private snapshotService: SnapshotService,
-  ) {}
+  ) { }
 
   /**
    * Generate monthly revenue snapshot for a landlord
@@ -233,9 +233,13 @@ export class TaxService {
   /**
    * Get effective regulation for a given year
    */
-  async getEffectiveRegulation(year: number, tx?: Prisma.TransactionClient) {
+  async getEffectiveRegulation(
+    year: number,
+    tx?: Prisma.TransactionClient,
+  ) {
     // Find the latest active regulation for the given year
-    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
+    const prisma =
+      (tx as Prisma.TransactionClient) || this.prisma;
     const regulation = await prisma.regulationVersion.findFirst({
       where: {
         type: 'RENTAL_TAX',
@@ -278,19 +282,27 @@ export class TaxService {
     year: number,
     tx?: Prisma.TransactionClient,
   ): Promise<{ type: string; version: string; hash: string } | null> {
-    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
+    const prisma =
+      (tx as Prisma.TransactionClient) || this.prisma;
     const regulation = await prisma.regulationVersion.findFirst({
       where: {
         type: 'RENTAL_TAX',
         effectiveFrom: { lte: new Date(year, 11, 31) },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date(year, 0, 1) } }],
+        OR: [
+          { effectiveTo: null },
+          { effectiveTo: { gte: new Date(year, 0, 1) } },
+        ],
         deletedAt: null,
       },
       orderBy: { effectiveFrom: 'desc' },
     });
 
     if (!regulation) return null;
-    return { type: regulation.type, version: regulation.version, hash: regulation.contentHash };
+    return {
+      type: regulation.type,
+      version: regulation.version,
+      hash: regulation.contentHash,
+    };
   }
 
   /**

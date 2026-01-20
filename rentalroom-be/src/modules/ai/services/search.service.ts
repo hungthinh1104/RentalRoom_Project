@@ -45,9 +45,8 @@ export class SearchService {
         : query;
 
       // Generate real embedding (Gemini text-embedding-004)
-      const queryEmbedding = await this.embeddingService.generateEmbedding(
-        effectiveQuery,
-      );
+      const queryEmbedding =
+        await this.embeddingService.generateEmbedding(effectiveQuery);
 
       // Run pgvector similarity to get candidate rooms using real data
       const candidates = await this.vectorSearch(queryEmbedding, limit * 3);
@@ -81,10 +80,20 @@ export class SearchService {
 
       // Apply structured filters on real data
       const filtered = rooms.filter((room) => {
-        if (filters.minPrice != null && Number(room.pricePerMonth) < filters.minPrice) return false;
-        if (filters.maxPrice != null && Number(room.pricePerMonth) > filters.maxPrice) return false;
-        if (filters.minArea != null && Number(room.area) < filters.minArea) return false;
-        if (filters.maxArea != null && Number(room.area) > filters.maxArea) return false;
+        if (
+          filters.minPrice != null &&
+          Number(room.pricePerMonth) < filters.minPrice
+        )
+          return false;
+        if (
+          filters.maxPrice != null &&
+          Number(room.pricePerMonth) > filters.maxPrice
+        )
+          return false;
+        if (filters.minArea != null && Number(room.area) < filters.minArea)
+          return false;
+        if (filters.maxArea != null && Number(room.area) > filters.maxArea)
+          return false;
 
         if (filters.amenities && filters.amenities.length > 0) {
           const roomAmenityTypes = room.amenities.map((a: any) => a.type);
@@ -95,7 +104,11 @@ export class SearchService {
         }
 
         if (filters.location) {
-          const haystack = [room.property?.address, room.property?.city, room.property?.ward]
+          const haystack = [
+            room.property?.address,
+            room.property?.city,
+            room.property?.ward,
+          ]
             .filter(Boolean)
             .join(' ')
             .toLowerCase();
@@ -112,9 +125,7 @@ export class SearchService {
       const results = filtered
         .map((room) => ({
           ...room,
-          similarity: Number(
-            (similarityMap.get(room.id) ?? 0).toFixed(4),
-          ),
+          similarity: Number((similarityMap.get(room.id) ?? 0).toFixed(4)),
         }))
         .sort((a, b) => b.similarity - a.similarity)
         .slice(0, Math.min(limit, 50));
@@ -218,7 +229,10 @@ export class SearchService {
 
       return rows.map((r) => ({ query: r.query, count: r.searchCount }));
     } catch (error) {
-      this.logger.warn('Failed to load popular searches, returning empty', error);
+      this.logger.warn(
+        'Failed to load popular searches, returning empty',
+        error,
+      );
       return [];
     }
   }

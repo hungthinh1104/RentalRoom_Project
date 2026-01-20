@@ -3,7 +3,7 @@ import { PrismaService } from '../../database/prisma/prisma.service';
 import { SnapshotService } from '../snapshots/snapshot.service';
 import { CreateIncomeDto } from './dto/income.dto';
 import { IncomeType, TaxCategory, UserRole } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from 'decimal.js';
 
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/entities';

@@ -151,7 +151,7 @@ export class AIController {
       example: {
         embeddings: [
           { index: 0, embedding: [0.123, -0.456, 0.789], success: true },
-          { index: 1, embedding: [-0.234, 0.567, -0.890], success: true },
+          { index: 1, embedding: [-0.234, 0.567, -0.89], success: true },
           { index: 2, error: 'Text too long', success: false },
         ],
         successful: 2,

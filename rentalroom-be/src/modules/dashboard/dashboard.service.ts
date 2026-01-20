@@ -21,7 +21,7 @@ export interface CashFlowAlert {
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Get Cash Flow Summary - Core Survival Feature
@@ -110,7 +110,7 @@ export class DashboardService {
     for (const inv of overdueInvoices.slice(0, 5)) {
       const daysOverdue = Math.floor(
         (new Date().getTime() - new Date(inv.dueDate).getTime()) /
-        (1000 * 60 * 60 * 24),
+          (1000 * 60 * 60 * 24),
       );
       alerts.push({
         type: 'overdue',
@@ -276,10 +276,7 @@ export class DashboardService {
       if (inv.paidAt) {
         const key = inv.paidAt.toISOString().slice(0, 7);
         if (monthMap.has(key)) {
-          monthMap.set(
-            key,
-            monthMap.get(key)! + Number(inv.totalAmount || 0),
-          );
+          monthMap.set(key, monthMap.get(key)! + Number(inv.totalAmount || 0));
         }
       }
     });
@@ -357,8 +354,8 @@ export class DashboardService {
 
       for (let i = 5; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        // Normalize to start of month for consistent keys if needed, 
-        // but the query returns ISO string which varies. 
+        // Normalize to start of month for consistent keys if needed,
+        // but the query returns ISO string which varies.
         // Let's use start of month ISO as key/label.
         const start = new Date(d.getFullYear(), d.getMonth(), 1);
         trendMap.set(start.toISOString(), 0);
@@ -377,7 +374,10 @@ export class DashboardService {
           const d = new Date(inv.paidAt);
           const key = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
           if (trendMap.has(key)) {
-            trendMap.set(key, trendMap.get(key)! + Number(inv.totalAmount || 0));
+            trendMap.set(
+              key,
+              trendMap.get(key)! + Number(inv.totalAmount || 0),
+            );
           }
         }
       });
@@ -513,10 +513,13 @@ export class DashboardService {
           const total = p.rooms?.length || 0;
           // Check if any active contract exists in the room's contracts list
           // Assuming Room -> Contracts[] (1-n)
-          const occupied = p.rooms?.filter((r) => {
-            // Check active contracts
-            return r.contracts?.some((c) => c.status === ContractStatus.ACTIVE);
-          }).length || 0;
+          const occupied =
+            p.rooms?.filter((r) => {
+              // Check active contracts
+              return r.contracts?.some(
+                (c) => c.status === ContractStatus.ACTIVE,
+              );
+            }).length || 0;
 
           return {
             id: p.id,
@@ -544,7 +547,10 @@ export class DashboardService {
         properties: properties.slice(0, 5),
       };
     } catch (error) {
-      this.logger.error('Error getting top performers', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Error getting top performers',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }

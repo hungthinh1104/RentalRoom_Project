@@ -104,8 +104,13 @@ export class ContractSigningService {
       }
 
       // State machine guard: only generate if not already signed
-      if (contract.signatureStatus === 'SIGNED' || contract.signatureStatus === 'VERIFIED') {
-        throw new BadRequestException('Cannot regenerate PDF for signed contract');
+      if (
+        contract.signatureStatus === 'SIGNED' ||
+        contract.signatureStatus === 'VERIFIED'
+      ) {
+        throw new BadRequestException(
+          'Cannot regenerate PDF for signed contract',
+        );
       }
 
       const tenantUser = contract.application.tenant.user;
@@ -198,9 +203,7 @@ export class ContractSigningService {
       this.logger.error(
         `Failed to generate PDF for contract ${contractId}: ${msg}`,
       );
-      throw new InternalServerErrorException(
-        `Failed to generate PDF: ${msg}`,
-      );
+      throw new InternalServerErrorException(`Failed to generate PDF: ${msg}`);
     }
   }
 
@@ -262,12 +265,11 @@ export class ContractSigningService {
 
       // CRITICAL: Party authorization - verify signer is contract party
       const tenantUserId = contract.application.tenant.user.id;
-      const landlordUserId = contract.application.room.property.landlord.user.id;
+      const landlordUserId =
+        contract.application.room.property.landlord.user.id;
 
       if (![tenantUserId, landlordUserId].includes(signerInfo.userId)) {
-        throw new BadRequestException(
-          'Signer is not a party to this contract',
-        );
+        throw new BadRequestException('Signer is not a party to this contract');
       }
 
       // Read original PDF
@@ -376,7 +378,9 @@ export class ContractSigningService {
 
       // CRITICAL: Verify hash integrity against stored hash
       const currentHash = this.digitalSignature.hashPDF(signedPdfBuffer);
-      const hashMatch = contract.pdfHash ? currentHash === contract.pdfHash : true;
+      const hashMatch = contract.pdfHash
+        ? currentHash === contract.pdfHash
+        : true;
 
       if (isVerified && !hashMatch) {
         this.logger.warn(
@@ -457,9 +461,7 @@ export class ContractSigningService {
       this.logger.error(
         `Failed to download PDF for contract ${contractId}: ${msg}`,
       );
-      throw new InternalServerErrorException(
-        `Failed to download PDF: ${msg}`,
-      );
+      throw new InternalServerErrorException(`Failed to download PDF: ${msg}`);
     }
   }
 

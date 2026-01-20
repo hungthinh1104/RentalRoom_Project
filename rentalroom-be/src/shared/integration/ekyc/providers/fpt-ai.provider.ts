@@ -7,7 +7,7 @@ import { IeKycService } from '../ekyc.service.interface';
 /**
  * FPT.AI eKYC Provider
  * Vietnamese KYC solution with AI-powered document recognition
- * 
+ *
  * Setup Instructions:
  * 1. Register at https://api.fpt.ai
  * 2. Get API Key from dashboard
@@ -127,9 +127,7 @@ export class FptAieKycProvider implements IeKycService {
   /**
    * Map FPT.AI document type to standard enum
    */
-  private mapDocumentType(
-    fptType: string,
-  ): 'CCCD' | 'CMND' | 'PASSPORT' {
+  private mapDocumentType(fptType: string): 'CCCD' | 'CMND' | 'PASSPORT' {
     if (fptType === 'cccd' || fptType === 'citizen_id') return 'CCCD';
     if (fptType === 'cmnd' || fptType === 'old_id') return 'CMND';
     return 'PASSPORT';
@@ -138,9 +136,7 @@ export class FptAieKycProvider implements IeKycService {
   /**
    * Calculate fraud risk level based on FPT.AI confidence scores
    */
-  private calculateRiskLevel(
-    data: any,
-  ): 'LOW' | 'MEDIUM' | 'HIGH' {
+  private calculateRiskLevel(data: any): 'LOW' | 'MEDIUM' | 'HIGH' {
     if (!data.verified) return 'HIGH';
     if (!data.liveness_passed) return 'HIGH';
     if (data.face_match_score < 70) return 'MEDIUM';

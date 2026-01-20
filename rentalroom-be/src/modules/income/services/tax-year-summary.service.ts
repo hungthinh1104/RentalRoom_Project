@@ -3,7 +3,7 @@ import { PrismaService } from '../../../database/prisma/prisma.service';
 import { SnapshotService } from '../../snapshots/snapshot.service';
 import { RegulationService } from '../../snapshots/services';
 import { TaxCategory, TaxStatus, UserRole } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from 'decimal.js';
 
 @Injectable()
 export class TaxYearSummaryService {

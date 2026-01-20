@@ -14,7 +14,7 @@ import * as path from 'path';
 /**
  * Service responsible for generating a PDF representation of a contract.
  * Uses pdf-lib to create a PDF with contract details and QR code.
- * 
+ *
  * NOTE: Authorization is handled by ContractPartyGuard in controller.
  * This service assumes the request is already authorized.
  */
@@ -22,7 +22,11 @@ import * as path from 'path';
 export class ContractPdfService {
   private readonly logger = new Logger(ContractPdfService.name);
   private fontCache: Buffer | null = null; // Cache font in memory
-  private readonly fontPath = path.join(process.cwd(), 'fonts', 'Roboto-Regular.ttf');
+  private readonly fontPath = path.join(
+    process.cwd(),
+    'fonts',
+    'Roboto-Regular.ttf',
+  );
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -120,8 +124,12 @@ export class ContractPdfService {
       y -= lineHeight * 2;
 
       drawText(`Hợp đồng số: ${contract.contractNumber}`);
-      drawText(`Ngày bắt đầu: ${contract.startDate.toISOString().split('T')[0]}`);
-      drawText(`Ngày kết thúc: ${contract.endDate.toISOString().split('T')[0]}`);
+      drawText(
+        `Ngày bắt đầu: ${contract.startDate.toISOString().split('T')[0]}`,
+      );
+      drawText(
+        `Ngày kết thúc: ${contract.endDate.toISOString().split('T')[0]}`,
+      );
       drawText(`Phòng: ${contract.room?.roomNumber || ''}`);
       drawText(`Chủ nhà: ${contract.landlord?.user?.fullName || ''}`);
       drawText(`Người thuê: ${contract.tenant?.user?.fullName || ''}`);
@@ -173,10 +181,10 @@ export class ContractPdfService {
       }
 
       const msg = (error as Error)?.message ?? String(error);
-      this.logger.error(`Failed to generate PDF for contract ${contractId}: ${msg}`);
-      throw new InternalServerErrorException(
-        `Failed to generate PDF: ${msg}`,
+      this.logger.error(
+        `Failed to generate PDF for contract ${contractId}: ${msg}`,
       );
+      throw new InternalServerErrorException(`Failed to generate PDF: ${msg}`);
     }
   }
 }

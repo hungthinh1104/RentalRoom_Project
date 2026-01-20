@@ -11,4 +11,4 @@ import { SnapshotsModule } from '../snapshots/snapshots.module';
   providers: [MaintenanceService, PrismaService],
   exports: [MaintenanceService],
 })
-export class MaintenanceModule { }
+export class MaintenanceModule {}

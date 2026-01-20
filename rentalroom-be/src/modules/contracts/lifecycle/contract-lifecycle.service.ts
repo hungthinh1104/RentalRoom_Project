@@ -6,7 +6,13 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, InvoiceStatus, UserRole, ContractStatus } from '@prisma/client';
+import {
+  Prisma,
+  InvoiceStatus,
+  UserRole,
+  ContractStatus,
+  PrismaClient,
+} from '@prisma/client';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreateContractDto,
@@ -51,7 +57,7 @@ export class ContractLifecycleService {
     private readonly emailService: EmailService,
     private readonly paymentService: PaymentService,
     private readonly snapshotService: SnapshotService,
-  ) { }
+  ) {}
 
   /**
    * Enforce allowed transitions for contract state machine
@@ -68,14 +74,20 @@ export class ContractLifecycleService {
   /**
    * Advisory lock to serialize per-key critical sections (Postgres only)
    */
-  private async acquireLock(tx: Prisma.TransactionClient, key: string) {
+  private async acquireLock(
+    tx: any,
+    key: string,
+  ) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
   }
 
   /**
    * Transaction-scoped contract loader to avoid mixed connections
    */
-  private async findOneTx(tx: Prisma.TransactionClient, id: string) {
+  private async findOneTx(
+    tx: any,
+    id: string,
+  ) {
     const contract = await tx.contract.findUnique({
       where: { id },
       include: {
@@ -105,7 +117,10 @@ export class ContractLifecycleService {
     totalDeductions: number,
     penalty: number,
   ) {
-    const maxReturnable = Math.max(deposit + penalty - unpaidAmount - totalDeductions, 0);
+    const maxReturnable = Math.max(
+      deposit + penalty - unpaidAmount - totalDeductions,
+      0,
+    );
     if (refundAmount > maxReturnable) {
       throw new BadRequestException(
         `Refund exceeds allowable amount. Max: ${maxReturnable.toFixed(2)}`,
@@ -717,7 +732,9 @@ export class ContractLifecycleService {
 
     if (!resident) throw new NotFoundException('Resident not found');
     if (resident.contractId !== contractId)
-      throw new BadRequestException('Resident does not belong to this contract');
+      throw new BadRequestException(
+        'Resident does not belong to this contract',
+      );
 
     if (
       resident.contract.tenant.userId !== userId &&
@@ -794,7 +811,10 @@ export class ContractLifecycleService {
           startDate: new Date(oldContract.endDate),
           endDate: new Date(renewDto.newEndDate),
           monthlyRent: newRent,
-          deposit: renewDto.newDeposit !== undefined ? renewDto.newDeposit : oldContract.deposit,
+          deposit:
+            renewDto.newDeposit !== undefined
+              ? renewDto.newDeposit
+              : oldContract.deposit,
           paymentDay: oldContract.paymentDay,
           maxOccupants: oldContract.maxOccupants,
           status: ContractStatus.DRAFT,
@@ -896,7 +916,7 @@ export class ContractLifecycleService {
         1,
         Math.ceil(
           (requestedTerminationDate.getTime() - usageStart.getTime()) /
-          (1000 * 60 * 60 * 24),
+            (1000 * 60 * 60 * 24),
         ) + 1,
       );
       const proratedRent = (monthlyRent / daysInMonth) * daysUsedInMonth;
@@ -947,7 +967,13 @@ export class ContractLifecycleService {
         }
       }
 
-      this.assertRefundInvariant(refundAmount, deposit, unpaidAmount, totalDeductions, penalty);
+      this.assertRefundInvariant(
+        refundAmount,
+        deposit,
+        unpaidAmount,
+        totalDeductions,
+        penalty,
+      );
 
       await tx.contract.update({
         where: { id },

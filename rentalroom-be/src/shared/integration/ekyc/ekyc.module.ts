@@ -13,7 +13,9 @@ import { eKycProviderType, IeKycService } from './ekyc.types';
   providers: [
     {
       provide: 'EKYC_SERVICE',
-      useFactory: async (configService: ConfigService): Promise<IeKycService> => {
+      useFactory: async (
+        configService: ConfigService,
+      ): Promise<IeKycService> => {
         const provider = configService.get('EKYC_PROVIDER', 'FPT_AI');
 
         if (provider === 'VNPT') {

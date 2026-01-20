@@ -44,7 +44,7 @@ export class ContractsController {
     private readonly contractSigningService: ContractSigningService,
     private readonly pdfQueueService: PdfQueueService,
     private readonly contractPdfService: ContractPdfService,
-  ) { }
+  ) {}
 
   @Patch(':id/handover')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
@@ -269,10 +269,11 @@ export class ContractsController {
         void (async () => {
           try {
             await this.pdfQueueService.markProcessing(jobId);
-            const result = await this.contractSigningService.generateContractPDF(
-              id,
-              templateName,
-            );
+            const result =
+              await this.contractSigningService.generateContractPDF(
+                id,
+                templateName,
+              );
             await this.pdfQueueService.markCompleted(jobId, result);
           } catch (error: unknown) {
             const msg = (error as Error)?.message ?? String(error);
@@ -312,7 +313,7 @@ export class ContractsController {
    * - Ký file PDF bằng Private Key của hệ thống
    * - Embed chữ ký vào file
    * - Tạo audit log (ai ký, khi nào, từ đâu)
-   * 
+   *
    * TODO: Validate contract state before signing (must have generated PDF, both parties approved)
    * TODO: Prevent duplicate signatures
    */

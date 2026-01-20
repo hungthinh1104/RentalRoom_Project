@@ -102,7 +102,11 @@ async function bootstrap() {
 
   // Payment Idempotency Middleware (UC_PAY_01 - Replay Attack Prevention)
   const prismaService = app.get(PrismaService);
-  app.use(new PaymentIdempotencyMiddleware(prismaService).use.bind(new PaymentIdempotencyMiddleware(prismaService)));
+  app.use(
+    new PaymentIdempotencyMiddleware(prismaService).use.bind(
+      new PaymentIdempotencyMiddleware(prismaService),
+    ),
+  );
 
   // CORS
   const corsOrigins = process.env.CORS_ORIGIN

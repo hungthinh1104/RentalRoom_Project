@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { UserRole, Prisma } from '@prisma/client';
+import { UserRole, Prisma, PrismaClient } from '@prisma/client';
 import * as crypto from 'crypto';
 
 export interface CreateSnapshotDto {
@@ -30,7 +30,7 @@ export interface DocumentRef {
 
 @Injectable()
 export class SnapshotService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Create immutable legal snapshot
@@ -105,7 +105,8 @@ export class SnapshotService {
     timestamp: Date,
     tx?: Prisma.TransactionClient | PrismaService,
   ): Promise<RegulationRef[]> {
-    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
+    const prisma =
+      (tx as Prisma.TransactionClient) || this.prisma;
     const regulations = await prisma.regulationVersion.findMany({
       where: {
         effectiveFrom: { lte: timestamp },
@@ -229,11 +230,11 @@ export class SnapshotService {
       ...(actorId && { actorId }),
       ...(startDate || endDate
         ? {
-            timestamp: {
-              ...(startDate && { gte: startDate }),
-              ...(endDate && { lte: endDate }),
-            },
-          }
+          timestamp: {
+            ...(startDate && { gte: startDate }),
+            ...(endDate && { lte: endDate }),
+          },
+        }
         : {}),
     };
 

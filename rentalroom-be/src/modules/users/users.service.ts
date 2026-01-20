@@ -29,7 +29,10 @@ export class UsersService {
   /**
    * Validate password against minimum requirements
    */
-  private validatePasswordPolicy(password: string): { valid: boolean; errors: string[] } {
+  private validatePasswordPolicy(password: string): {
+    valid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
     if (password.length < 8) {
@@ -45,7 +48,9 @@ export class UsersService {
       errors.push('Password must contain at least 1 number');
     }
     if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push('Password must contain at least 1 special character (!@#$%^&*)');
+      errors.push(
+        'Password must contain at least 1 special character (!@#$%^&*)',
+      );
     }
 
     return {
@@ -260,7 +265,9 @@ export class UsersService {
     }
 
     // Validate new password policy
-    const pwValidation = this.validatePasswordPolicy(changePasswordDto.newPassword);
+    const pwValidation = this.validatePasswordPolicy(
+      changePasswordDto.newPassword,
+    );
     if (!pwValidation.valid) {
       throw new BadRequestException({
         message: 'New password does not meet security requirements',

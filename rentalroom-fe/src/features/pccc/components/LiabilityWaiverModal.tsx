@@ -100,7 +100,7 @@ export function LiabilityWaiverModal({ open, onOpenChange, onAgree }: LiabilityW
                                 4. Miễn trừ trách nhiệm
                             </h4>
                             <p>
-                                Đội ngũ phát triển, chủ sở hữu nền tảng Hestia và các bên liên quan được MIỄN TRỪ HOÀN TOÀN TRÁCH NHIỆM đối với bất kỳ thiệt hại trực tiếp, gián tiếp, ngẫu nhiên hoặc hệ quả nào phát sinh từ việc sử dụng hoặc không thể sử dụng Công cụ này, bao gồm cả việc hồ sơ bị từ chối hoặc các vấn đề pháp lý phát sinh.
+                                Đội ngũ phát triển, chủ sở hữu nền tảng RentalRoom và các bên liên quan được MIỄN TRỪ HOÀN TOÀN TRÁCH NHIỆM đối với bất kỳ thiệt hại trực tiếp, gián tiếp, ngẫu nhiên hoặc hệ quả nào phát sinh từ việc sử dụng hoặc không thể sử dụng Công cụ này, bao gồm cả việc hồ sơ bị từ chối hoặc các vấn đề pháp lý phát sinh.
                             </p>
 
                             <p className="pt-4 text-center italic text-muted-foreground border-t">

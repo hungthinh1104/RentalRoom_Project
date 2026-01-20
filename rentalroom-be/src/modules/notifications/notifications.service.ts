@@ -204,7 +204,7 @@ export class NotificationsService {
     //   where: { id },
     //   data: { deletedAt: new Date() },
     // });
-    
+
     await this.prisma.notification.delete({
       where: { id },
     });

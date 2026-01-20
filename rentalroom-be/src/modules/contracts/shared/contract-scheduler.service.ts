@@ -197,7 +197,9 @@ export class ContractSchedulerService {
           const otherActiveApps = await tx.rentalApplication.count({
             where: {
               roomId: app.roomId,
-              status: { in: [ApplicationStatus.PENDING, ApplicationStatus.APPROVED] },
+              status: {
+                in: [ApplicationStatus.PENDING, ApplicationStatus.APPROVED],
+              },
               id: { not: app.id },
             },
           });

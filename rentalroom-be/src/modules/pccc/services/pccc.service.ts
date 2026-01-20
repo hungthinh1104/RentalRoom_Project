@@ -16,7 +16,7 @@ import { UserRole } from 'src/modules/users/entities';
 @Injectable()
 export class PCCCService {
   private readonly logger = new Logger(PCCCService.name);
-  
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly snapshotService: SnapshotService,
@@ -91,7 +91,7 @@ export class PCCCService {
       const qrData = {
         reportId: report.id,
         propertyId,
-        url: `https://hestia.vn/verify/${report.id}`,
+        url: `https://diphungthinh.io.vn/verify/${report.id}`,
         expires: report.expiryDate,
         pdfHash, // Include hash in QR for verification
       };

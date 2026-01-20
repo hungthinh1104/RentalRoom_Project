@@ -109,4 +109,4 @@ import { OperationalExpensesModule } from './modules/operational-expenses/operat
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}

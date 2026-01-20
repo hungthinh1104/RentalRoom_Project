@@ -46,7 +46,11 @@ export class DisputeController {
     @Body() dto: { evidenceUrls: string[] },
     @Req() req: any,
   ) {
-    return this.disputeService.submitCounterEvidence(disputeId, dto, req.user.id);
+    return this.disputeService.submitCounterEvidence(
+      disputeId,
+      dto,
+      req.user.id,
+    );
   }
 
   /**

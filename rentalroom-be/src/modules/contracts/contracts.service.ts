@@ -22,7 +22,7 @@ export class ContractsService {
   constructor(
     private readonly applicationService: ContractApplicationService,
     private readonly lifecycleService: ContractLifecycleService,
-  ) { }
+  ) {}
 
   // --- Applications ---
 
@@ -104,11 +104,7 @@ export class ContractsService {
     return this.lifecycleService.terminate(id, userId, terminateDto);
   }
 
-  async renew(
-    id: string,
-    userId: string,
-    renewDto: RenewContractDto,
-  ) {
+  async renew(id: string, userId: string, renewDto: RenewContractDto) {
     return this.lifecycleService.renew(id, userId, renewDto);
   }
 

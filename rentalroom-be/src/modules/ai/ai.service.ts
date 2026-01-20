@@ -145,7 +145,12 @@ export class AIService {
     texts: string[],
     batchSize: number = 10,
   ): Promise<
-    Array<{ index: number; embedding?: number[]; error?: string; success: boolean }>
+    Array<{
+      index: number;
+      embedding?: number[];
+      error?: string;
+      success: boolean;
+    }>
   > {
     this.metrics.batchCalls++;
     const results: Array<{
@@ -160,9 +165,8 @@ export class AIService {
       const batchResults = await Promise.allSettled(
         batch.map(async (text, batchIdx) => {
           try {
-            const embedding = await this.embeddingService.generateEmbedding(
-              text,
-            );
+            const embedding =
+              await this.embeddingService.generateEmbedding(text);
             return { index: i + batchIdx, embedding, success: true };
           } catch (error: unknown) {
             return {

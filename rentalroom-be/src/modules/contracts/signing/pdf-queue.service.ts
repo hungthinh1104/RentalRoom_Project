@@ -25,14 +25,14 @@ export interface PdfJob {
 
 /**
  * PdfQueueService - Level 1 (Redis-based Job Tracker)
- * 
+ *
  * Manages async PDF generation job tracking using Redis cache.
- * 
+ *
  * IMPORTANT:
  * - This is a job STATUS STORE, not a task QUEUE
  * - For true queue semantics, upgrade to BullMQ/Cloud Tasks (Level 2)
  * - Current design is safe for MVP/low-concurrency scenarios
- * 
+ *
  * Features:
  * - UUID-based job IDs (no collision)
  * - Idempotent per contract (1 pending job max)
@@ -51,7 +51,7 @@ export class PdfQueueService {
 
   /**
    * Create PDF generation job (idempotent per contract)
-   * 
+   *
    * BEHAVIOR:
    * - If pending/processing job exists for contract → return existing jobId
    * - If completed/failed job exists → create new job
@@ -141,15 +141,11 @@ export class PdfQueueService {
 
       // Restore Date objects
       if (parsed.createdAt)
-        parsed.createdAt = new Date(
-          parsed.createdAt as unknown as string,
-        );
+        parsed.createdAt = new Date(parsed.createdAt as unknown as string);
       if (parsed.startedAt)
         parsed.startedAt = new Date(parsed.startedAt as unknown as string);
       if (parsed.completedAt)
-        parsed.completedAt = new Date(
-          parsed.completedAt as unknown as string,
-        );
+        parsed.completedAt = new Date(parsed.completedAt as unknown as string);
       if (parsed.expiresAt)
         parsed.expiresAt = new Date(parsed.expiresAt as unknown as string);
 
@@ -224,10 +220,7 @@ export class PdfQueueService {
    * Mark job as completed
    * ATOMIC: Ensures transition from processing → completed
    */
-  async markCompleted(
-    jobId: string,
-    result: PdfJobResult,
-  ): Promise<void> {
+  async markCompleted(jobId: string, result: PdfJobResult): Promise<void> {
     const job = await this.getJob(jobId);
     if (!job) {
       throw new BadRequestException(`Job ${jobId} not found`);

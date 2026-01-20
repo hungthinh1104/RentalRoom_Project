@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 
 /**
  * Contract Hash Snapshot Utility
- * 
+ *
  * UC_COT_02: Prevent bait-and-switch attacks on contracts
  * Creates SHA256 hash of contract before signing
  * Verifies hash match on signature submission
@@ -39,20 +39,14 @@ export class ContractHashService {
       contractData.terms,
     ].join('|');
 
-    return crypto
-      .createHash('sha256')
-      .update(hashInput)
-      .digest('hex');
+    return crypto.createHash('sha256').update(hashInput).digest('hex');
   }
 
   /**
    * Verify contract hash matches stored value
    * Throws if hash mismatch detected (bait-and-switch attempt)
    */
-  verifyContractHash(
-    contractHash: string,
-    storedHash: string,
-  ): boolean {
+  verifyContractHash(contractHash: string, storedHash: string): boolean {
     if (contractHash !== storedHash) {
       throw new Error(
         'Contract hash mismatch: Document may have been altered after signing',
@@ -79,9 +73,7 @@ export class ContractHashService {
       contract_hash: data.contractHash,
       signed_at: data.timestamp.toISOString(),
       e_signature_provider: data.eSignatureProviderId,
-      verification_token: crypto
-        .randomBytes(32)
-        .toString('hex'),
+      verification_token: crypto.randomBytes(32).toString('hex'),
     });
   }
 
@@ -104,10 +96,7 @@ export class ContractHashService {
       data.modificationDate.toISOString(),
     ].join('|');
 
-    return crypto
-      .createHash('sha256')
-      .update(hashInput)
-      .digest('hex');
+    return crypto.createHash('sha256').update(hashInput).digest('hex');
   }
 
   /**
@@ -129,9 +118,6 @@ export class ContractHashService {
       modification.timestamp.toISOString(),
     ].join('|');
 
-    return crypto
-      .createHash('sha256')
-      .update(chainInput)
-      .digest('hex');
+    return crypto.createHash('sha256').update(chainInput).digest('hex');
   }
 }

@@ -49,6 +49,17 @@ export const PDFDownloadCard: React.FC<PDFDownloadCardProps> = ({ report, onDown
                 </button>
             </div>
 
+            {report.pdfHash && (
+                <div className="mt-4 py-2 px-3 bg-slate-50 rounded-md border border-slate-100">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
+                        Digital Signature (SHA-256)
+                    </div>
+                    <div className="font-mono text-[10px] text-slate-600 break-all select-all">
+                        {report.pdfHash}
+                    </div>
+                </div>
+            )}
+
             <div className="mt-6 pt-4 border-t border-gray-100 flex items-center justify-between text-xs">
                 <span className="text-gray-500">Trạng thái:</span>
                 <span className={`font-semibold ${isExpired ? 'text-red-600' : 'text-green-600'}`}>
