@@ -48,6 +48,25 @@ service-account*.json
 *.swo
 *~
 
+# AI/Development Metadata
+.ai/
+**/beads/
+analysis/
+
+# Temporary Documentation (Session Notes)
+AUTH_*.md
+AUTH_*.txt
+BACKEND_*.md
+COMPLETION_*.txt
+FINAL_*.md
+IMPLEMENTATION_*.md
+QUICK_*.txt
+REMAINING_*.md
+SCENARIOS_*.md
+SESSION_*.md
+STATUS_*.md
+VULNERABILITY_*.md
+
 # Testing
 coverage/
 *.test.ts
