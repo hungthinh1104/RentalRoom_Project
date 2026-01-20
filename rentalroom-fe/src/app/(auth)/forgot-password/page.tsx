@@ -185,7 +185,7 @@ export default function ForgotPasswordPage() {
           transition={{ delay: 0.4 }}
           className="text-muted-foreground text-base px-4"
         >
-          Don't worry! Enter your email and we'll send you reset instructions.
+          Don&apos;t worry! Enter your email and we&apos;ll send you reset instructions.
         </motion.p>
       </div>
 

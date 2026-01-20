@@ -43,23 +43,23 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 <div className="flex flex-col items-center justify-center min-h-screen p-4">
                     <div className="max-w-md w-full space-y-6 text-center">
                         <div className="flex justify-center">
-                            <div className="rounded-full bg-red-100 p-4">
-                                <AlertTriangle className="h-12 w-12 text-red-600" />
+                            <div className="rounded-full bg-destructive-light p-4">
+                                <AlertTriangle className="h-12 w-12 text-destructive" />
                             </div>
                         </div>
 
                         <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-gray-900">
+                            <h2 className="text-2xl font-bold text-foreground">
                                 Đã xảy ra lỗi
                             </h2>
-                            <p className="text-gray-600">
+                            <p className="text-muted-foreground">
                                 Xin lỗi, có lỗi xảy ra khi tải trang này. Vui lòng thử lại sau.
                             </p>
                         </div>
 
                         {process.env.NODE_ENV === 'development' && this.state.error && (
-                            <div className="mt-4 p-4 bg-gray-100 rounded-lg text-left">
-                                <p className="text-sm font-mono text-red-600">
+                            <div className="mt-4 p-4 bg-muted rounded-lg text-left">
+                                <p className="text-sm font-mono text-destructive">
                                     {this.state.error.message}
                                 </p>
                             </div>

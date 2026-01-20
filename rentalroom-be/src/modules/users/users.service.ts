@@ -11,13 +11,13 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import * as bcrypt from 'bcrypt';
 
+import { UploadService } from '../upload/upload.service';
+
 interface FindAllParams {
   search?: string;
   role?: UserRole;
   emailVerified?: boolean;
 }
-
-import { UploadService } from '../upload/upload.service';
 
 @Injectable()
 export class UsersService {
@@ -25,6 +25,34 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly uploadService: UploadService,
   ) {}
+
+  /**
+   * Validate password against minimum requirements
+   */
+  private validatePasswordPolicy(password: string): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters long');
+    }
+    if (!/[A-Z]/.test(password)) {
+      errors.push('Password must contain at least 1 uppercase letter');
+    }
+    if (!/[a-z]/.test(password)) {
+      errors.push('Password must contain at least 1 lowercase letter');
+    }
+    if (!/\d/.test(password)) {
+      errors.push('Password must contain at least 1 number');
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      errors.push('Password must contain at least 1 special character (!@#$%^&*)');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
 
   async findAll(params?: FindAllParams) {
     const { search, role, emailVerified } = params || {};
@@ -229,6 +257,15 @@ export class UsersService {
     );
     if (!isPasswordValid) {
       throw new BadRequestException('Current password is incorrect');
+    }
+
+    // Validate new password policy
+    const pwValidation = this.validatePasswordPolicy(changePasswordDto.newPassword);
+    if (!pwValidation.valid) {
+      throw new BadRequestException({
+        message: 'New password does not meet security requirements',
+        errors: pwValidation.errors,
+      });
     }
 
     // Hash new password

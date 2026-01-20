@@ -3,13 +3,15 @@
 // Version: 3.0 - Production Ready with AI Features
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 // ============================================================================
@@ -32,10 +34,11 @@ enum PropertyType {
 enum RoomStatus {
   AVAILABLE
   OCCUPIED
-  UNAVAILABLE     // Maintenance, Police Lock, Quarantine
+  UNAVAILABLE // Maintenance, Police Lock, Quarantine
   DEPOSIT_PENDING // Reserved, Waiting for deposit
-  MAINTENANCE     // Legacy support
-  RESERVED        // Legacy support
+  PENDING_HANDOVER // After tenant move-out, before landlord confirms clean
+  MAINTENANCE // Legacy support
+  RESERVED // Legacy support
 }
 
 enum AmenityType {
@@ -155,6 +158,15 @@ enum UserAiFeedback {
   OFFENSIVE
 }
 
+enum TerminationType {
+  EARLY_BY_TENANT
+  EARLY_BY_LANDLORD
+  MUTUAL_AGREEMENT
+  EXPIRY
+  EVICTION
+  OTHER
+}
+
 // ============================================================================
 // CONTRACT MANAGEMENT (Added Phase 3)
 // ============================================================================
@@ -165,42 +177,42 @@ enum ContractType {
   HANDOVER_CHECKLIST
   SERVICE_AGREEMENT
   LIQUIDATION_MINUTES // Biên bản thanh lý
-  PCCC_APPLICATION    // 🔥 NEW: Hồ sơ PCCC
-  PCCC_CHECKLIST      // Checklist tự đánh giá
+  PCCC_APPLICATION // 🔥 NEW: Hồ sơ PCCC
+  PCCC_CHECKLIST // Checklist tự đánh giá
 }
 
 enum TemplateStatus {
-  DRAFT      // Chưa review
-  REVIEWED   // PCCC expert OK
-  ACTIVE     // Live production
+  DRAFT // Chưa review
+  REVIEWED // PCCC expert OK
+  ACTIVE // Live production
   DEPRECATED // Giữ history
 }
 
 model ContractTemplate {
-  id              String        @id @default(uuid()) @db.Uuid
-  type            ContractType  @map("type")
-  name            String        @db.VarChar(100)
-  title           String        @db.VarChar(200)
-  content         String        @db.Text
-  version         Int           @default(1)
-  status          TemplateStatus @default(DRAFT)  // 🔥 CRITICAL
-  legalDisclaimer String        @default("Mẫu tham khảo, không thay thế xác nhận chính thức Cảnh sát PCCC") @map("legal_disclaimer") @db.Text
-  pcccPartner     String?       @map("pccc_partner") // "618 Architects"
-  description     String?       @db.Text
-  isActive        Boolean       @default(false) @map("is_active")   // Only ACTIVE templates
-  isDefault       Boolean       @default(false) @map("is_default")
-  
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-  createdBy       String?       @map("created_by") @db.Uuid
-  reviewedBy      String?       @map("reviewed_by") @db.Uuid           // 🔥 PCCC expert
-  reviewDate      DateTime?     @map("review_date")
-  
+  id              String         @id @default(uuid()) @db.Uuid
+  type            ContractType   @map("type")
+  name            String         @db.VarChar(100)
+  title           String         @db.VarChar(200)
+  content         String         @db.Text
+  version         Int            @default(1)
+  status          TemplateStatus @default(DRAFT) // 🔥 CRITICAL
+  legalDisclaimer String         @default("Mẫu tham khảo, không thay thế xác nhận chính thức Cảnh sát PCCC") @map("legal_disclaimer") @db.Text
+  pcccPartner     String?        @map("pccc_partner") // "618 Architects"
+  description     String?        @db.Text
+  isActive        Boolean        @default(false) @map("is_active") // Only ACTIVE templates
+  isDefault       Boolean        @default(false) @map("is_default")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  createdBy  String?   @map("created_by") @db.Uuid
+  reviewedBy String?   @map("reviewed_by") @db.Uuid // 🔥 PCCC expert
+  reviewDate DateTime? @map("review_date")
+
   // Relations
-  deletedAt       DateTime?     @map("deleted_at")
-  audits          ContractTemplateAudit[]
-  userAgreements  UserAgreement[]
-  
+  deletedAt      DateTime?               @map("deleted_at")
+  audits         ContractTemplateAudit[]
+  userAgreements UserAgreement[]
+
   @@unique([name, version])
   @@index([type, status])
   @@index([isActive])
@@ -208,14 +220,14 @@ model ContractTemplate {
 }
 
 model UserAgreement {
-  id          String   @id @default(uuid()) @db.Uuid
-  templateId  String   @map("template_id") @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  ipAddress   String?  @map("ip_address") @db.VarChar(50)
-  userAgent   String?  @map("user_agent") @db.Text
-  phone       String?  @map("phone") @db.VarChar(20) // Audit phone
-  acceptedAt  DateTime @default(now()) @map("accepted_at")
-  
+  id         String   @id @default(uuid()) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  ipAddress  String?  @map("ip_address") @db.VarChar(50)
+  userAgent  String?  @map("user_agent") @db.Text
+  phone      String?  @map("phone") @db.VarChar(20) // Audit phone
+  acceptedAt DateTime @default(now()) @map("accepted_at")
+
   // Relations
   template ContractTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
   user     User             @relation(fields: [userId], references: [id])
@@ -226,13 +238,13 @@ model UserAgreement {
 }
 
 model ContractTemplateAudit {
-  id          String   @id @default(uuid()) @db.Uuid
-  templateId  String   @map("template_id") @db.Uuid
-  action      String   @db.VarChar(50) // EDIT, ACTIVATE, PREVIEW, DELETE, CREATE
-  oldContent  String?  @map("old_content") @db.Text
-  newContent  String?  @map("new_content") @db.Text
-  userId      String   @map("user_id") @db.Uuid
-  timestamp   DateTime @default(now())
+  id         String   @id @default(uuid()) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
+  action     String   @db.VarChar(50) // EDIT, ACTIVATE, PREVIEW, DELETE, CREATE
+  oldContent String?  @map("old_content") @db.Text
+  newContent String?  @map("new_content") @db.Text
+  userId     String   @map("user_id") @db.Uuid
+  timestamp  DateTime @default(now())
 
   // Relations
   template ContractTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
@@ -276,10 +288,6 @@ enum TaxStatus {
   PAID // Đã nộp
 }
 
-//============================================================================
-// CORE MODELS
-// ============================================================================
-
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   fullName     String   @map("full_name") @db.VarChar(100)
@@ -289,16 +297,32 @@ model User {
   avatarUrl    String?  @map("avatar_url") @db.VarChar(500)
   role         UserRole
 
-  // Email Verification
-  emailVerified      Boolean   @default(false) @map("email_verified")
-  verificationCode   String?   @map("verification_code") @db.VarChar(6)
-  verificationExpiry DateTime? @map("verification_expiry")
+  // Email Verification (OTP-like, 6 chars, short expiry)
+  emailVerified           Boolean   @default(false) @map("email_verified")
+  emailVerificationCode   String?   @map("email_verification_code") @db.VarChar(32) // Stronger code
+  emailVerificationExpiry DateTime? @map("email_verification_expiry")
+
+  // Password Reset (different from email verification, longer token)
+  passwordResetToken  String?   @unique @map("password_reset_token") @db.VarChar(128)
+  passwordResetExpiry DateTime? @map("password_reset_expiry")
+
+  // Refresh Token Tracking (for stateful revocation on logout/ban)
+  lastRefreshTokenFamily String?   @map("last_refresh_token_family") @db.VarChar(128) // Token family for rotation
+  lastRefreshIssuedAt    DateTime? @map("last_refresh_issued_at")
 
   // Ban/Unban (Admin User Management)
   isBanned     Boolean   @default(false) @map("is_banned")
   bannedAt     DateTime? @map("banned_at")
   bannedReason String?   @map("banned_reason") @db.VarChar(500)
   bannedBy     String?   @map("banned_by") @db.Uuid
+
+  // eKYC Verification (UC_AUTH_01 - Identity Fraud Prevention)
+  ekycVerified       Boolean   @default(false) @map("ekyc_verified")
+  ekycVerifiedAt     DateTime? @map("ekyc_verified_at")
+  ekycProvider       String?   @map("ekyc_provider") @db.VarChar(20) // FPT_AI | VNPT
+  ekycVerificationId String?   @map("ekyc_verification_id") @db.VarChar(100)
+  ekycRiskLevel      String?   @map("ekyc_risk_level") @db.VarChar(20) // LOW | MEDIUM | HIGH
+  ekycDocumentNumber String?   @map("ekyc_document_number") @db.VarChar(50) // Masked CCCD/CMND
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -308,14 +332,18 @@ model User {
   landlord                Landlord?
   notifications           Notification[]
   aiInteractionLogs       AiInteractionLog[]
-  assignedMaintenanceReqs MaintenanceRequest[] @relation("AssignedMaintenanceRequests")
-  terminatedContracts     Contract[]           @relation("ContractTerminatedBy")
+  assignedMaintenanceReqs MaintenanceRequest[]    @relation("AssignedMaintenanceRequests")
+  terminatedContracts     Contract[]              @relation("ContractTerminatedBy")
   systemFeedbacks         SystemFeedback[]
   consentLogs             ConsentLog[] // PDPL compliance (Phase 2)
-  contractTemplateAudits  ContractTemplateAudit[]
-  userAgreements          UserAgreement[]
+  contractTemplateAudits  ContractTemplateAudit[] // Legacy relation
+  userAgreements          UserAgreement[] // Legacy relation
+  badDebtInvoices         BadDebtInvoice[]        @relation("TenantBadDebt") // UC_COT_03
+  disputesCreated         Dispute[]               @relation("DisputeClaimant")
+  disputesResolved        Dispute[]               @relation("DisputeResolver")
 
   @@index([email])
+  @@index([ekycVerified])
   @@map("user")
 }
 
@@ -374,6 +402,7 @@ model Landlord {
   rentalUnits        RentalUnit[]              @relation("LandlordRentalUnits")
   taxYearSummaries   TaxYearSummary[]          @relation("LandlordTaxSummaries")
   pcccReports        PCCCReport[]
+  operationalExpenses OperationalExpense[]
 
   @@index([userId])
   @@index([verified])
@@ -399,10 +428,11 @@ model Property {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  landlord Landlord  @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
-  rooms    Room[]
-  services Service[]
+  landlord    Landlord     @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  rooms       Room[]
+  services    Service[]
   pcccReports PCCCReport[]
+  operationalExpenses OperationalExpense[]
 
   @@unique([landlordId, name]) // Prevent duplicate property names per landlord
   @@index([landlordId])
@@ -425,6 +455,8 @@ model Room {
   // Lean State Management
   unavailableReason String? @map("unavailable_reason") @db.VarChar(500)
   metadata          Json?
+
+  // Version Tracking (UC_ROOM_01 - Editing History)\n  version Int @default(1)
 
   // Soft Delete
   deletedAt DateTime? @map("deleted_at")
@@ -538,14 +570,25 @@ model Contract {
   lastNegotiationNote String? @map("last_negotiation_note") @db.Text
 
   // Termination tracking
-  terminationReason       String?  @map("termination_reason") @db.Text
-  terminatedByUserId      String?  @map("terminated_by_user_id") @db.Uuid
-  earlyTerminationPenalty Decimal? @default(0) @map("early_termination_penalty") @db.Decimal(10, 2)
-  noticeDays              Int?     @default(0) @map("notice_days")
-  terminationApproved     Boolean  @default(false) @map("termination_approved")
+  terminationType         TerminationType? @map("termination_type")
+  terminationReason       String?          @map("termination_reason") @db.Text
+  terminatedByUserId      String?          @map("terminated_by_user_id") @db.Uuid
+  earlyTerminationPenalty Decimal?         @default(0) @map("early_termination_penalty") @db.Decimal(10, 2)
+  refundAmount            Decimal?         @default(0) @map("refund_amount") @db.Decimal(10, 2) // 🔥 NEW: Track refunded deposit
+  noticeDays              Int?             @default(0) @map("notice_days")
+  terminationApproved     Boolean          @default(false) @map("termination_approved")
+
+  // Renewal tracking (Linked List structure)
+  previousContractId String?   @unique @map("previous_contract_id") @db.Uuid // Pointer to OLD contract
+  previousContract   Contract? @relation("ContractRenewal", fields: [previousContractId], references: [id]) // Relation to OLD
+  nextContract       Contract? @relation("ContractRenewal") // Relation to NEW (on the old contract)
 
   // Legal Snapshot Link (MVP)
   snapshotId String? @map("snapshot_id") @db.Uuid
+
+  // Version Tracking & Hash Verification (UC_COT_02 - Bait-and-Switch Prevention)
+  version      Int     @default(1)
+  contractHash String? @map("contract_hash") @db.VarChar(64) // SHA256 hash for verification
 
   // Soft Delete (Important for legal/audit trail)
   deletedAt DateTime? @map("deleted_at")
@@ -558,7 +601,7 @@ model Contract {
 
   // Termination & Handover (New Features)
   terminationDetails Json? @map("termination_details") // { reason, deductions: [], refundAmount }
-  handoverChecklist  Json? @map("handover_checklist")  // { checkIn: {}, checkOut: {} }
+  handoverChecklist  Json? @map("handover_checklist") // { checkIn: {}, checkOut: {} }
 
   // Terms and Residents
   paymentDay   Int                @default(5) @map("payment_day")
@@ -567,14 +610,16 @@ model Contract {
   residents    ContractResident[]
 
   // Relations
-  application   RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  room          Room              @relation(fields: [roomId], references: [id])
-  tenant        Tenant            @relation(fields: [tenantId], references: [userId])
-  landlord      Landlord          @relation(fields: [landlordId], references: [userId])
-  terminatedBy  User?             @relation("ContractTerminatedBy", fields: [terminatedByUserId], references: [id], onDelete: SetNull)
-  invoices      Invoice[]
-  reviews       RoomReview[]
-  meterReadings MeterReading[]    @relation("MeterReadings")
+  application     RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  room            Room              @relation(fields: [roomId], references: [id])
+  tenant          Tenant            @relation(fields: [tenantId], references: [userId])
+  landlord        Landlord          @relation(fields: [landlordId], references: [userId])
+  terminatedBy    User?             @relation("ContractTerminatedBy", fields: [terminatedByUserId], references: [id], onDelete: SetNull)
+  invoices        Invoice[]
+  reviews         RoomReview[]
+  meterReadings   MeterReading[]    @relation("MeterReadings")
+  disputes        Dispute[]         @relation("ContractDisputes") // UC_DISPUTE_01
+  badDebtInvoices BadDebtInvoice[]  @relation("ContractBadDebt") // UC_COT_03
 
   @@index([roomId])
   @@index([tenantId])
@@ -628,7 +673,7 @@ model Invoice {
   lineItems InvoiceLineItem[]
   income    Income? // Auto-created income when paid
   payments  Payment[]
-  snapshot  LegalSnapshot? @relation("InvoiceSnapshot", fields: [snapshotId], references: [id])
+  snapshot  LegalSnapshot?    @relation("InvoiceSnapshot", fields: [snapshotId], references: [id])
 
   snapshotId String? @map("snapshot_id") @db.Uuid
 
@@ -643,6 +688,28 @@ model Invoice {
   @@index([status, dueDate])
   @@map("invoice")
 }
+
+model OperationalExpense {
+  id          String   @id @default(uuid()) @db.Uuid
+  landlordId  String   @map("landlord_id") @db.Uuid
+  propertyId  String?  @map("property_id") @db.Uuid // Optional: Link to specific property
+  amount      Decimal  @db.Decimal(10, 2)
+  date        DateTime @db.Date // Date of expense
+  category    String   @db.VarChar(50) // MAINTENANCE, UTILITIES, MARKETING, TAX, OTHER
+  description String?  @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  landlord Landlord  @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  property Property? @relation(fields: [propertyId], references: [id])
+
+  @@index([landlordId])
+  @@index([date])
+  @@index([category])
+  @@map("operational_expense")
+}
+
 
 model InvoiceLineItem {
   id          String   @id @default(uuid()) @db.Uuid
@@ -694,6 +761,18 @@ model Payment {
   // Performance: Transaction reconciliation (10-15x faster)
   @@index([transactionId, status])
   @@map("payment")
+}
+
+model WebhookFailure {
+  id         String   @id @default(uuid()) @db.Uuid
+  provider   String   @db.VarChar(20) // e.g., SEPAY
+  payload    String   @db.Text
+  error      String   @db.Text
+  retryCount Int      @default(0) @map("retry_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("webhook_failure")
 }
 
 model Service {
@@ -809,13 +888,57 @@ model Notification {
   sentAt           DateTime         @default(now()) @map("sent_at")
   createdAt        DateTime         @default(now()) @map("created_at")
   readAt           DateTime?        @map("read_at")
+  deletedAt        DateTime?        @map("deleted_at") // 📋 Soft delete field for audit trail
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, isRead])
+  @@index([userId, isRead, deletedAt]) // Include deletedAt for filtering active notifications
   @@index([notificationType])
   @@map("notification")
+}
+
+// EMAIL OUTBOX PATTERN - P1 HARDENING
+// Ensures at-least-once email delivery for critical notifications
+// Retry pattern with exponential backoff for payment/contract emails
+// Usage:
+// 1. Insert row with status=PENDING when creating critical notification
+// 2. Async worker polls and attempts delivery
+// 3. On success: mark status=SENT
+// 4. On failure: increment retryCount, set nextRetryAt with backoff
+// 5. Max 5 retries, then status=FAILED_PERMANENT
+model NotificationOutbox {
+  id                String           @id @default(uuid()) @db.Uuid
+  notificationId    String?          @map("notification_id") @db.Uuid // Optional FK to notification
+  userId            String           @map("user_id") @db.Uuid
+  email             String           @db.VarChar(255)
+  subject           String           @db.VarChar(255)
+  bodyHtml          String           @db.Text
+  notificationType  NotificationType @map("notification_type")
+  
+  // Delivery tracking
+  status            OutboxStatus     @default(PENDING) // PENDING, SENT, FAILED_PERMANENT
+  sentAt            DateTime?        @map("sent_at")
+  failureReason     String?          @map("failure_reason") @db.Text
+  
+  // Retry logic
+  retryCount        Int              @default(0) @map("retry_count")
+  nextRetryAt       DateTime?        @map("next_retry_at")
+  maxRetries        Int              @default(5) @map("max_retries")
+  
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+
+  @@index([status, nextRetryAt]) // For polling pending/failed messages
+  @@index([userId, status])
+  @@index([notificationType]) // Group by type for analytics
+  @@map("notification_outbox")
+}
+
+enum OutboxStatus {
+  PENDING
+  SENT
+  FAILED_PERMANENT
 }
 
 model SystemFeedback {
@@ -1591,9 +1714,9 @@ model DocumentAttachment {
 // ============================================================================
 
 enum PCCCPropertyType {
-  NHA_TRO           // Nhà trọ
-  CHUNG_CU_MINI     // Chung cư mini
-  KINH_DOANH        // Nhà ở kết hợp kinh doanh
+  NHA_TRO // Nhà trọ
+  CHUNG_CU_MINI // Chung cư mini
+  KINH_DOANH // Nhà ở kết hợp kinh doanh
 }
 
 enum PCCCStatus {
@@ -1604,39 +1727,41 @@ enum PCCCStatus {
 }
 
 model PCCCReport {
-  id              String            @id @default(uuid()) @db.Uuid
-  propertyId      String            @map("property_id") @db.Uuid
-  landlordId      String            @map("landlord_id") @db.Uuid
-  
+  id         String @id @default(uuid()) @db.Uuid
+  propertyId String @map("property_id") @db.Uuid
+  landlordId String @map("landlord_id") @db.Uuid
+
   // Property specifications
-  propertyType    PCCCPropertyType  @map("property_type")
-  floors          Int
-  area            Decimal           @db.Decimal(10, 2)
-  volume          Decimal?          @db.Decimal(10, 2)
-  laneWidth       Decimal?          @map("lane_width") @db.Decimal(5, 2)
-  hasCage         Boolean           @default(false) @map("has_cage")
-  
+  propertyType PCCCPropertyType @map("property_type")
+  floors       Int
+  area         Decimal          @db.Decimal(10, 2)
+  volume       Decimal?         @db.Decimal(10, 2)
+  laneWidth    Decimal?         @map("lane_width") @db.Decimal(5, 2)
+  hasCage      Boolean          @default(false) @map("has_cage")
+
   // Generated requirements (JSON)
-  requirements    Json              // Fire extinguishers, alarms, etc.
-  
+  requirements Json // Fire extinguishers, alarms, etc.
+
   // Compliance
-  complianceScore Int               @map("compliance_score") // 0-100
-  status          PCCCStatus        @default(DRAFT)
-  
+  complianceScore Int        @map("compliance_score") // 0-100
+  status          PCCCStatus @default(DRAFT)
+
   // Generated files
-  pdfUrl          String?           @map("pdf_url") @db.Text
-  qrCode          String?           @map("qr_code") @db.Text
-  
+  pdfUrl  String? @map("pdf_url") @db.Text
+  pdfHash String? @map("pdf_hash") @db.VarChar(64) // 🔐 SHA-256 hash (hex) for integrity verification
+  qrCode  String? @map("qr_code") @db.Text
+
   // Validity
-  expiryDate      DateTime          @map("expiry_date") // Valid for 6 months
-  
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
-  
+  expiryDate DateTime @map("expiry_date") // Valid for 6 months
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   // Relations
-  property        Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  landlord        Landlord          @relation(fields: [landlordId], references: [userId])
-  realSurvey      PCCCRealSurvey? 
+  property   Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  landlord   Landlord        @relation(fields: [landlordId], references: [userId])
+  realSurvey PCCCRealSurvey?
+
   @@index([propertyId])
   @@index([landlordId])
   @@index([status])
@@ -1671,4 +1796,105 @@ model PCCCRealSurvey {
 
   @@unique([reportId])
   @@map("pccc_real_surveys")
+}
+
+// ============================================================================
+// SECURITY & COMPLIANCE MODELS (Phase 3 - January 2026)
+// ============================================================================
+
+// UC_PAY_01: Payment Idempotency - Replay Attack Prevention
+model PaymentTransaction {
+  id            Int       @id @default(autoincrement())
+  transactionId String    @unique @map("transaction_id") @db.VarChar(100)
+  status        String    @db.VarChar(20) // PENDING | SUCCESS | FAILED
+  amount        BigInt // Amount in cents/dong for precision
+  paymentMethod String?   @map("payment_method") @db.VarChar(50)
+  referenceCode String    @unique @map("reference_code") @db.VarChar(100)
+  responseData  Json?     @map("response_data")
+  errorDetails  String?   @map("error_details") @db.Text
+  processedAt   DateTime? @map("processed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([transactionId])
+  @@index([referenceCode])
+  @@index([createdAt])
+  @@map("payment_transaction")
+}
+
+// UC_DISPUTE_01: Deposit Dispute Resolution
+model Dispute {
+  id               String    @id @default(uuid()) @db.Uuid
+  contractId       String    @map("contract_id") @db.Uuid
+  claimantId       String    @map("claimant_id") @db.Uuid
+  claimantRole     String    @map("claimant_role") @db.VarChar(20) // TENANT | LANDLORD
+  claimAmount      BigInt    @map("claim_amount") // Amount in cents/dong
+  description      String    @db.Text
+  status           String    @db.VarChar(20) // OPEN | APPROVED | REJECTED | PARTIAL | ESCALATED
+  approvedAmount   BigInt?   @map("approved_amount")
+  deadline         DateTime
+  resolvedAt       DateTime? @map("resolved_at")
+  resolvedBy       String?   @map("resolved_by") @db.Uuid
+  resolutionReason String?   @map("resolution_reason") @db.Text
+  escalatedAt      DateTime? @map("escalated_at")
+  escalatedBy      String?   @map("escalated_by") @db.Uuid
+  escalationReason String?   @map("escalation_reason") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  contract Contract          @relation("ContractDisputes", fields: [contractId], references: [id], onDelete: Cascade)
+  claimant User              @relation("DisputeClaimant", fields: [claimantId], references: [id])
+  resolver User?             @relation("DisputeResolver", fields: [resolvedBy], references: [id])
+  evidence DisputeEvidence[]
+
+  @@unique([contractId, status], map: "unique_open_dispute")
+  @@index([status, deadline])
+  @@index([claimantId])
+  @@map("dispute")
+}
+
+// Dispute Evidence Timeline
+model DisputeEvidence {
+  id          String   @id @default(uuid()) @db.Uuid
+  disputeId   String   @map("dispute_id") @db.Uuid
+  url         String   @db.Text
+  submittedBy String   @map("submitted_by") @db.Uuid
+  type        String   @db.VarChar(20) // CLAIMANT | RESPONDENT
+  order       Int?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([disputeId])
+  @@index([submittedBy])
+  @@map("dispute_evidence")
+}
+
+// UC_COT_03: Bad Debt Invoice Tracking
+model BadDebtInvoice {
+  id                 Int       @id @default(autoincrement())
+  tenantId           String    @map("tenant_id") @db.Uuid
+  contractId         String    @map("contract_id") @db.Uuid
+  amount             BigInt // Amount in cents/dong
+  reason             String    @db.Text
+  status             String    @db.VarChar(20) // ACTIVE | COLLECTION | WRITTEN_OFF
+  dueDate            DateTime? @map("due_date")
+  paidAt             DateTime? @map("paid_at")
+  paidAmount         BigInt?   @map("paid_amount")
+  collectionAttempts Int       @default(0) @map("collection_attempts")
+  collectionNotes    String?   @map("collection_notes") @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  tenant   User     @relation("TenantBadDebt", fields: [tenantId], references: [id], onDelete: Cascade)
+  contract Contract @relation("ContractBadDebt", fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([contractId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("bad_debt_invoice")
 }

@@ -2,6 +2,7 @@
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 ALTER EXTENSION vector SET SCHEMA extensions;
+SET search_path TO "$user", public, extensions;
 
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('TENANT', 'LANDLORD', 'ADMIN');

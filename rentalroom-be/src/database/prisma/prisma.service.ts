@@ -9,11 +9,16 @@ import { Prisma, PrismaClient } from '@prisma/client';
 @Injectable()
 export class PrismaService
   extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+  implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
+    // Prevent multiple instances during HMR (Hot Module Replacement)
+    const globalPrisma = (global as any).prisma;
+    if (process.env.NODE_ENV === 'development' && globalPrisma) {
+      return globalPrisma;
+    }
+
     super({
       log: [{ level: 'query', emit: 'event' }, 'warn', 'error'],
       datasources: {
@@ -22,6 +27,10 @@ export class PrismaService
         },
       },
     });
+
+    if (process.env.NODE_ENV === 'development') {
+      (global as any).prisma = this;
+    }
 
     const slowMs = parseInt(process.env.PRISMA_SLOW_QUERY_MS || '200', 10);
     // Lightweight slow query logging to identify hot spots

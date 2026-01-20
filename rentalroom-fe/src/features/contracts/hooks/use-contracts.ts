@@ -49,11 +49,59 @@ export function useTerminateContract() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: ({ id, data }: { id: string; data: { reason: string; noticeDays?: number } }) =>
+		mutationFn: ({ id, data }: { id: string; data: { reason: string; noticeDays?: number; terminationType?: string; refundAmount?: number } }) =>
 			contractsApi.terminateContract(id, data),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['contracts'] });
 			queryClient.invalidateQueries({ queryKey: ['rooms'] });
+		},
+	});
+}
+
+export function useRenewContract() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, data }: { id: string; data: { newEndDate: string; newRentPrice?: number; increasePercentage?: number } }) =>
+			contractsApi.renewContract(id, data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['contracts'] });
+		},
+	});
+}
+
+export function useAddResident() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ contractId, data }: { contractId: string; data: { fullName: string; phoneNumber?: string; citizenId?: string; relationship?: string } }) =>
+			contractsApi.addResident(contractId, data),
+		onSuccess: (_data: any, variables: { contractId: string }) => {
+			queryClient.invalidateQueries({ queryKey: ['contracts', variables.contractId] });
+		},
+	});
+}
+
+export function useUpdateResident() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ contractId, residentId, data }: { contractId: string; residentId: string; data: { fullName?: string; phoneNumber?: string; citizenId?: string; relationship?: string } }) =>
+			contractsApi.updateResident(contractId, residentId, data),
+		onSuccess: (_data: any, variables: { contractId: string }) => {
+			queryClient.invalidateQueries({ queryKey: ['contracts', variables.contractId] });
+		},
+	});
+}
+
+export function useRemoveResident() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ contractId, residentId }: { contractId: string; residentId: string }) =>
+			contractsApi.removeResident(contractId, residentId),
+		onSuccess: (_data: any, variables: { contractId: string }) => {
+			queryClient.invalidateQueries({ queryKey: ['contracts', variables.contractId] });
 		},
 	});
 }

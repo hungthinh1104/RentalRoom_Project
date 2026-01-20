@@ -4,6 +4,8 @@ export * from './update-contract.dto';
 export * from './filter-rental-applications.dto';
 export * from './filter-contracts.dto';
 export * from './rental-application-response.dto';
+export * from './renew-contract.dto';
 export * from './contract-response.dto';
 export * from './terminate-contract.dto';
 export * from './update-handover-checklist.dto';
+export * from './update-contract-resident.dto';

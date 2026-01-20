@@ -58,6 +58,55 @@ interface BackendPaginatedResponse<T> {
     };
 }
 
+interface BackendProperty {
+    id: string;
+    name?: string;
+    propertyName?: string;
+    address?: string;
+    street?: string;
+    ward?: string;
+    district?: string;
+    city?: string;
+    landlord?: {
+        id?: string;
+        user?: {
+            fullName?: string;
+        };
+    };
+    landlordName?: string;
+    landlordId?: string;
+    _count?: {
+        rooms: number;
+    };
+    roomCount?: number;
+    createdAt: string;
+}
+
+interface BackendRoom {
+    id: string;
+    roomNumber?: string;
+    number?: string;
+    property?: {
+        id?: string;
+        name?: string;
+    };
+    propertyName?: string;
+    propertyId?: string;
+    status?: string;
+    price?: number;
+    rentPrice?: number;
+    area?: number;
+    contracts?: Array<{
+        tenant?: {
+            user?: {
+                fullName?: string;
+            };
+        };
+    }>;
+    tenantName?: string;
+    occupant?: string;
+}
+
 /**
  * Hook to fetch all properties (admin view)
  */
@@ -70,7 +119,7 @@ export function useAdminProperties(params: { page?: number; search?: string } = 
             const queryParams: Record<string, unknown> = { page, limit: 10 };
             if (search) queryParams.search = search;
 
-            const { data } = await api.get<Property[] | BackendPaginatedResponse<Property>>("/properties", { params: queryParams });
+            const { data } = await api.get<BackendProperty[] | BackendPaginatedResponse<BackendProperty>>("/properties", { params: queryParams });
 
             // Normalize response
             if (Array.isArray(data)) {
@@ -108,7 +157,7 @@ export function useAdminRooms(params: { page?: number; search?: string; status?:
             if (status) queryParams.status = status;
             if (propertyId) queryParams.propertyId = propertyId;
 
-            const { data } = await api.get<Room[] | BackendPaginatedResponse<Room>>("/rooms", { params: queryParams });
+            const { data } = await api.get<BackendRoom[] | BackendPaginatedResponse<BackendRoom>>("/rooms", { params: queryParams });
 
             if (Array.isArray(data)) {
                 return {
@@ -166,7 +215,7 @@ export function useDeleteProperty() {
 }
 
 // Normalize functions to handle different API response formats
-function normalizeProperty(p: any): Property {
+function normalizeProperty(p: BackendProperty): Property {
     return {
         id: p.id,
         name: p.name || p.propertyName || "Chưa đặt tên",
@@ -181,11 +230,11 @@ function normalizeProperty(p: any): Property {
     };
 }
 
-function normalizeRoom(r: any): Room {
+function normalizeRoom(r: BackendRoom): Room {
     return {
         id: r.id,
         roomNumber: r.roomNumber || r.number || "N/A",
-        propertyName: r.property?.name || r.propertyName || r.property || "N/A",
+        propertyName: r.property?.name || r.propertyName || (typeof r.property === 'string' ? r.property : "N/A"),
         propertyId: r.propertyId || r.property?.id || "",
         status: r.status || "AVAILABLE",
         price: r.price || r.rentPrice || 0,

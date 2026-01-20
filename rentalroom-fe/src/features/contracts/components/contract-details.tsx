@@ -18,7 +18,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Receipt, Pencil, Send, Ban, Check, RefreshCw } from "lucide-react";
+import { FileText, Receipt, Pencil, Send, Ban, Check, RefreshCw, TrendingUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 
@@ -27,22 +27,17 @@ import { ContractHeader } from "./details/contract-header";
 import { ContractInfo } from "./details/contract-info";
 import { ContractFinancials } from "./details/contract-financials";
 import { ContractInvoices } from "./details/contract-invoices";
-import { ContractTerms } from "./contract-terms"; // Existing simple component if valid, or inline content. 
-// NOTE: I notice there was a ContractTerms content in original file. Let's create a wrapper or just use Card.
-// Original used a Card with prose. I'll include it directly or create ContractTerms component now?
-// To be safe, I'll inline the Terms card here or check if ContractTerms component exists.
-// ls showed "contract-terms.tsx". Let's use it or inline.
-// Original file Lines 563-577 showed inline card. I'll stick to a clean structure and maybe create it if needed, but for now I'll use the Card structure here or distinct component.
-// Re-reading file structure: "contract-terms.tsx" exists (1101 bytes). It probably just renders the terms. I should check it.
-// Assuming it's good, I'll use it. If not, I'll render the cleanup version.
 
 import { TerminateDialog } from "./terminate-dialog";
 import { EditContractDialog } from "./edit-contract-dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Needed for Terms container if I don't use simple component
+import { RenewalDialog } from "./renewal-dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRenewContract } from "../hooks/use-contracts";
+import { ContractResidents } from "./details/contract-residents";
 
 interface ContractDetailsProps {
     contract: Contract;
-    onTerminate: (reason: string, noticeDays: number) => Promise<void>;
+    onTerminate: (reason: string, noticeDays: number, terminationType?: string, refundAmount?: number) => Promise<void>;
     isTerminating?: boolean;
 }
 
@@ -62,9 +57,14 @@ export function ContractDetails({
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [showSendDialog, setShowSendDialog] = useState(false);
     const [showApproveDialog, setShowApproveDialog] = useState(false);
+    const [showRenewDialog, setShowRenewDialog] = useState(false);
+
     const [isActionLoading, setIsActionLoading] = useState(false);
 
     const isLandlord = user?.role === UserRole.LANDLORD || user?.role === UserRole.ADMIN;
+
+    // Mutations
+    const renewMutation = useRenewContract();
 
     // Handlers
     const handleRevokeContract = async () => {
@@ -149,6 +149,18 @@ export function ContractDetails({
         }
     };
 
+    const handleRenew = async (data: { newEndDate: string; newRentPrice?: number; increasePercentage?: number }) => {
+        try {
+            await renewMutation.mutateAsync({ id: contract.id, data });
+            toast.success("Đã gia hạn hợp đồng thành công!");
+            setShowRenewDialog(false);
+            window.location.reload(); // Quick refresh to show new state
+        } catch (error) {
+            console.error(error);
+            toast.error("Gia hạn thất bại");
+        }
+    };
+
     const containerVariants = {
         hidden: { opacity: 0 },
         visible: {
@@ -195,7 +207,7 @@ export function ContractDetails({
                     <FileText className="w-5 h-5 mt-0.5" />
                     <div>
                         <p className="font-semibold">Vui lòng ký hợp đồng</p>
-                        <p className="text-sm">Xem kỹ các điều khoản bên dưới và nhấn "Phê duyệt" để tiến hành thanh toán cọc.</p>
+                        <p className="text-sm">Xem kỹ các điều khoản bên dưới và nhấn &quot;Phê duyệt&quot; để tiến hành thanh toán cọc.</p>
                     </div>
                 </div>
             )}
@@ -211,10 +223,14 @@ export function ContractDetails({
             )}
 
             <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 max-w-[400px] mb-6">
+                <TabsList className="grid w-full grid-cols-3 max-w-[600px] mb-6">
                     <TabsTrigger value="overview" className="flex items-center gap-2">
                         <FileText className="w-4 h-4" />
                         Tổng quan & Điều khoản
+                    </TabsTrigger>
+                    <TabsTrigger value="residents" className="flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Cư dân
                     </TabsTrigger>
                     <TabsTrigger value="invoices" className="flex items-center gap-2">
                         <Receipt className="w-4 h-4" />
@@ -243,6 +259,18 @@ export function ContractDetails({
 
                                 {/* Action Buttons Area */}
                                 <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+                                    {/* Renewal Button for Active Contracts */}
+                                    {(contract.status === ContractStatus.ACTIVE || contract.status === ContractStatus.EXPIRED) && isLandlord && (
+                                        <Button
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                                            onClick={() => setShowRenewDialog(true)}
+                                            disabled={isActionLoading || renewMutation.isPending}
+                                        >
+                                            <TrendingUp className="w-4 h-4" />
+                                            Gia hạn hợp đồng
+                                        </Button>
+                                    )}
+
                                     {/* Landlord Buttons */}
                                     {contract.status === ContractStatus.DRAFT && isLandlord && (
                                         <>
@@ -300,6 +328,13 @@ export function ContractDetails({
                     </motion.div>
                 </TabsContent>
 
+                <TabsContent value="residents" className="space-y-6">
+                    <ContractResidents
+                        contract={contract}
+                        isOwner={contract.tenant?.userId === user?.id || isLandlord}
+                    />
+                </TabsContent>
+
                 <TabsContent value="invoices">
                     <ContractInvoices contract={contract} />
                 </TabsContent>
@@ -310,8 +345,21 @@ export function ContractDetails({
             <TerminateDialog
                 open={showTerminateDialog}
                 onOpenChange={setShowTerminateDialog}
-                onConfirm={({ reason, noticeDays }) => onTerminate(reason, noticeDays)}
+                onConfirm={({ reason, noticeDays, terminationType, refundAmount }) => onTerminate(reason, noticeDays, terminationType, refundAmount)}
                 loading={isTerminatingProp}
+                isTenant={!isLandlord}
+                deposit={Number(contract.deposit)}
+                // TODO: Calculate daysRemaining properly
+                daysRemaining={30} // Placeholder
+            />
+
+            <RenewalDialog
+                open={showRenewDialog}
+                onOpenChange={setShowRenewDialog}
+                onConfirm={handleRenew}
+                loading={renewMutation.isPending}
+                currentRent={Number(contract.monthlyRent)}
+                currentEndDate={contract.endDate}
             />
 
             <EditContractDialog
@@ -326,7 +374,7 @@ export function ContractDetails({
                     <AlertDialogHeader>
                         <AlertDialogTitle>Phê duyệt hợp đồng thuê?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Bằng việc nhấn "Phê duyệt", bạn đồng ý với tất cả các điều khoản trong hợp đồng.
+                            Bằng việc nhấn &quot;Phê duyệt&quot;, bạn đồng ý với tất cả các điều khoản trong hợp đồng.
                             Bước tiếp theo là thanh toán tiền cọc để kích hoạt hợp đồng.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -344,7 +392,7 @@ export function ContractDetails({
                     <AlertDialogHeader>
                         <AlertDialogTitle>Gửi hợp đồng cho khách thuê?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Hợp đồng sẽ chuyển sang trạng thái "Chờ khách ký". Bạn sẽ không thể chỉnh sửa các điều khoản sau khi gửi.
+                            Hợp đồng sẽ chuyển sang trạng thái &quot;Chờ khách ký&quot;. Bạn sẽ không thể chỉnh sửa các điều khoản sau khi gửi.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -362,7 +410,7 @@ export function ContractDetails({
                         <AlertDialogTitle>{isLandlord ? 'Thu hồi hợp đồng?' : 'Từ chối ký hợp đồng?'}</AlertDialogTitle>
                         <AlertDialogDescription>
                             Bạn có chắc chắn muốn {isLandlord ? 'thu hồi' : 'từ chối'} hợp đồng này? Hợp đồng sẽ chuyển về trạng thái {isLandlord ? 'NHÁP' : 'ĐÃ HỦY'}.
-                            Phòng sẽ được mở lại thành "Trống" (Available).
+                            Phòng sẽ được mở lại thành &quot;Trống&quot; (Available).
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

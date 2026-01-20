@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CreditCard, Wallet, QrCode, Loader2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api/client";
+import api, { ApiError } from "@/lib/api/client";
 import { toast } from "sonner";
 
 interface Invoice {
@@ -70,9 +70,10 @@ export function PaymentDialog({ invoice, open, onClose }: PaymentDialogProps) {
             });
             onClose();
         },
-        onError: (error: any) => {
+        onError: (error: unknown) => {
+            const apiError = error as ApiError;
             toast.error("Không thể thanh toán", {
-                description: error?.message || "Vui lòng thử lại sau",
+                description: apiError?.message || "Vui lòng thử lại sau",
             });
         },
     });

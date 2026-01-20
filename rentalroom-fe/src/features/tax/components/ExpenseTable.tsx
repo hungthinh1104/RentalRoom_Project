@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taxService } from '@/features/tax/api/tax-api';
 import { formatCurrency, formatDate } from '@/utils/tax-helpers';
 import { Trash2, FileText, Loader2 } from 'lucide-react';
+import { Expense } from '@/types/tax';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -73,7 +74,7 @@ export function ExpenseTable({ year }: ExpenseTableProps) {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                    {expenses.map((expense: any) => (
+                    {expenses.map((expense: Expense) => (
                         <tr key={expense.id} className="hover:bg-muted/30 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-foreground">
                                 {formatDate(expense.paidAt)}

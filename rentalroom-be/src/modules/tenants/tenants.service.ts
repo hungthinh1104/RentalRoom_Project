@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreateTenantDto,
@@ -8,6 +8,7 @@ import {
 } from './dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
+import { User, UserRole } from '@prisma/client';
 
 @Injectable()
 export class TenantsService {
@@ -98,8 +99,16 @@ export class TenantsService {
     );
   }
 
-  async update(id: string, updateTenantDto: UpdateTenantDto) {
+  async update(id: string, updateTenantDto: UpdateTenantDto, user: User) {
     await this.findOne(id); // Check existence
+
+    // 🔒 SECURITY: Ownership validation
+    // Admins can update any tenant, but regular tenants can only update their own profile
+    if (user.role !== UserRole.ADMIN && user.id !== id) {
+      throw new ForbiddenException(
+        'You can only update your own tenant profile',
+      );
+    }
 
     // Logic: If sensitive info (citizenId) changes, reset KYC status
     const updateData: any = { ...updateTenantDto };

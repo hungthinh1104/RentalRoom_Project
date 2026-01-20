@@ -8,9 +8,20 @@ import { toast } from "sonner";
 import Image from "next/image";
 import api from "@/lib/api/client";
 
+interface ImageKitUploadResponse {
+    url: string;
+    fileId: string;
+    [key: string]: unknown;
+}
+
+interface ImageKitError {
+    message: string;
+    [key: string]: unknown;
+}
+
 interface ImageUploadProps {
     onSuccess: (url: string, fileId: string) => void;
-    onError?: (err: any) => void;
+    onError?: (err: ImageKitError) => void;
     folder?: string;
     className?: string;
     value?: string; // Current image URL
@@ -37,13 +48,13 @@ export function ImageUpload({ onSuccess, onError, folder = "/properties", value,
     const [isUploading, setIsUploading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const onErrorHandler = (err: any) => {
+    const onErrorHandler = (err: ImageKitError) => {
         setIsUploading(false);
         toast.error("Upload failed", { description: err.message });
         if (onError) onError(err);
     };
 
-    const onSuccessHandler = (res: any) => {
+    const onSuccessHandler = (res: ImageKitUploadResponse) => {
         setIsUploading(false);
         toast.success("Image uploaded successfully");
         // res contains { url, fileId, ... }
@@ -82,17 +93,17 @@ export function ImageUpload({ onSuccess, onError, folder = "/properties", value,
                 ) : (
                     <div
                         onClick={() => inputRef.current?.click()}
-                        className="flex flex-col items-center justify-center w-full aspect-video rounded-lg border-2 border-dashed border-border/50 bg-muted/10 hover:bg-muted/20 hover:border-amber-500/50 transition-all cursor-pointer group"
+                        className="flex flex-col items-center justify-center w-full aspect-video rounded-lg border-2 border-dashed border-border/50 bg-muted/10 hover:bg-muted/20 hover:border-primary/50 transition-all cursor-pointer group"
                     >
                         {isUploading ? (
                             <div className="flex flex-col items-center gap-2">
-                                <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
+                                <Loader2 className="w-8 h-8 text-primary animate-spin" />
                                 <span className="text-sm text-muted-foreground">Uploading...</span>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-foreground">
-                                <div className="p-3 rounded-full bg-muted/30 group-hover:bg-amber-500/10 transition-colors">
-                                    <UploadCloud className="w-6 h-6 group-hover:text-amber-500" />
+                                <div className="p-3 rounded-full bg-muted/30 group-hover:bg-primary/10 transition-colors">
+                                    <UploadCloud className="w-6 h-6 group-hover:text-primary" />
                                 </div>
                                 <div className="text-center">
                                     <p className="text-sm font-medium">Click to upload</p>
@@ -109,7 +120,7 @@ export function ImageUpload({ onSuccess, onError, folder = "/properties", value,
                     folder={folder}
                     onError={onErrorHandler}
                     onSuccess={onSuccessHandler}
-                    validateFile={(file: any) => file.size < 5000000} // 5MB
+                    validateFile={(file: File) => file.size < 5000000} // 5MB
                 />
             </div>
         </IKContext>

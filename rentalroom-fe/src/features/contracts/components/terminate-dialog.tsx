@@ -6,14 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
+import { TerminationType } from '@/types/enums';
 
 interface TerminateDialogProps {
   open: boolean;
   onOpenChange: (o: boolean) => void;
-  onConfirm: (data: { reason: string; noticeDays: number }) => void;
+  onConfirm: (data: { reason: string; noticeDays: number; terminationType: string; refundAmount: number }) => void;
   loading?: boolean;
   deposit?: number;
-  depositAmount?: number; // Alias for deposit
+  depositAmount?: number; // Alias
   daysRemaining?: number;
   isTenant?: boolean;
 }
@@ -24,121 +25,131 @@ export function TerminateDialog({
   onConfirm,
   loading,
   deposit = 0,
-  depositAmount, // Support both prop names
+  depositAmount,
   daysRemaining = 0,
   isTenant = true,
 }: TerminateDialogProps) {
   const [reason, setReason] = useState('');
   const [noticeDays, setNoticeDays] = useState(30);
-  
-  // Use depositAmount if provided, otherwise fallback to deposit
+  const [terminationType, setTerminationType] = useState<TerminationType>(
+    isTenant ? TerminationType.EARLY_BY_TENANT : TerminationType.EARLY_BY_LANDLORD
+  );
+
   const finalDeposit = depositAmount ?? deposit;
+  const [refundAmount, setRefundAmount] = useState<number>(0);
 
   const handleConfirm = () => {
     if (!reason.trim()) {
       alert('Vui lòng nhập lý do chấm dứt hợp đồng');
       return;
     }
-    onConfirm({ reason: reason.trim(), noticeDays });
+    onConfirm({ reason: reason.trim(), noticeDays, terminationType, refundAmount });
     setReason('');
     setNoticeDays(30);
   };
 
-  // Calculate penalty
-  let penaltyAmount = 0;
-  let penaltyWarning = '';
-
-  if (daysRemaining > 0) {
-    if (isTenant) {
-      penaltyAmount = finalDeposit;
-      penaltyWarning = `⚠️ Chấm dứt trước hạn (còn ${daysRemaining} ngày): BẠN SẼ MẤT 100% TIỀN CỌC (${penaltyAmount.toLocaleString('vi-VN')} VNĐ). Mặc dù báo trước ${noticeDays} ngày, do vi phạm cam kết thời gian thuê, tiền cọc sẽ bị giữ lại.`;
+  // Logic to auto-calculate refund/penalty based on Type
+  // Note: This matches the warning logic roughly, but allows manual override
+  const handleTypeChange = (type: TerminationType) => {
+    setTerminationType(type);
+    if (type === TerminationType.EXPIRY) {
+      setRefundAmount(finalDeposit); // Full refund if expired
+    } else if (type === TerminationType.EARLY_BY_TENANT) {
+      setRefundAmount(0); // Lose deposit
+    } else if (type === TerminationType.EARLY_BY_LANDLORD) {
+      setRefundAmount(finalDeposit * 2); // Double refund (compensation)
+    } else if (type === TerminationType.EVICTION) {
+      setRefundAmount(0); // Evicted, likely 0
     } else {
-      penaltyAmount = finalDeposit * 2;
-      penaltyWarning = `⚠️ Chấm dứt trước hạn (còn ${daysRemaining} ngày): BẠN PHẢI TRẢ LẠI 100% TIỀN CỌC + ĐỀN BÙ THÊM 100% TIỀN CỌC = ${penaltyAmount.toLocaleString('vi-VN')} VNĐ cho người thuê.`;
-      if (noticeDays < 30) {
-        penaltyWarning += ` Bạn chỉ báo trước ${noticeDays} ngày (yêu cầu tối thiểu 30 ngày).`;
-      }
+      setRefundAmount(finalDeposit); // Mutual or Other -> Default to full refund, let user change
     }
-  } else {
-    penaltyWarning = '✅ Hợp đồng đã hết hạn hoặc sắp hết hạn. Không có phạt.';
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">⚠️ Chấm dứt hợp đồng</DialogTitle>
+          <DialogTitle className="text-2xl text-destructive flex items-center gap-2">
+            <AlertTriangle className="w-6 h-6" />
+            Chấm dứt hợp đồng
+          </DialogTitle>
           <DialogDescription>
-            Vui lòng đọc kỹ cảnh báo bên dưới trước khi xác nhận chấm dứt hợp đồng.
+            Hành động này sẽ kết thúc hiệu lực hợp đồng và giải phóng phòng.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
-          {/* Warning Alert */}
-          <Alert variant={daysRemaining > 0 ? "destructive" : "default"} className="border-2">
-            <AlertTriangle className="h-5 w-5" />
-            <AlertDescription className="text-sm font-medium whitespace-pre-line">
-              {penaltyWarning}
-            </AlertDescription>
-          </Alert>
-
-          {/* Contract Terms Reminder */}
-          {daysRemaining > 0 && (
-            <div className="bg-warning-light/20 border-2 border-warning/30 rounded-lg p-4 space-y-3">
-              <h3 className="font-semibold text-sm text-warning-foreground">📋 Điều khoản hợp đồng:</h3>
-              <ul className="text-xs space-y-2 text-muted-foreground">
-                <li>• <strong>Điều 6.2:</strong> Bên {isTenant ? 'B (Người thuê)' : 'A (Chủ nhà)'} chấm dứt trước thời hạn đã ký sẽ {isTenant ? 'BỊ MẤT 100% TIỀN CỌC' : 'PHẢI ĐỀN BÙ 200% TIỀN CỌC'}.</li>
-                <li>• Kể cả trường hợp đã báo trước 30 ngày, do vi phạm cam kết thời gian thuê, {isTenant ? 'tiền cọc sẽ bị giữ lại' : 'vẫn phải bồi thường'}.</li>
-                <li>• Muốn tránh mất cọc, {isTenant ? 'người thuê' : 'chủ nhà'} cần tìm người thay thế thuê tiếp (được bên còn lại chấp thuận).</li>
-              </ul>
-            </div>
+        <div className="space-y-5 mt-2">
+          {/* Logic Warning */}
+          {(daysRemaining > 0 && terminationType !== TerminationType.EXPIRY) && (
+            <Alert variant="destructive" className="border-2 bg-red-50">
+              <AlertDescription className="text-sm font-medium text-red-800">
+                ⚠️ Hợp đồng còn {daysRemaining} ngày. Chấm dứt sớm có thể phát sinh phạt cọc.
+              </AlertDescription>
+            </Alert>
           )}
 
-          {/* Form Inputs */}
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="noticeDays" className="text-sm font-medium">
-                Số ngày báo trước <span className="text-destructive">*</span>
-              </Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Loại chấm dứt</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={terminationType}
+                onChange={(e) => handleTypeChange(e.target.value as TerminationType)}
+              >
+                <option value={TerminationType.EARLY_BY_TENANT}>Khách hủy sớm (Mất cọc)</option>
+                <option value={TerminationType.EARLY_BY_LANDLORD}>Chủ nhà hủy sớm (Đền cọc)</option>
+                <option value={TerminationType.MUTUAL_AGREEMENT}>Thỏa thuận 2 bên</option>
+                <option value={TerminationType.EVICTION}>Trục xuất (Vi phạm)</option>
+                <option value={TerminationType.EXPIRY}>Hết hạn hợp đồng</option>
+                <option value={TerminationType.OTHER}>Khác</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Số ngày đã báo trước</Label>
               <Input
-                id="noticeDays"
                 type="number"
                 min={0}
                 value={noticeDays}
                 onChange={(e) => setNoticeDays(Number(e.target.value))}
-                placeholder="Số ngày đã báo trước"
-                className="mt-1"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Yêu cầu tối thiểu: 30 ngày
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="reason" className="text-sm font-medium">
-                Lý do chấm dứt <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="VD: Chuyển công tác, phòng không phù hợp..."
-                className="mt-1"
               />
             </div>
           </div>
 
-          {/* Confirmation Checkbox */}
-          <div className="bg-muted/50 rounded-lg p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input type="checkbox" className="mt-1" required />
-              <span className="text-xs">
-                Tôi xác nhận đã đọc và hiểu rõ các điều khoản chấm dứt hợp đồng. Tôi chấp nhận {isTenant ? 'mất tiền cọc' : 'bồi thường theo quy định'} khi chấm dứt trước thời hạn.
-              </span>
-            </label>
+          <div className="space-y-2">
+            <Label>Lý do cụ thể <span className="text-destructive">*</span></Label>
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="VD: Chuyển công tác, vi phạm nội quy..."
+            />
           </div>
 
-          {/* Action Buttons */}
+          <div className="p-4 bg-muted/50 rounded-lg space-y-4 border">
+            <h4 className="font-semibold text-sm">💰 Tài chính hoàn lại (Dự kiến)</h4>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">Tiền cọc gốc</Label>
+                <div className="font-medium">{finalDeposit.toLocaleString('vi-VN')} đ</div>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Số tiền hoàn lại cho khách</Label>
+                <Input
+                  type="number"
+                  className="mt-1 font-bold text-green-700"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(Number(e.target.value))}
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {refundAmount === 0 && "Khách mất cọc"}
+                  {refundAmount === finalDeposit && "Hoàn lại toàn bộ cọc"}
+                  {refundAmount > finalDeposit && "Có đền bù thêm"}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Hủy bỏ
@@ -156,3 +167,5 @@ export function TerminateDialog({
     </Dialog>
   );
 }
+
+

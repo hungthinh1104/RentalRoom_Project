@@ -1,7 +1,7 @@
 import api from '@/lib/api/client';
 import type { Room, PaginatedResponse } from '@/types';
 
-export interface SemanticSearchResponse {
+export interface UnifiedRoomSearchResult {
   query: string;
   method: 'SEMANTIC' | 'HYBRID' | 'STANDARD';
   count: number;
@@ -17,20 +17,20 @@ export const semanticSearchApi = {
    * Optimized for: Single natural language query
    * API calls: 1 (semantic search)
    */
-  async semanticSearch(query: string, limit: number = 12) {
+  async semanticSearch(query: string, limit: number = 12): Promise<UnifiedRoomSearchResult> {
     const trimmed = (query || '').toString().trim();
     if (!trimmed) {
       console.warn('[semanticSearch] Empty query provided; returning empty result');
       return {
         query: trimmed,
-        method: 'STANDARD' as const,
+        method: 'STANDARD',
         count: 0,
         results: [],
       };
     }
 
     try {
-      const { data } = await api.get<SemanticSearchResponse>('/ai/search/semantic', {
+      const { data } = await api.get<UnifiedRoomSearchResult>('/ai/search/semantic', {
         params: { q: trimmed, limit: Math.min(limit, 50) },
       });
       return data;
@@ -45,10 +45,10 @@ export const semanticSearchApi = {
       // Fallback to standard search on error
       try {
         const standardData = await this.standardSearch({ search: trimmed }, 1, limit);
-        // Convert PaginatedResponse to SemanticSearchResponse format
+        // Convert PaginatedResponse to UnifiedRoomSearchResult format
         return {
           query: trimmed,
-          method: 'STANDARD' as const,
+          method: 'STANDARD',
           count: standardData.data?.length ?? 0,
           results: standardData.data ?? [],
         };
@@ -57,7 +57,7 @@ export const semanticSearchApi = {
         // Return empty results if both fail
         return {
           query: trimmed,
-          method: 'STANDARD' as const,
+          method: 'STANDARD',
           count: 0,
           results: [],
         };
@@ -80,9 +80,9 @@ export const semanticSearchApi = {
       amenities?: string[];
     },
     limit: number = 12
-  ) {
+  ): Promise<UnifiedRoomSearchResult> {
     try {
-      const { data } = await api.get<SemanticSearchResponse>('/ai/search/hybrid', {
+      const { data } = await api.get<UnifiedRoomSearchResult>('/ai/search/hybrid', {
         params: {
           q: query,
           minPrice: filters?.minPrice,
@@ -103,10 +103,10 @@ export const semanticSearchApi = {
           1,
           limit
         );
-        // Convert PaginatedResponse to SemanticSearchResponse format
+        // Convert PaginatedResponse to UnifiedRoomSearchResult format
         return {
           query,
-          method: 'STANDARD' as const,
+          method: 'STANDARD',
           count: standardData.data?.length ?? 0,
           results: standardData.data ?? [],
         };
@@ -114,7 +114,7 @@ export const semanticSearchApi = {
         console.error('[hybridSearch] Fallback also failed:', fallbackError);
         return {
           query,
-          method: 'STANDARD' as const,
+          method: 'STANDARD',
           count: 0,
           results: [],
         };

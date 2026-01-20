@@ -10,6 +10,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { RegisterDto, AuthResponseDto } from './dto/auth.dto';
@@ -27,10 +28,66 @@ export class AuthService {
     private readonly emailService: EmailService,
   ) {}
 
+  /**
+   * Generate a cryptographically strong random token for password reset (128 chars)
+   */
+  private generatePasswordResetToken(): string {
+    return crypto.randomBytes(64).toString('hex');
+  }
+
+  /**
+   * Generate a 6-digit email verification code
+   */
+  private generateVerificationCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  /**
+   * Validate password against minimum requirements
+   * - At least 8 characters
+   * - At least 1 uppercase letter
+   * - At least 1 lowercase letter
+   * - At least 1 number
+   * - At least 1 special character (!@#$%^&*)
+   */
+  private validatePasswordPolicy(password: string): { valid: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (password.length < 8) {
+      errors.push('Password must be at least 8 characters long');
+    }
+    if (!/[A-Z]/.test(password)) {
+      errors.push('Password must contain at least 1 uppercase letter');
+    }
+    if (!/[a-z]/.test(password)) {
+      errors.push('Password must contain at least 1 lowercase letter');
+    }
+    if (!/\d/.test(password)) {
+      errors.push('Password must contain at least 1 number');
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      errors.push('Password must contain at least 1 special character (!@#$%^&*)');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
   async register(registerDto: RegisterDto): Promise<{ message: string }> {
     // Prevent creating admin via public registration
     if ((registerDto.role || '').toString().toUpperCase() === 'ADMIN') {
       throw new ForbiddenException('Cannot create ADMIN via registration');
+    }
+
+    // Validate password policy
+    const pwValidation = this.validatePasswordPolicy(registerDto.password);
+    if (!pwValidation.valid) {
+      throw new BadRequestException({
+        message: 'Password does not meet security requirements',
+        errors: pwValidation.errors,
+      });
     }
 
     // Check if user exists
@@ -46,10 +103,8 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
     // Generate 6-digit verification code
-    const verificationCode = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const emailVerificationCode = this.generateVerificationCode();
+    const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     try {
       // Use transaction to ensure atomicity
@@ -60,10 +115,10 @@ export class AuthService {
             email: registerDto.email,
             passwordHash: hashedPassword,
             fullName: registerDto.fullName,
-            phoneNumber: registerDto.phone || '', // Handle null case
-            role: (registerDto.role || 'TENANT') as any, // Cast to UserRole enum
-            verificationCode,
-            verificationExpiry,
+            phoneNumber: registerDto.phone || '',
+            role: (registerDto.role || 'TENANT') as any,
+            emailVerificationCode,
+            emailVerificationExpiry,
           },
         });
 
@@ -91,7 +146,7 @@ export class AuthService {
       await this.emailService.sendVerificationEmail(
         user.email,
         user.fullName,
-        verificationCode,
+        emailVerificationCode,
       );
 
       return {
@@ -102,7 +157,7 @@ export class AuthService {
       this.logger.error('Registration failed', error);
 
       // Check if it's a Prisma unique constraint error
-      if (error.code === 'P2002') {
+      if ((error as any).code === 'P2002') {
         throw new ConflictException('Email already registered');
       }
 
@@ -119,6 +174,13 @@ export class AuthService {
 
     if (!user) {
       return null;
+    }
+
+    // Check if user is banned
+    if (user.isBanned) {
+      throw new UnauthorizedException(
+        `Account is banned. Reason: ${user.bannedReason || 'No reason provided'}`,
+      );
     }
 
     // Check if email is verified
@@ -167,6 +229,19 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
+      // Check if user is banned - revoke token if so
+      if (user.isBanned) {
+        throw new UnauthorizedException('Account has been banned');
+      }
+
+      // Optional: Validate token family for additional security
+      // This helps prevent token reuse attacks across devices
+      if (user.lastRefreshTokenFamily && payload.family !== user.lastRefreshTokenFamily) {
+        // Token family mismatch - possible token reuse attack
+        this.logger.warn(`Possible token reuse attack detected for user ${user.id}`);
+        throw new UnauthorizedException('Token reuse detected. Please login again.');
+      }
+
       const access_token = await this.jwtService.signAsync(
         {
           sub: user.id,
@@ -181,14 +256,19 @@ export class AuthService {
       );
 
       return { access_token };
-    } catch {
+    } catch (error) {
+      if ((error as any).name === 'TokenExpiredError') {
+        throw new UnauthorizedException('Refresh token has expired');
+      }
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
   async verifyEmail(code: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findFirst({
-      where: { verificationCode: code },
+      where: {
+        emailVerificationCode: code,
+      },
     });
 
     if (!user) {
@@ -199,7 +279,10 @@ export class AuthService {
       throw new BadRequestException('Email already verified');
     }
 
-    if (user.verificationExpiry && new Date() > user.verificationExpiry) {
+    if (
+      user.emailVerificationExpiry &&
+      new Date() > user.emailVerificationExpiry
+    ) {
       throw new BadRequestException('Verification code has expired');
     }
 
@@ -208,8 +291,8 @@ export class AuthService {
       where: { id: user.id },
       data: {
         emailVerified: true,
-        verificationCode: null,
-        verificationExpiry: null,
+        emailVerificationCode: null,
+        emailVerificationExpiry: null,
       },
     });
 
@@ -235,16 +318,14 @@ export class AuthService {
     }
 
     // Generate new verification code
-    const verificationCode = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
-    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const emailVerificationCode = this.generateVerificationCode();
+    const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        verificationCode,
-        verificationExpiry,
+        emailVerificationCode,
+        emailVerificationExpiry,
       },
     });
 
@@ -252,7 +333,7 @@ export class AuthService {
     await this.emailService.sendVerificationEmail(
       user.email,
       user.fullName,
-      verificationCode,
+      emailVerificationCode,
     );
 
     return {
@@ -268,17 +349,15 @@ export class AuthService {
       return { message: 'If that email exists, a reset link has been sent.' };
     }
 
-    // Generate reset token (valid for 1 hour)
-    const resetToken =
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15);
-    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    // Generate reset token (valid for 1 hour, cryptographically strong)
+    const passwordResetToken = this.generatePasswordResetToken();
+    const passwordResetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        verificationCode: resetToken,
-        verificationExpiry: resetTokenExpiry,
+        passwordResetToken,
+        passwordResetExpiry,
       },
     });
 
@@ -290,7 +369,7 @@ export class AuthService {
         <h2>Password Reset Request</h2>
         <p>Hi ${user.fullName},</p>
         <p>Click the link below to reset your password:</p>
-        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}">Reset Password</a>
+        <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${passwordResetToken}">Reset Password</a>
         <p>This link will expire in 1 hour.</p>
         <p>If you didn't request this, please ignore this email.</p>
       `,
@@ -303,10 +382,20 @@ export class AuthService {
     token: string,
     newPassword: string,
   ): Promise<{ message: string }> {
+    // Validate new password policy
+    const pwValidation = this.validatePasswordPolicy(newPassword);
+    if (!pwValidation.valid) {
+      throw new BadRequestException({
+        message: 'New password does not meet security requirements',
+        errors: pwValidation.errors,
+      });
+    }
+
+    // 🔒 UC_AUTH_03: Single-use token enforcement
     const user = await this.prisma.user.findFirst({
       where: {
-        verificationCode: token,
-        verificationExpiry: { gte: new Date() },
+        passwordResetToken: token,
+        passwordResetExpiry: { gte: new Date() },
       },
     });
 
@@ -317,13 +406,16 @@ export class AuthService {
     // Hash new password
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
-    // Update password and clear reset token
+    // 🔒 UC_AUTH_03: Update password, clear reset token, and revoke all sessions
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         passwordHash,
-        verificationCode: null,
-        verificationExpiry: null,
+        passwordResetToken: null,
+        passwordResetExpiry: null,
+        // Revoke token family to invalidate all existing sessions
+        lastRefreshTokenFamily: null,
+        lastRefreshIssuedAt: null,
       },
     });
 
@@ -331,10 +423,14 @@ export class AuthService {
   }
 
   private async generateTokens(user: any) {
+    // Generate a unique family ID for token rotation
+    const tokenFamily = crypto.randomBytes(16).toString('hex');
+
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      family: tokenFamily, // Include family for rotation tracking
     };
 
     const [access_token, refresh_token] = await Promise.all([
@@ -351,9 +447,32 @@ export class AuthService {
       }),
     ]);
 
+    // Store token family for reuse detection on next refresh
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastRefreshTokenFamily: tokenFamily,
+        lastRefreshIssuedAt: new Date(),
+      },
+    });
+
     return {
       access_token,
       refresh_token,
     };
+  }
+
+  /**
+   * Revoke all refresh tokens for a user by clearing token family
+   * Called on logout or when user is banned
+   */
+  async revokeTokenFamily(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        lastRefreshTokenFamily: null,
+        lastRefreshIssuedAt: null,
+      },
+    });
   }
 }

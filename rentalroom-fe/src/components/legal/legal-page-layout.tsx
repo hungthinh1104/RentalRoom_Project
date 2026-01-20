@@ -131,7 +131,7 @@ export function LegalHighlight({ label, content, color = 'primary' }: LegalHighl
     const colorClasses = {
         primary: 'border-primary',
         blue: 'border-blue-500',
-        amber: 'border-amber-500',
+        amber: 'border-warning',
         green: 'border-green-500',
     };
 

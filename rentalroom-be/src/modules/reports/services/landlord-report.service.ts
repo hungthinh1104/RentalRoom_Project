@@ -23,7 +23,7 @@ import {
 export class LandlordReportService {
   private readonly logger = new Logger(LandlordReportService.name);
 
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Get revenue breakdown for a landlord
@@ -50,12 +50,14 @@ export class LandlordReportService {
           ...(propertyId ? { room: { propertyId } } : {}),
         },
         deletedAt: null,
-        ...(startDate || endDate ? {
-          createdAt: {
-            ...(startDate ? { gte: new Date(startDate) } : {}),
-            ...(endDate ? { lte: new Date(endDate) } : {}),
-          }
-        } : {}),
+        ...(startDate || endDate
+          ? {
+              createdAt: {
+                ...(startDate ? { gte: new Date(startDate) } : {}),
+                ...(endDate ? { lte: new Date(endDate) } : {}),
+              },
+            }
+          : {}),
       },
       include: {
         payments: {
@@ -90,7 +92,10 @@ export class LandlordReportService {
       data.invoiceCount++;
       data.totalRevenue += Number(inv.totalAmount);
 
-      const paidForInvoice = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const paidForInvoice = inv.payments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0,
+      );
       data.paidAmount += paidForInvoice;
       data.paymentCount += inv.payments.length;
 
@@ -124,7 +129,7 @@ export class LandlordReportService {
       averageMonthlyRevenue:
         monthlyData.length > 0
           ? monthlyData.reduce((sum, m) => sum + Number(m.totalRevenue), 0) /
-          monthlyData.length
+            monthlyData.length
           : 0,
     };
 
@@ -161,10 +166,10 @@ export class LandlordReportService {
             id: true,
             status: true,
             pricePerMonth: true,
-          }
+          },
         },
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
     });
 
     const startDate = new Date();
@@ -176,23 +181,28 @@ export class LandlordReportService {
       _count: true,
       where: {
         room: { property: { landlordId } },
-        requestDate: { gte: startDate }
-      }
+        requestDate: { gte: startDate },
+      },
     });
 
     const maintenanceMap = new Map<string, number>();
-    maintenanceCounts.forEach(c => maintenanceMap.set(c.roomId, c._count));
+    maintenanceCounts.forEach((c) => maintenanceMap.set(c.roomId, c._count));
 
     const results: PropertyMetricsDto[] = [];
 
     for (const prop of propertiesData) {
       const totalRooms = prop.rooms.length;
-      const occupiedRooms = prop.rooms.filter(r => r.status === 'OCCUPIED').length;
-      const occupancyRate = totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
+      const occupiedRooms = prop.rooms.filter(
+        (r) => r.status === 'OCCUPIED',
+      ).length;
+      const occupancyRate =
+        totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
 
-      const avgRoomPrice = totalRooms > 0
-        ? prop.rooms.reduce((s, r) => s + Number(r.pricePerMonth), 0) / totalRooms
-        : 0;
+      const avgRoomPrice =
+        totalRooms > 0
+          ? prop.rooms.reduce((s, r) => s + Number(r.pricePerMonth), 0) /
+            totalRooms
+          : 0;
 
       // Revenue for this property in the given period
       const revenueAgg = await this.prisma.payment.aggregate({
@@ -201,18 +211,18 @@ export class LandlordReportService {
           paidAt: { gte: startDate },
           invoice: {
             contract: {
-              room: { propertyId: prop.id }
-            }
-          }
+              room: { propertyId: prop.id },
+            },
+          },
         },
-        _sum: { amount: true }
+        _sum: { amount: true },
       });
 
       const totalRevenue = Number(revenueAgg._sum.amount || 0);
 
       // Maintenance count for all rooms in property
       let propertyMaintenance = 0;
-      prop.rooms.forEach(r => {
+      prop.rooms.forEach((r) => {
         propertyMaintenance += maintenanceMap.get(r.id) || 0;
       });
 
@@ -229,7 +239,10 @@ export class LandlordReportService {
     }
 
     // Sort by occupancy and revenue
-    results.sort((a, b) => b.occupancyRate - a.occupancyRate || b.totalRevenue - a.totalRevenue);
+    results.sort(
+      (a, b) =>
+        b.occupancyRate - a.occupancyRate || b.totalRevenue - a.totalRevenue,
+    );
 
     // Calculate summary
     const totalProperties = results.length;
@@ -242,10 +255,10 @@ export class LandlordReportService {
     const bestPerformingProperty =
       results.length > 0
         ? {
-          id: results[0].propertyId,
-          name: results[0].propertyName,
-          occupancyRate: results[0].occupancyRate,
-        }
+            id: results[0].propertyId,
+            name: results[0].propertyName,
+            occupancyRate: results[0].occupancyRate,
+          }
         : null;
 
     return {
@@ -274,7 +287,7 @@ export class LandlordReportService {
     }
 
     // Fetch active contracts for this landlord/property to identify current tenants
-    const contracts = await this.prisma.contract.findMany({
+    const contracts = (await this.prisma.contract.findMany({
       where: {
         landlordId,
         ...(propertyId ? { room: { propertyId } } : {}),
@@ -286,8 +299,8 @@ export class LandlordReportService {
           include: {
             property: true,
             _count: {
-              select: { maintenanceRequests: true }
-            }
+              select: { maintenanceRequests: true },
+            },
           },
         },
         invoices: {
@@ -298,7 +311,7 @@ export class LandlordReportService {
           },
         },
       },
-    }) as any[]; // Use any[] for the loop to avoid strict typing issues with complex includes for now
+    })) as any[]; // Use any[] for the loop to avoid strict typing issues with complex includes for now
 
     const results: TenantBehaviorDto[] = [];
 
@@ -309,7 +322,7 @@ export class LandlordReportService {
       let latePayments = 0;
       let totalDelay = 0;
 
-      filteredInvoices.forEach(inv => {
+      filteredInvoices.forEach((inv) => {
         const payment = inv.payments[0]; // Assuming one completed payment per invoice for this logic
         if (payment && payment.paidAt) {
           const paidDate = new Date(payment.paidAt);
@@ -319,7 +332,9 @@ export class LandlordReportService {
             onTimePayments++;
           } else {
             latePayments++;
-            const diffDays = Math.ceil((paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+            const diffDays = Math.ceil(
+              (paidDate.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24),
+            );
             totalDelay += diffDays;
           }
         } else if (inv.status === 'OVERDUE') {
@@ -345,8 +360,10 @@ export class LandlordReportService {
 
     // Sort by on-time rate
     results.sort((a, b) => {
-      const rateA = a.totalPayments > 0 ? a.onTimePayments / a.totalPayments : 0;
-      const rateB = b.totalPayments > 0 ? b.onTimePayments / b.totalPayments : 0;
+      const rateA =
+        a.totalPayments > 0 ? a.onTimePayments / a.totalPayments : 0;
+      const rateB =
+        b.totalPayments > 0 ? b.onTimePayments / b.totalPayments : 0;
       return rateB - rateA;
     });
 
@@ -355,16 +372,19 @@ export class LandlordReportService {
     const averageOnTimeRate =
       totalTenants > 0
         ? (results.reduce(
-          (sum, t) => sum + (t.totalPayments > 0 ? t.onTimePayments / t.totalPayments : 0),
-          0,
-        ) /
-          totalTenants) *
-        100
+            (sum, t) =>
+              sum +
+              (t.totalPayments > 0 ? t.onTimePayments / t.totalPayments : 0),
+            0,
+          ) /
+            totalTenants) *
+          100
         : 0;
 
     const averagePaymentDelay =
       totalTenants > 0
-        ? results.reduce((sum, t) => sum + t.averagePaymentDelay, 0) / totalTenants
+        ? results.reduce((sum, t) => sum + t.averagePaymentDelay, 0) /
+          totalTenants
         : 0;
 
     const totalMaintenanceRequests = results.reduce(

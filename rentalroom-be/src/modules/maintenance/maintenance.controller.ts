@@ -54,8 +54,8 @@ export class MaintenanceController {
 
   @Patch('requests/:id/complete')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  complete(@Param('id') id: string) {
-    return this.maintenanceService.complete(id);
+  complete(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.maintenanceService.complete(id, user);
   }
 
   @Delete('requests/:id')

@@ -38,7 +38,9 @@ export function LiabilityWaiverModal({ open, onOpenChange, onAgree }: LiabilityW
     // Reset state when modal opens
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setHasReadToBottom(false);
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setAgreed(false);
         }
     }, [open]);
@@ -69,7 +71,7 @@ export function LiabilityWaiverModal({ open, onOpenChange, onAgree }: LiabilityW
                                 1. Mục đích sử dụng
                             </h4>
                             <p>
-                                Công cụ "AI PCCC Consultant" ("Công cụ") được cung cấp nhằm mục đích hỗ trợ người dùng tạo lập các tài liệu tham khảo ban đầu cho hồ sơ Phòng cháy chữa cháy (PCCC).
+                                Công cụ &quot;AI PCCC Consultant&quot; (&quot;Công cụ&quot;) được cung cấp nhằm mục đích hỗ trợ người dùng tạo lập các tài liệu tham khảo ban đầu cho hồ sơ Phòng cháy chữa cháy (PCCC).
                                 <strong className="text-primary block mt-1">
                                     Mọi tài liệu được tạo ra từ Công cụ này CHỈ MANG TÍNH CHẤT THAM KHẢO.
                                 </strong>
@@ -102,7 +104,7 @@ export function LiabilityWaiverModal({ open, onOpenChange, onAgree }: LiabilityW
                             </p>
 
                             <p className="pt-4 text-center italic text-muted-foreground border-t">
-                                Bằng việc nhấn "Đồng ý", bạn xác nhận đã hiểu rõ và chấp nhận các điều khoản trên.
+                                Bằng việc nhấn &quot;Đồng ý&quot;, bạn xác nhận đã hiểu rõ và chấp nhận các điều khoản trên.
                             </p>
                         </div>
                     </ScrollArea>

@@ -1,0 +1,1 @@
+{"id":"DEC-ARCH-USER-01","topic":"User Module Structure","decision":"Distributed User Logic","reason":"No dedicated 'src/features/users' found. User identity handled in 'auth', management in 'admin', profiles in 'tenant/landlord'.","implication":"Scanning 'USERS' means scanning these 3 modules."}

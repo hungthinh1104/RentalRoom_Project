@@ -85,7 +85,12 @@ export class TaxController {
       throw new BadRequestException('Invalid year parameter');
     }
 
-    return this.taxService.exportTaxData(landlordId, yearNum);
+    return this.taxService.exportTaxData(
+      landlordId,
+      yearNum,
+      user.id,
+      user.role,
+    );
   }
 
   @Get('snapshot/:landlordId/:year/:month')

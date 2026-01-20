@@ -1,3 +1,5 @@
+import type { Room } from "@/types";
+
 export enum PropertyType {
     APARTMENT = 'APARTMENT',
     HOUSE = 'HOUSE',
@@ -11,13 +13,15 @@ export interface Property {
     address: string;
     city: string;
     cityCode?: string;
+    district?: string;
     ward: string;
     wardCode?: string;
     propertyType: PropertyType;
     description?: string;
     images: string[];
     totalRooms?: number;
-    rooms?: any[]; // Defined in room types if needed
+    occupiedRooms?: number;
+    rooms?: Room[];
     createdAt: string;
 }
 

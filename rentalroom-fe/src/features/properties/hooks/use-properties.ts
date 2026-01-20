@@ -7,7 +7,7 @@ import { CreatePropertyInput, Property } from "../types";
 export const propertyKeys = {
 	all: ["properties"] as const,
 	lists: () => [...propertyKeys.all, "list"] as const,
-	list: (filters: any) => [...propertyKeys.lists(), { ...filters }] as const,
+	list: (filters: Record<string, unknown> | undefined) => [...propertyKeys.lists(), { ...filters }] as const,
 	details: () => [...propertyKeys.all, "detail"] as const,
 	detail: (id: string) => [...propertyKeys.details(), id] as const,
 };
@@ -24,7 +24,7 @@ export function useProperties(filters?: { search?: string }) {
 			// Ensure we explicitly request landlord properties if this is landlord view
 			// But backend filters by CurrentUser role automatically for /properties
 
-			const { data } = await api.get<{ data: Property[], meta: any }>(`/properties?${params.toString()}`);
+			const { data } = await api.get<{ data: Property[], meta: Record<string, unknown> }>(`/properties?${params.toString()}`);
 			return data;
 		},
 		staleTime: 60 * 1000,

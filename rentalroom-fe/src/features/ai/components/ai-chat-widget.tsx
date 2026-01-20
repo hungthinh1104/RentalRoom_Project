@@ -9,10 +9,14 @@ import { AIChatInput } from "./ai-chat-input";
 import { AIChatMessages } from "./ai-chat-messages";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 export function AIChatWidget() {
   const { messages, isOpen, isLoading, sendMessage, clearHistory, toggleOpen } = useAIChat();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+
+
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -20,6 +24,11 @@ export function AIChatWidget() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isOpen]);
+
+  // Hide chat on auth pages
+  if (pathname === '/login' || pathname === '/register') {
+    return null;
+  }
 
   if (!isOpen) {
     return (
@@ -84,7 +93,7 @@ export function AIChatWidget() {
                 <div className="h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-background"></div>
               </div>
             </div>
-            
+
             <div className="space-y-1">
               <h4 className="font-semibold text-base">Xin chào! 👋</h4>
               <p className="text-xs text-muted-foreground max-w-[240px] mx-auto">

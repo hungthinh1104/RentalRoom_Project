@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { contractsApi } from '@/features/contracts/api/contracts-api';
-import { utilitiesApi } from '@/features/utilities/api/utilities-api';
+import { utilitiesApi, Invoice } from '@/features/utilities/api/utilities-api';
+import { calculateInvoiceEstimate } from '@/features/utilities/utils/invoice-helpers';
 import { InvoicePreviewModal } from './InvoicePreviewModal';
 import { ServiceConfigModal } from './ServiceConfigModal';
 import { InvoiceDetailDialog } from './InvoiceDetailDialog';
@@ -16,10 +17,19 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/utils/tax-helpers';
-import { Loader2, Plus, Save } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+interface ServiceStub {
+    id: string;
+    serviceName?: string;
+    serviceType?: string;
+    billingMethod?: string;
+    unitPrice?: number;
+    unit?: string;
+}
 
 export const UnifiedInvoiceTable = () => {
     const [month, setMonth] = useState<number>(new Date().getMonth() + 1);
@@ -41,7 +51,7 @@ export const UnifiedInvoiceTable = () => {
         },
     });
 
-    const contracts = contractsData?.data || [];
+    const contracts = useMemo(() => contractsData?.data || [], [contractsData?.data]);
 
     // Local state for readings and selection
     // Key: contractId
@@ -101,7 +111,17 @@ export const UnifiedInvoiceTable = () => {
         });
     };
 
-    const [previewData, setPreviewData] = useState<any>(null);
+    const [previewData, setPreviewData] = useState<{
+        contract: {
+            id: string;
+            monthlyRent: number;
+            room?: { roomNumber?: string; property?: { services?: Array<{ id: string; billingMethod?: string; serviceType?: string; unitPrice?: number; serviceName?: string }> } };
+            tenant?: { user?: { fullName?: string } };
+        };
+        month: string;
+        readings: Record<string, { old: string; new: string }>;
+        selectedServices: string[];
+    } | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isConfigOpen, setIsConfigOpen] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
@@ -124,8 +144,22 @@ export const UnifiedInvoiceTable = () => {
         if (!previewData) return;
 
         try {
-            setProcessing(previewData.contract.id);
-            const { contract, readings: contractReadings, selectedServices: selectedIds } = previewData;
+            const data = previewData as {
+                contract: {
+                    id: string;
+                    room?: {
+                        roomNumber?: string;
+                        property?: {
+                            services?: Array<{ id: string; billingMethod?: string; serviceType?: string; unitPrice?: number; serviceName?: string }>
+                        }
+                    }
+                };
+                readings: Record<string, { new: string }>;
+                selectedServices: string[]
+            };
+
+            setProcessing(data.contract.id);
+            const { contract, readings: contractReadings } = data;
 
             // Prepare metered readings payload
             const readingsPayload: Array<{ serviceId: string; currentReading: number }> = [];
@@ -299,34 +333,14 @@ export const UnifiedInvoiceTable = () => {
                                     const fixed = services.filter((s) => s.billingMethod === 'FIXED');
 
                                     // Calculate estimated total
+                                    // Calculate estimated total
                                     const calculateEstimate = () => {
-                                        let total = Number(contract.monthlyRent);
-
-                                        // Metered
-                                        if (elec) {
-                                            const r = readings[contract.id]?.[elec.id];
-                                            if (r?.new && r?.old) {
-                                                const usage = Number(r.new) - Number(r.old);
-                                                if (usage > 0) total += usage * Number(elec.unitPrice);
-                                            }
-                                        }
-                                        if (water) {
-                                            const r = readings[contract.id]?.[water.id];
-                                            if (r?.new && r?.old) {
-                                                const usage = Number(r.new) - Number(r.old);
-                                                if (usage > 0) total += usage * Number(water.unitPrice);
-                                            }
-                                        }
-
-                                        // Fixed
-                                        fixed.forEach((s: any) => {
-                                            // Check if selected (if UI supports selection)
-                                            if (selectedServices[contract.id]?.includes(s.id)) {
-                                                total += Number(s.unitPrice);
-                                            }
+                                        return calculateInvoiceEstimate({
+                                            monthlyRent: contract.monthlyRent,
+                                            readings: readings[contract.id] || {},
+                                            selectedServices: selectedServices[contract.id] || [],
+                                            services: contract.room?.property?.services || []
                                         });
-
-                                        return total;
                                     };
 
                                     return (
@@ -380,7 +394,7 @@ export const UnifiedInvoiceTable = () => {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex flex-col gap-1">
-                                                    {fixed.map((s: any) => (
+                                                    {fixed.map((s: ServiceStub) => (
                                                         <div key={s.id} className="flex items-center gap-2 text-xs">
                                                             <Checkbox
                                                                 checked={selectedServices[contract.id]?.includes(s.id)}
@@ -396,16 +410,16 @@ export const UnifiedInvoiceTable = () => {
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 {(() => {
-                                                    const existingInvoice = existingInvoices?.find((inv: any) => inv.contractId === contract.id);
-                                                    
+                                                    const existingInvoice = existingInvoices?.find((inv: Invoice) => inv.contractId === contract.id);
+
                                                     if (existingInvoice) {
                                                         return (
                                                             <div className="text-xs text-muted-foreground">
-                                                                <span className="text-green-600 font-semibold">✓ Đã tạo</span>
+                                                                <span className="text-success font-semibold">✓ Đã tạo</span>
                                                             </div>
                                                         );
                                                     }
-                                                    
+
                                                     return (
                                                         <Button
                                                             size="sm"
@@ -444,8 +458,8 @@ export const UnifiedInvoiceTable = () => {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {existingInvoices.map((invoice: any) => {
-                                    const contract = contracts.find((c: any) => c.id === invoice.contractId);
+                                {existingInvoices.map((invoice: Invoice) => {
+                                    const contract = contracts.find((c: { id: string }) => c.id === invoice.contractId);
                                     return (
                                         <TableRow key={invoice.id}>
                                             <TableCell>
@@ -456,22 +470,21 @@ export const UnifiedInvoiceTable = () => {
                                                 {formatCurrency(Number(invoice.totalAmount) || 0)}
                                             </TableCell>
                                             <TableCell>
-                                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                                    invoice.status === 'PAID' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                                    invoice.status === 'OVERDUE' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                                    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                                }`}>
+                                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${invoice.status === 'PAID' ? 'bg-success/10 text-success' :
+                                                    invoice.status === 'OVERDUE' ? 'bg-destructive/10 text-destructive' :
+                                                        'bg-warning/10 text-warning'
+                                                    }`}>
                                                     {invoice.status === 'PAID' ? 'Đã thanh toán' :
-                                                     invoice.status === 'OVERDUE' ? 'Quá hạn' :
-                                                     'Chưa thanh toán'}
+                                                        invoice.status === 'OVERDUE' ? 'Quá hạn' :
+                                                            'Chưa thanh toán'}
                                                 </span>
                                             </TableCell>
                                             <TableCell className="text-sm text-muted-foreground">
                                                 {new Date(invoice.createdAt).toLocaleDateString('vi-VN')}
                                             </TableCell>
                                             <TableCell className="text-right">
-                                                <Button 
-                                                    size="sm" 
+                                                <Button
+                                                    size="sm"
                                                     variant="outline"
                                                     onClick={() => {
                                                         setSelectedInvoiceId(invoice.id);

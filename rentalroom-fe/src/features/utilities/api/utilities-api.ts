@@ -53,6 +53,7 @@ export interface InvoiceLineItem {
   quantity: number;
   unitPrice: number;
   amount: number;
+  service?: Service;
 }
 
 export interface Payment {

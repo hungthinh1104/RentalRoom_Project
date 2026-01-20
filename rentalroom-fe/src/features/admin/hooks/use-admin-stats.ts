@@ -10,7 +10,7 @@ export const adminStatsKeys = {
 };
 
 // Types
-interface TopLandlord {
+export interface TopLandlord {
     landlordId: string;
     name: string;
     properties: number;
@@ -18,7 +18,7 @@ interface TopLandlord {
     occupancyRate: number;
 }
 
-interface TopProperty {
+export interface TopProperty {
     propertyId: string; // or id
     id?: string;
     name: string;
@@ -29,10 +29,9 @@ interface TopProperty {
     occupancyRate: number;
 }
 
-interface Trend {
+export interface Trend {
     date: string;
     revenue: number;
-    // contracts: number; // Removed from backend response
 }
 
 // Backend API Response Shape

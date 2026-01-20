@@ -1,0 +1,157 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Beads Element",
+    "description": "A fundamental unit of agent cognition/memory",
+    "definitions": {
+        "Task": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "pattern": "^TASK-[A-Z0-9]{4,}$"
+                },
+                "type": {
+                    "enum": [
+                        "analysis",
+                        "design",
+                        "implementation",
+                        "verification",
+                        "refactor"
+                    ]
+                },
+                "title": {
+                    "type": "string"
+                },
+                "context_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dependencies": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "description": "ID of tasks that must be COMPLETED before this one"
+                    }
+                },
+                "priority": {
+                    "enum": [
+                        "critical",
+                        "high",
+                        "medium",
+                        "low"
+                    ]
+                },
+                "status": {
+                    "enum": [
+                        "pending",
+                        "in_progress",
+                        "blocked",
+                        "completed",
+                        "cancelled"
+                    ]
+                },
+                "acceptance_criteria": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "id",
+                "type",
+                "title",
+                "status"
+            ]
+        },
+        "Event": {
+            "type": "object",
+            "description": "Immutable record of something that happened (Append-Only Log)",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "pattern": "^EVT-[A-Z0-9]{6,}$"
+                },
+                "timestamp": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "actor": {
+                    "enum": [
+                        "user",
+                        "agent",
+                        "system"
+                    ]
+                },
+                "task_id": {
+                    "type": "string",
+                    "description": "Related task ID if applicable"
+                },
+                "action": {
+                    "enum": [
+                        "task_created",
+                        "status_changed",
+                        "comment_added",
+                        "blockage_identified",
+                        "assumption_failed",
+                        "verification_passed"
+                    ]
+                },
+                "payload": {
+                    "type": "object",
+                    "description": "Arbitrary data specific to the action"
+                }
+            },
+            "required": [
+                "id",
+                "timestamp",
+                "actor",
+                "action"
+            ]
+        },
+        "Decision": {
+            "type": "object",
+            "description": "Architectural or Logic Decision Record (ADR-lite)",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "pattern": "^DEC-[A-Z0-9]{4,}$"
+                },
+                "topic": {
+                    "type": "string"
+                },
+                "context": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "alternatives_considered": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "consequences": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "related_tasks": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "id",
+                "topic",
+                "decision"
+            ]
+        }
+    }
+}

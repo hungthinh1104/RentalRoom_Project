@@ -3,8 +3,10 @@ import {
   NotFoundException,
   BadRequestException,
   UnauthorizedException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { Prisma, ContractStatus } from '@prisma/client';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreateRentalApplicationDto,
@@ -13,7 +15,7 @@ import {
 } from '../dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
-import { ApplicationStatus, ContractStatus } from '../entities';
+import { ApplicationStatus } from '../entities';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { EmailService } from 'src/common/services/email.service';
 import { NotificationType } from '../../notifications/entities/notification.entity';
@@ -28,31 +30,35 @@ export class ContractApplicationService {
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
+
+  private async acquireLock(tx: Prisma.TransactionClient, key: string) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+  }
 
   /**
-   * Auto-generate unique contract number with transaction safety
+   * Auto-generate unique contract number with transaction safety (tx-provided)
    * Format: HD-{landlordPrefix}-{YYYYMM}-{XXXX}
    */
-  private async generateContractNumber(landlordId: string): Promise<string> {
+  private async generateContractNumberTx(
+    tx: Prisma.TransactionClient,
+    landlordId: string,
+  ): Promise<string> {
     const landlordPrefix = landlordId.slice(0, 4).toUpperCase();
     const date = new Date();
     const yearMonth = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-    return await this.prisma.$transaction(
-      async (tx) => {
-        const count = await tx.contract.count({
-          where: {
-            landlordId,
-            contractNumber: { startsWith: `HD-${landlordPrefix}-${yearMonth}` },
-          },
-        });
+    await this.acquireLock(tx, `contract-number:${landlordId}:${yearMonth}`);
 
-        const sequence = String(count + 1).padStart(4, '0');
-        return `HD-${landlordPrefix}-${yearMonth}-${sequence}`;
+    const count = await tx.contract.count({
+      where: {
+        landlordId,
+        contractNumber: { startsWith: `HD-${landlordPrefix}-${yearMonth}` },
       },
-      { maxWait: 5000, timeout: 10000 },
-    );
+    });
+
+    const sequence = String(count + 1).padStart(4, '0');
+    return `HD-${landlordPrefix}-${yearMonth}-${sequence}`;
   }
 
   async createApplication(createDto: CreateRentalApplicationDto, user: User) {
@@ -134,11 +140,6 @@ export class ContractApplicationService {
             },
           });
 
-          await tx.room.update({
-            where: { id: createDto.roomId },
-            data: { status: RoomStatus.DEPOSIT_PENDING as any },
-          });
-
           return application;
         },
         { maxWait: 5000, timeout: 10000 },
@@ -184,8 +185,8 @@ export class ContractApplicationService {
               tenantUser.phoneNumber || 'N/A',
               application.requestedMoveInDate
                 ? new Date(application.requestedMoveInDate).toLocaleDateString(
-                    'vi-VN',
-                  )
+                  'vi-VN',
+                )
                 : undefined,
               application.message || undefined,
             );
@@ -281,10 +282,55 @@ export class ContractApplicationService {
     );
   }
 
-  async approveApplication(id: string) {
+  async approveApplication(id: string, user: User) {
     const application = await this.findOneApplication(id);
 
+    if (application.status !== ApplicationStatus.PENDING) {
+      throw new BadRequestException('Only pending applications can be approved');
+    }
+
+    // 🔒 SECURITY: Landlord ownership validation
+    // Only landlords owning the property can approve applications
+    if (user.role !== 'ADMIN' && user.role !== 'SYSTEM') {
+      const landlord = await this.prisma.landlord.findUnique({
+        where: { userId: user.id },
+      });
+
+      if (!landlord || landlord.userId !== application.landlordId) {
+        throw new ForbiddenException(
+          'You can only approve applications for your properties',
+        );
+      }
+    }
+
     const result = await this.prisma.$transaction(async (tx) => {
+      // 🔒 UC_APP_01: Prevent bulk-approve protection
+      // Lock room and check for other approved/active applications
+      const roomLock = await tx.$queryRaw<Array<{ id: string; status: string }>>`
+        SELECT id, status FROM "room"
+        WHERE id = ${application.roomId}::uuid
+        FOR UPDATE
+      `;
+
+      if (!roomLock || roomLock.length === 0) {
+        throw new NotFoundException('Room not found');
+      }
+
+      // Check if another application is already approved for this room
+      const otherApproved = await tx.rentalApplication.findFirst({
+        where: {
+          roomId: application.roomId,
+          status: ApplicationStatus.APPROVED,
+          id: { not: id },
+        },
+      });
+
+      if (otherApproved) {
+        throw new BadRequestException(
+          'Another application has already been approved for this room. Cannot approve multiple applications.',
+        );
+      }
+
       const app = await tx.rentalApplication.update({
         where: { id },
         data: {
@@ -303,12 +349,8 @@ export class ContractApplicationService {
         },
       });
 
-      await tx.room.update({
-        where: { id: application.roomId },
-        data: { status: RoomStatus.DEPOSIT_PENDING as any },
-      });
-
-      const contractNumber = await this.generateContractNumber(
+      const contractNumber = await this.generateContractNumberTx(
+        tx,
         application.landlordId,
       );
       const startDate = app.requestedMoveInDate
@@ -329,7 +371,6 @@ export class ContractApplicationService {
           monthlyRent: app.room.pricePerMonth,
           deposit: app.room.deposit,
           status: ContractStatus.DRAFT,
-          signedAt: new Date(),
           terms: `1. TRÁCH NHIỆM BÊN A (CHỦ NHÀ):
 - Bàn giao phòng và trang thiết bị cho Bên B đúng thời hạn.
 - Đảm bảo quyền sử dụng riêng rẽ và trọn vẹn của Bên B đối với phòng thuê.
@@ -347,6 +388,11 @@ export class ContractApplicationService {
 - Mọi thay đổi phải được thỏa thuận và lập thành văn bản.
 - Hợp đồng có giá trị kể từ ngày ký đến ngày kết thúc thời hạn thuê.`,
         },
+      });
+
+      await tx.room.update({
+        where: { id: application.roomId },
+        data: { status: RoomStatus.DEPOSIT_PENDING },
       });
 
       return { app, contract };
@@ -387,8 +433,26 @@ export class ContractApplicationService {
     };
   }
 
-  async rejectApplication(id: string) {
-    await this.findOneApplication(id);
+  async rejectApplication(id: string, user: User) {
+    const application = await this.findOneApplication(id);
+
+    if (application.status !== ApplicationStatus.PENDING) {
+      throw new BadRequestException('Only pending applications can be rejected');
+    }
+
+    // 🔒 SECURITY: Landlord ownership validation
+    // Only landlords owning the property can reject applications
+    if (user.role !== 'ADMIN' && user.role !== 'SYSTEM') {
+      const landlord = await this.prisma.landlord.findUnique({
+        where: { userId: user.id },
+      });
+
+      if (!landlord || landlord.userId !== application.landlordId) {
+        throw new ForbiddenException(
+          'You can only reject applications for your properties',
+        );
+      }
+    }
 
     const updated = await this.prisma.rentalApplication.update({
       where: { id },

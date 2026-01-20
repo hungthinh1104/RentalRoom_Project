@@ -34,60 +34,62 @@ export class ExpenseService {
     const periodMonth = paidDate.getMonth() + 1;
     const periodMonthStr = `${periodYear}-${periodMonth.toString().padStart(2, '0')}`;
 
-    const expense = await this.prisma.expense.create({
-      data: {
-        rentalUnitId: dto.rentalUnitId,
-        amount: new Decimal(dto.amount),
-        currency: 'VND',
-        expenseType: dto.expenseType,
-        periodYear,
-        periodMonth,
-        periodMonthStr,
-        paidAt: paidDate,
-        note: dto.note,
-        receiptNumber: dto.receiptNumber,
-      },
-    });
-
-    // 📸 A CREATE SNAPSHOT: Expense Recorded
-    this.snapshotService
-      .create({
-        actorId: userId,
-        actorRole: UserRole.LANDLORD,
-        actionType: 'EXPENSE_RECORDED',
-        entityType: 'EXPENSE',
-        entityId: expense.id,
-        timestamp: new Date(),
-        metadata: {
-          amount: expense.amount.toString(),
-          expenseType: expense.expenseType,
-          receiptNumber: expense.receiptNumber,
+    return await this.prisma.$transaction(async (tx) => {
+      const expense = await tx.expense.create({
+        data: {
+          rentalUnitId: dto.rentalUnitId,
+          amount: new Decimal(dto.amount),
+          currency: 'VND',
+          expenseType: dto.expenseType,
+          periodYear,
+          periodMonth,
+          periodMonthStr,
+          paidAt: paidDate,
+          note: dto.note,
+          receiptNumber: dto.receiptNumber,
         },
-      })
-      .then(async (snapshotId) => {
-        await this.prisma.expense.update({
-          where: { id: expense.id },
-          data: { snapshotId },
-        });
-      })
-      .catch((err) =>
-        this.logger.error('Failed to create expense snapshot', err),
+      });
+
+      // 📸 CREATE SNAPSHOT: Expense Recorded (MANDATORY - fail-fast)
+      const snapshotId = await this.snapshotService.create(
+        {
+          actorId: userId,
+          actorRole: UserRole.LANDLORD,
+          actionType: 'EXPENSE_RECORDED',
+          entityType: 'EXPENSE',
+          entityId: expense.id,
+          timestamp: new Date(),
+          metadata: {
+            amount: expense.amount.toString(),
+            expenseType: expense.expenseType,
+            receiptNumber: expense.receiptNumber,
+          },
+        },
+        tx,
       );
 
-    // Trigger Notification
-    this.notificationsService
-      .create({
-        userId,
-        title: '💸 Chi phí mới',
-        content: `Đã ghi nhận chi ${Number(expense.amount).toLocaleString('vi-VN')} VND (${expense.expenseType})`,
-        notificationType: NotificationType.SYSTEM,
-        relatedEntityId: expense.id,
-      })
-      .catch((e) =>
-        this.logger.error(`Failed to send notification: ${e.message}`),
-      );
+      await tx.expense.update({
+        where: { id: expense.id },
+        data: { snapshotId },
+      });
 
-    return expense;
+      return expense;
+    }).then((expense) => {
+      // Trigger Notification (ASYNC - outside transaction)
+      this.notificationsService
+        .create({
+          userId,
+          title: '💸 Chi phí mới',
+          content: `Đã ghi nhận chi ${Number(expense.amount).toLocaleString('vi-VN')} VND (${expense.expenseType})`,
+          notificationType: NotificationType.SYSTEM,
+          relatedEntityId: expense.id,
+        })
+        .catch((e) =>
+          this.logger.error(`Failed to send notification: ${e.message}`),
+        );
+
+      return expense;
+    });
   }
 
   /**

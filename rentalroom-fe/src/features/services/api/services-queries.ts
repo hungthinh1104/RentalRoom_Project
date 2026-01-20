@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { servicesApi, FilterServicesParams, CreateServiceDto, UpdateServiceDto, Service } from "./services-api";
-import { PaginatedResponse } from "@/types";
 
 export const serviceKeys = {
     all: ["services"] as const,

@@ -7,11 +7,13 @@ import {
   TerminateContractDto,
   UpdateContractDto,
   UpdateHandoverChecklistDto,
+  RenewContractDto,
 } from './dto';
 import { User } from '../users/entities';
 import { ContractApplicationService } from './applications/contract-application.service';
 import { ContractLifecycleService } from './lifecycle/contract-lifecycle.service';
 import { CreateContractResidentDto } from './dto/create-contract-resident.dto';
+import { UpdateContractResidentDto } from './dto/update-contract-resident.dto';
 
 @Injectable()
 export class ContractsService {
@@ -20,7 +22,7 @@ export class ContractsService {
   constructor(
     private readonly applicationService: ContractApplicationService,
     private readonly lifecycleService: ContractLifecycleService,
-  ) {}
+  ) { }
 
   // --- Applications ---
 
@@ -36,12 +38,12 @@ export class ContractsService {
     return this.applicationService.findOneApplication(id);
   }
 
-  async approveApplication(id: string) {
-    return this.applicationService.approveApplication(id);
+  async approveApplication(id: string, user: User) {
+    return this.applicationService.approveApplication(id, user);
   }
 
-  async rejectApplication(id: string) {
-    return this.applicationService.rejectApplication(id);
+  async rejectApplication(id: string, user: User) {
+    return this.applicationService.rejectApplication(id, user);
   }
 
   async withdrawApplication(id: string, userId: string) {
@@ -102,6 +104,14 @@ export class ContractsService {
     return this.lifecycleService.terminate(id, userId, terminateDto);
   }
 
+  async renew(
+    id: string,
+    userId: string,
+    renewDto: RenewContractDto,
+  ) {
+    return this.lifecycleService.renew(id, userId, renewDto);
+  }
+
   async addResident(
     contractId: string,
     dto: CreateContractResidentDto,
@@ -112,6 +122,20 @@ export class ContractsService {
 
   async removeResident(contractId: string, residentId: string, userId: string) {
     return this.lifecycleService.removeResident(contractId, residentId, userId);
+  }
+
+  async updateResident(
+    contractId: string,
+    residentId: string,
+    dto: UpdateContractResidentDto,
+    userId: string,
+  ) {
+    return this.lifecycleService.updateResident(
+      contractId,
+      residentId,
+      dto,
+      userId,
+    );
   }
 
   async updateHandoverChecklist(

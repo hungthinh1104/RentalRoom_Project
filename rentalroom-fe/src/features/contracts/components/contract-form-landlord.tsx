@@ -94,7 +94,7 @@ export function ContractFormLandlord({
     // Section 5 (residents) is optional
     if (values.terms && values.terms.length > 10) completedSections.add(6);
 
-    const handleSubmit = async (data: any) => {
+    const handleSubmit = async (data: ContractInput) => {
         try {
             await onSubmit(data as ContractInput);
         } catch (error) {
@@ -132,8 +132,7 @@ export function ContractFormLandlord({
                     section={FORM_SECTIONS[0]}
                     isCompleted={completedSections.has(1)}
                 >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <ContractParties form={form as any} tenantId={tenantId} />
+                    <ContractParties form={form} tenantId={tenantId} />
                 </SectionCard>
 
                 {/* 2. Room Selection */}
@@ -141,8 +140,7 @@ export function ContractFormLandlord({
                     section={FORM_SECTIONS[1]}
                     isCompleted={completedSections.has(2)}
                 >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <ContractRoomSelection form={form as any} />
+                    <ContractRoomSelection form={form} />
                 </SectionCard>
 
                 {/* 3. Basic Info (Dates) */}
@@ -150,8 +148,7 @@ export function ContractFormLandlord({
                     section={FORM_SECTIONS[2]}
                     isCompleted={completedSections.has(3)}
                 >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <ContractBasicInfo form={form as any} />
+                    <ContractBasicInfo form={form} />
                 </SectionCard>
 
                 {/* 4. Financial */}
@@ -159,8 +156,7 @@ export function ContractFormLandlord({
                     section={FORM_SECTIONS[3]}
                     isCompleted={completedSections.has(4)}
                 >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <ContractFinancial form={form as any} />
+                    <ContractFinancial form={form} />
                 </SectionCard>
 
                 {/* 5. Residents */}
@@ -169,8 +165,7 @@ export function ContractFormLandlord({
                     isCompleted={false}
                     isOptional
                 >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <ContractResidents form={form as any} />
+                    <ContractResidents form={form} />
                 </SectionCard>
 
                 {/* 6. Terms */}
@@ -178,8 +173,7 @@ export function ContractFormLandlord({
                     section={FORM_SECTIONS[5]}
                     isCompleted={completedSections.has(6)}
                 >
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    <ContractTermsEditor form={form as any} />
+                    <ContractTermsEditor form={form} />
                 </SectionCard>
 
                 {/* Actions */}

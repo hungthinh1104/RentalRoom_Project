@@ -13,6 +13,7 @@ export function OfflineBanner() {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setMounted(true);
     }, []);
 
@@ -22,7 +23,7 @@ export function OfflineBanner() {
     }
 
     return (
-        <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-white px-4 py-3 text-center z-50 shadow-lg">
+        <div className="fixed top-0 left-0 right-0 bg-warning text-white px-4 py-3 text-center z-50 shadow-lg">
             <div className="flex items-center justify-center gap-2">
                 <WifiOff className="h-5 w-5" />
                 <span className="font-medium">

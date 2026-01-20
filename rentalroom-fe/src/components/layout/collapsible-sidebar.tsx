@@ -1,30 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import {
-    LayoutDashboard,
-    Building,
-    FileText,
-    CreditCard,
-    Wrench,
-    Users,
-    BarChart3,
-    Heart,
-    Star,
-    Coins,
-    ChevronDown,
-    ChevronRight,
-    LogOut,
-    Settings,
-    Scale,
-    ShieldCheck,
-    Wallet,
-    MessageSquareWarning,
-    Pin,
-    PinOff,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -34,14 +10,9 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react';
-
-interface NavItem {
-    title: string;
-    href: string;
-    icon: React.ComponentType<{ className?: string }>;
-    children?: { title: string; href: string }[];
-}
+import { Pin, PinOff, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { SidebarContent } from './sidebar'; // Import the unified content
 
 interface CollapsibleSidebarProps {
     role?: string;
@@ -49,32 +20,61 @@ interface CollapsibleSidebarProps {
 }
 
 export function CollapsibleSidebar({ role, className }: CollapsibleSidebarProps) {
-    const [isPinned, setIsPinned] = useState<boolean>(() => (typeof window !== 'undefined' ? localStorage.getItem('sidebar-pinned') === 'true' : false));
-    const [isExpanded, setIsExpanded] = useState<boolean>(() => (typeof window !== 'undefined' ? localStorage.getItem('sidebar-pinned') === 'true' : false));
+    // Persist pinned state
+    // Default to true (pinned) to match server consistency
+    const [isPinned, setIsPinned] = useState(true);
 
+    // Sync with localStorage on mount (client-side only behavior)
+    useEffect(() => {
+        const pinned = localStorage.getItem('sidebar-pinned');
+        if (pinned !== null) {
+            setIsPinned(pinned === 'true');
+        }
+    }, []);
+
+    const [isHovered, setIsHovered] = useState(false);
 
     const handlePinToggle = () => {
         const newPinned = !isPinned;
         setIsPinned(newPinned);
         localStorage.setItem('sidebar-pinned', String(newPinned));
-        setIsExpanded(newPinned);
     };
 
-    const shouldExpand = isExpanded || isPinned;
+    const isExpanded = isPinned || isHovered;
 
     return (
-        <TooltipProvider delayDuration={0}>
-            <aside
-                className={cn(
-                    'hidden lg:flex flex-col border-r bg-card h-[calc(100vh-var(--height-header))] sticky top-[var(--height-header)] transition-all duration-300 ease-in-out',
-                    shouldExpand ? 'w-64' : 'w-16',
-                    className
+        <motion.aside
+            layout
+            initial={false}
+            animate={{
+                width: isExpanded ? 280 : 88,
+            }}
+            transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 30, // Slightly less damping for subtle bounce, effectively smooth
+                mass: 0.8
+            }}
+            className={cn(
+                'hidden lg:flex flex-col',
+                'fixed left-4 top-24 bottom-4 z-40', // Floating Position
+                'rounded-[2rem]', // Modern Shape
+                'bg-background/60 backdrop-blur-md', // Glass Effect (Lighter blur for better blend)
+                'border border-white/20 shadow-2xl shadow-black/5',
+                'overflow-hidden',
+                className
+            )}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            {/* Header / Pin Button */}
+            <div className={cn("p-6 pb-2 flex items-center mb-2", isExpanded ? "justify-between" : "justify-center")}>
+                {isExpanded && (
+                    <span className="text-sm font-bold uppercase tracking-widest text-muted-foreground/80 fade-in pl-2">
+                        Menu
+                    </span>
                 )}
-                onMouseEnter={() => !isPinned && setIsExpanded(true)}
-                onMouseLeave={() => !isPinned && setIsExpanded(false)}
-            >
-                {/* Pin Button */}
-                <div className="p-2 border-b flex justify-end">
+                <TooltipProvider delayDuration={0}>
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <Button
@@ -82,252 +82,34 @@ export function CollapsibleSidebar({ role, className }: CollapsibleSidebarProps)
                                 size="icon"
                                 onClick={handlePinToggle}
                                 className={cn(
-                                    'h-8 w-8',
-                                    !shouldExpand && 'opacity-0 pointer-events-none'
+                                    "h-8 w-8 rounded-full hover:bg-muted/50 transition-all",
+                                    !isExpanded && "hidden" // Hide pin button when collapsed, hover triggers expand first
                                 )}
                             >
                                 {isPinned ? (
-                                    <PinOff className="h-4 w-4" />
+                                    <Pin className="h-4 w-4 text-primary" />
                                 ) : (
-                                    <Pin className="h-4 w-4" />
+                                    <PinOff className="h-4 w-4 text-muted-foreground" />
                                 )}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="right">
-                            {isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
+                            {isPinned ? 'Bỏ ghim Sidebar' : 'Ghim Sidebar'}
                         </TooltipContent>
                     </Tooltip>
-                </div>
-
-                {/* Navigation Items */}
-                <ScrollArea className="flex-1 py-4">
-                    <SidebarContent role={role} isExpanded={shouldExpand} />
-                </ScrollArea>
-
-                {/* Logout Button */}
-                <div className="p-2 border-t">
-                    {shouldExpand ? (
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start text-muted-foreground hover:text-destructive"
-                            onClick={() => signOut({ callbackUrl: '/' })}
-                        >
-                            <LogOut className="mr-2 h-4 w-4" />
-                            Đăng xuất
-                        </Button>
-                    ) : (
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="w-full text-muted-foreground hover:text-destructive"
-                                    onClick={() => signOut({ callbackUrl: '/' })}
-                                >
-                                    <LogOut className="h-4 w-4" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="right">Đăng xuất</TooltipContent>
-                        </Tooltip>
-                    )}
-                </div>
-            </aside>
-        </TooltipProvider>
-    );
-}
-
-function SidebarContent({ role, isExpanded }: { role?: string; isExpanded: boolean }) {
-    const pathname = usePathname();
-
-    const getNavItems = (): NavItem[] => {
-        switch (role) {
-            case 'ADMIN':
-                return [
-                    { title: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-                    { title: 'Người dùng', href: '/dashboard/admin/users', icon: Users },
-                    { title: 'Bất động sản', href: '/dashboard/admin/properties', icon: Building },
-                    { title: 'Thống kê', href: '/dashboard/admin/analytics', icon: BarChart3 },
-                    { title: 'Tài liệu pháp lý', href: '/dashboard/admin/legal-documents', icon: Scale },
-                    { title: 'Nhật ký', href: '/dashboard/admin/audit-logs', icon: ShieldCheck },
-                    { title: 'Báo cáo', href: '/dashboard/admin/reports', icon: FileText },
-                ];
-            case 'LANDLORD':
-                return [
-                    { title: 'Dashboard', href: '/dashboard/landlord', icon: LayoutDashboard },
-                    {
-                        title: 'Bất động sản',
-                        href: '/dashboard/landlord/properties',
-                        icon: Building,
-                        children: [
-                            { title: 'Danh sách', href: '/dashboard/landlord/properties' },
-                            { title: 'Thêm mới', href: '/dashboard/landlord/properties/new' },
-                        ],
-                    },
-                    { title: 'Khách thuê', href: '/dashboard/landlord/tenants', icon: Users },
-                    { title: 'Hợp đồng', href: '/dashboard/landlord/contracts', icon: FileText },
-                    { title: 'Thanh toán', href: '/dashboard/landlord/payments', icon: CreditCard },
-                    { title: 'Thu Chi', href: '/dashboard/landlord/finance', icon: Coins },
-                    { title: 'An toàn PCCC', href: '/pccc', icon: ShieldCheck },
-                    { title: 'Bảo trì', href: '/dashboard/landlord/maintenance', icon: Wrench },
-                    { title: 'Đánh giá', href: '/dashboard/landlord/reviews', icon: Star },
-                ];
-            case 'TENANT':
-                return [
-                    { title: 'Dashboard', href: '/dashboard/tenant', icon: LayoutDashboard },
-                    { title: 'Hợp đồng', href: '/dashboard/tenant/contracts', icon: FileText },
-                    { title: 'Thanh toán', href: '/dashboard/tenant/payments', icon: CreditCard },
-                    { title: 'Tài chính', href: '/dashboard/tenant/finance', icon: Wallet },
-                    { title: 'Khiếu nại', href: '/dashboard/tenant/complaints', icon: MessageSquareWarning },
-                    { title: 'Bảo trì', href: '/dashboard/tenant/maintenance', icon: Wrench },
-                    { title: 'Yêu thích', href: '/dashboard/tenant/favorites', icon: Heart },
-                ];
-            default:
-                return [];
-        }
-    };
-
-    const navItems = getNavItems();
-
-    return (
-        <nav className="grid gap-1 px-2">
-            {navItems.map((item, index) => (
-                <SidebarItem key={index} item={item} pathname={pathname} isExpanded={isExpanded} />
-            ))}
-        </nav>
-    );
-}
-
-function SidebarItem({
-    item,
-    pathname,
-    isExpanded,
-}: {
-    item: NavItem;
-    pathname: string | null;
-    isExpanded: boolean;
-}) {
-    const [isOpen, setIsOpen] = useState(false);
-    const isActive = pathname === item.href;
-    const isChildActive = item.children?.some((child) => pathname === child.href);
-
-    // Auto-expand if child is active (deferred to avoid synchronous setState in effect)
-    useEffect(() => {
-        let id: number | undefined;
-        if (isChildActive) {
-            id = window.setTimeout(() => setIsOpen(true), 0);
-        } else {
-            id = window.setTimeout(() => setIsOpen(false), 0);
-        }
-        return () => {
-            if (id) clearTimeout(id);
-        };
-    }, [isChildActive]);
-
-    if (item.children) {
-        // Item with children
-        if (!isExpanded) {
-            // Collapsed: Show only icon with tooltip
-            return (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Link
-                            href={item.href}
-                            className={cn(
-                                'flex items-center justify-center h-10 w-10 rounded-md transition-colors',
-                                isActive || isChildActive
-                                    ? 'bg-accent text-accent-foreground'
-                                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                            )}
-                        >
-                            <item.icon className="h-4 w-4" />
-                        </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                        <div className="space-y-1">
-                            <p className="font-medium">{item.title}</p>
-                            {item.children.map((child) => (
-                                <p key={child.href} className="text-xs text-muted-foreground">
-                                    {child.title}
-                                </p>
-                            ))}
-                        </div>
-                    </TooltipContent>
-                </Tooltip>
-            );
-        }
-
-        // Expanded: Show full menu with children
-        return (
-            <div className="space-y-1">
-                <Button
-                    variant={isActive || isChildActive ? 'secondary' : 'ghost'}
-                    className={cn(
-                        'w-full justify-between font-normal',
-                        (isActive || isChildActive) && 'font-medium'
-                    )}
-                    onClick={() => setIsOpen(!isOpen)}
-                >
-                    <span className="flex items-center">
-                        <item.icon className="mr-2 h-4 w-4" />
-                        {item.title}
-                    </span>
-                    {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </Button>
-
-                {(isOpen || isChildActive) && (
-                    <div className="pl-4 space-y-1">
-                        {item.children.map((child) => (
-                            <Link
-                                key={child.href}
-                                href={child.href}
-                                className={cn(
-                                    'flex items-center gap-2 px-4 py-2 text-sm rounded-md transition-colors hover:bg-accent hover:text-accent-foreground',
-                                    pathname === child.href
-                                        ? 'bg-accent text-accent-foreground font-medium'
-                                        : 'text-muted-foreground'
-                                )}
-                            >
-                                {child.title}
-                            </Link>
-                        ))}
-                    </div>
-                )}
+                </TooltipProvider>
             </div>
-        );
-    }
 
-    // Simple item without children
-    if (!isExpanded) {
-        return (
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Link
-                        href={item.href}
-                        className={cn(
-                            'flex items-center justify-center h-10 w-10 rounded-md transition-colors',
-                            isActive
-                                ? 'bg-accent text-accent-foreground'
-                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                        )}
-                    >
-                        <item.icon className="h-4 w-4" />
-                    </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right">{item.title}</TooltipContent>
-            </Tooltip>
-        );
-    }
+            {/* Navigation Content */}
+            <ScrollArea className="flex-1 px-3 -mr-3 pr-3"> {/* Negative margin hack for scrollbar */}
+                <SidebarContent role={role} isCollapsed={!isExpanded} />
+            </ScrollArea>
 
-    return (
-        <Link
-            href={item.href}
-            className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors hover:bg-accent hover:text-accent-foreground',
-                isActive ? 'bg-accent/80 text-accent-foreground' : 'text-muted-foreground'
-            )}
-        >
-            <item.icon className="h-4 w-4" />
-            {item.title}
-        </Link>
+            {/* Decoration / Footer */}
+            <div className="p-4 flex justify-center">
+                <div className={cn("h-1 rounded-full bg-border transition-all duration-500", isExpanded ? "w-12" : "w-4")} />
+            </div>
+
+        </motion.aside>
     );
 }

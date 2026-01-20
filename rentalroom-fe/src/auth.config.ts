@@ -16,21 +16,20 @@ export const authConfig = {
                 // 1. Strict Role Checks for specific sub-paths
                 if (nextUrl.pathname.startsWith("/dashboard/admin")) {
                     if (userRole !== 'ADMIN') {
-                        // Redirect unauthorized users to their own dashboard or 403
-                        // Here we redirect to their correct dashboard to be helpful/safe
-                        return Response.redirect(new URL("/dashboard", nextUrl));
+                        // Redirect unauthorized users to Unauthorized page for clarity
+                        return Response.redirect(new URL("/unauthorized", nextUrl));
                     }
                 }
 
                 if (nextUrl.pathname.startsWith("/dashboard/landlord")) {
                     if (userRole !== 'LANDLORD') {
-                        return Response.redirect(new URL("/dashboard", nextUrl));
+                        return Response.redirect(new URL("/unauthorized", nextUrl));
                     }
                 }
 
                 if (nextUrl.pathname.startsWith("/dashboard/tenant")) {
                     if (userRole !== 'TENANT') {
-                        return Response.redirect(new URL("/dashboard", nextUrl));
+                        return Response.redirect(new URL("/unauthorized", nextUrl));
                     }
                 }
 

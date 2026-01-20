@@ -6,19 +6,17 @@ import { useState } from 'react';
 import { contractsApi } from '@/features/contracts/api/contracts-api';
 import {
   UtilityInvoiceGenerator,
-  UtilityBillingCard,
   MeterReadingInputForm,
 } from '@/features/utilities/components';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, Zap } from 'lucide-react';
 
 export default function LandlordUtilitiesPage() {
   const { data: session } = useSession();
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const { data: contractsData, isLoading: contractsLoading } = useQuery({
     queryKey: ['landlord-contracts'],
-      queryFn: () => contractsApi.getContracts({ status: 'ACTIVE' }),
+    queryFn: () => contractsApi.getContracts({ status: 'ACTIVE' }),
     enabled: !!session?.user?.id,
   });
 
@@ -53,7 +51,6 @@ export default function LandlordUtilitiesPage() {
           {contracts.length > 0 ? (
             <MeterReadingInputForm
               contracts={contracts}
-              onSuccess={() => setRefreshKey((k) => k + 1)}
             />
           ) : (
             <Card>
@@ -84,7 +81,6 @@ export default function LandlordUtilitiesPage() {
           {contracts.length > 0 ? (
             <UtilityInvoiceGenerator
               contracts={contracts}
-              onSuccess={() => setRefreshKey((k) => k + 1)}
             />
           ) : (
             <Card>

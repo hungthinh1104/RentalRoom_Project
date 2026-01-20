@@ -21,7 +21,7 @@ interface ContractFinancialsProps {
 }
 
 export function ContractFinancials({ contract }: ContractFinancialsProps) {
-    const isFinancialVisible = [ContractStatus.DEPOSIT_PENDING, ContractStatus.ACTIVE, ContractStatus.TERMINATED, ContractStatus.EXPIRED, ContractStatus.CANCELLED].includes(contract.status as any);
+    const isFinancialVisible = [ContractStatus.DEPOSIT_PENDING, ContractStatus.ACTIVE, ContractStatus.TERMINATED, ContractStatus.EXPIRED, ContractStatus.CANCELLED].includes(contract.status as ContractStatus);
 
     if (!isFinancialVisible) {
         return null;

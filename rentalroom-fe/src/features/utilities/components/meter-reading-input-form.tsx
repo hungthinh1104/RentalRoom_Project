@@ -4,14 +4,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Form,
   FormControl,
@@ -30,7 +22,6 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -40,7 +31,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { AlertCircle, Zap, Check, Plus } from 'lucide-react';
-import { utilitiesApi } from '../api/utilities-api';
+import { utilitiesApi, Service } from '../api/utilities-api';
 
 interface Contract {
   id: string;
@@ -49,7 +40,7 @@ interface Contract {
     roomNumber: string;
     property: {
       propertyName: string;
-      services: any[];
+      services: Service[];
     };
   };
 }
@@ -126,7 +117,7 @@ export function MeterReadingInputForm({
     form.setValue('contractId', contractId);
     const contract = contracts.find((c) => c.id === contractId);
     if (contract?.room?.property?.services) {
-      const newReadings = contract.room.property.services.map((service: any) => ({
+      const newReadings = contract.room.property.services.map((service: Service) => ({
         serviceId: service.id,
         currentReading: 0,
       }));
@@ -213,7 +204,7 @@ export function MeterReadingInputForm({
               <div className="space-y-3">
                 <label className="text-sm font-medium">Chỉ số dịch vụ</label>
                 {selectedContract.room.property.services.map(
-                  (service: any, idx: number) => (
+                  (service: Service, idx: number) => (
                     <FormField
                       key={service.id}
                       control={form.control}

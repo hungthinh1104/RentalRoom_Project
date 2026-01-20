@@ -28,7 +28,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { AlertCircle, Zap, Check } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '../api/utilities-api';

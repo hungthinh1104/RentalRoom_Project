@@ -24,9 +24,9 @@ interface InvoicePreviewModalProps {
                 property?: {
                     services?: Array<{
                         id: string;
-                        serviceName: string;
-                        billingMethod: string;
-                        unitPrice: number;
+                        serviceName?: string;
+                        billingMethod?: string;
+                        unitPrice?: number;
                         unit?: string;
                     }>;
                 };
@@ -38,7 +38,7 @@ interface InvoicePreviewModalProps {
             };
         };
         month: string;
-        readings: Record<string, { old: number; new: number }>;
+        readings: Record<string, { old: string | number; new: string | number }>;
         selectedServices: string[];
     } | null;
 }
@@ -80,8 +80,8 @@ export const InvoicePreviewModal = ({
             const amount = usage * price;
             if (amount > 0) {
                 lineItems.push({
-                    name: s.serviceName,
-                    description: `${r.new} - ${r.old} = ${usage} ${s.unit}`,
+                    name: s.serviceName || 'Dịch vụ',
+                    description: `${r.new} - ${r.old} = ${usage} ${s.unit || ''}`,
                     quantity: usage,
                     price: price,
                     amount: amount
@@ -99,7 +99,7 @@ export const InvoicePreviewModal = ({
         if (selectedServices.includes(s.id)) {
             const price = Number(s.unitPrice);
             lineItems.push({
-                name: s.serviceName,
+                name: s.serviceName || 'Dịch vụ',
                 description: 'Phí cố định',
                 quantity: 1,
                 price: price,

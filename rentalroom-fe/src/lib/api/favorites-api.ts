@@ -4,7 +4,7 @@ interface ToggleFavoriteParams {
     roomId: string;
 }
 
-interface FavoriteRoom {
+export interface FavoriteRoom {
     id: string;
     userId: string;
     roomId: string;

@@ -1,3 +1,10 @@
+import type {
+    Room as SharedRoom,
+    RoomAmenity,
+    RoomImage,
+    RoomReview
+} from '@/types';
+
 export enum RoomStatus {
     AVAILABLE = 'AVAILABLE',
     OCCUPIED = 'OCCUPIED',
@@ -34,7 +41,7 @@ export interface Room {
 
 export interface CreateRoomInput {
     propertyId: string;
-    roomNumber: string; // "101"
+    roomNumber: string;
     area: number;
     pricePerMonth: number;
     deposit: number;
@@ -48,3 +55,5 @@ export interface CreateRoomInput {
 export interface BulkCreateRoomInput {
     rooms: CreateRoomInput[];
 }
+
+export type { SharedRoom, RoomAmenity, RoomImage, RoomReview };

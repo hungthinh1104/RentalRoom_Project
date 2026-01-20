@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -9,11 +10,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Receipt, Calendar, User, Home, CreditCard, QrCode, AlertCircle } from 'lucide-react';
+import { Loader2, Receipt, Calendar, User, Home, CreditCard, QrCode } from 'lucide-react';
 import { formatCurrency } from '@/utils/tax-helpers';
-import { utilitiesApi, Invoice } from '../api/utilities-api';
+import { utilitiesApi, InvoiceLineItem, Payment } from '../api/utilities-api';
 import { UtilityPaymentDialog } from './utility-payment-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import api from '@/lib/api/client';
 import { toast } from 'sonner';
 
@@ -56,12 +56,12 @@ export function InvoiceDetailDialog({
       } else {
         toast.error(response.data?.error || 'Không thể tạo mã QR');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to generate QR:', error);
 
       // Extract error message
       let errorMessage = 'Không thể tạo mã QR thanh toán';
-      if (error?.message) {
+      if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
         if (error.message.includes('Payment config missing')) {
           errorMessage = 'Chưa cấu hình thông tin thanh toán';
         } else if (error.message.includes('not own this invoice')) {
@@ -234,7 +234,7 @@ export function InvoiceDetailDialog({
                     <h3 className="font-semibold text-lg">Quét mã QR để thanh toán</h3>
                     <div className="bg-white p-4 rounded-lg inline-block shadow-lg">
                       {qrUrl ? (
-                        <img
+                        <Image
                           src={qrUrl}
                           alt="Payment QR Code"
                           width={256}
@@ -284,7 +284,7 @@ export function InvoiceDetailDialog({
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {invoice.lineItems?.map((item: any) => (
+                      {invoice.lineItems?.map((item: InvoiceLineItem) => (
                         <tr key={item.id}>
                           <td className="p-3">
                             <div>
@@ -343,7 +343,7 @@ export function InvoiceDetailDialog({
                 <div>
                   <h3 className="font-semibold mb-3">Lịch sử thanh toán</h3>
                   <div className="space-y-2">
-                    {invoice.payments.map((payment: any) => (
+                    {invoice.payments.map((payment: Payment) => (
                       <div
                         key={payment.id}
                         className="flex justify-between items-center p-3 rounded-lg bg-muted/30"

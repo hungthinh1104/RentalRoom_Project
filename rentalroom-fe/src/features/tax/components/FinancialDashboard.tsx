@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/utils/tax-helpers';
+import { Income, Expense } from '@/types/tax';
 import {
     AreaChart,
     Area,
@@ -19,6 +20,16 @@ import {
 } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, TrendingUp, Wallet, Receipt, DollarSign, Calendar, Plus, TrendingDown } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+
+interface FinancialStats {
+    monthlyData: { name: string; income: number; expense: number; profit: number }[];
+    totalIncome: number;
+    totalExpense: number;
+    netProfit: number;
+    incomeGrowth: number;
+    expenseGrowth: number;
+    recentTransactions: any[];
+}
 
 export function FinancialDashboard() {
     const [year, setYear] = useState<number>(new Date().getFullYear());
@@ -51,7 +62,7 @@ export function FinancialDashboard() {
     });
 
     // Process Data for Chart & Summary
-    const stats = useMemo(() => {
+    const stats = useMemo<FinancialStats>(() => {
         const incomes = Array.isArray(incomeData) ? incomeData : [];
         const expenses = Array.isArray(expenseData) ? expenseData : [];
         const prevIncomes = Array.isArray(prevYearIncomeData) ? prevYearIncomeData : [];
@@ -71,8 +82,8 @@ export function FinancialDashboard() {
         let prevYearTotalExpense = 0;
 
         // Aggregate Income
-        incomes.forEach((item: any) => {
-            const date = new Date(item.date || item.receivedAt);
+        incomes.forEach((item: Income) => {
+            const date = new Date(item.receivedAt);
             if (date.getFullYear() === year) {
                 const month = date.getMonth();
                 monthlyData[month].income += Number(item.amount);
@@ -81,7 +92,7 @@ export function FinancialDashboard() {
         });
 
         // Aggregate Expense
-        expenses.forEach((item: any) => {
+        expenses.forEach((item: Expense) => {
             const date = new Date(item.paidAt);
             if (date.getFullYear() === year) {
                 const month = date.getMonth();
@@ -91,10 +102,10 @@ export function FinancialDashboard() {
         });
 
         // Calculate previous year totals
-        prevIncomes.forEach((item: any) => {
+        prevIncomes.forEach((item: Income) => {
             prevYearTotalIncome += Number(item.amount);
         });
-        prevExpenses.forEach((item: any) => {
+        prevExpenses.forEach((item: Expense) => {
             prevYearTotalExpense += Number(item.amount);
         });
 
@@ -116,6 +127,11 @@ export function FinancialDashboard() {
             ? ((totalExpense - prevYearTotalExpense) / prevYearTotalExpense) * 100
             : 0;
 
+        const recentTransactions = [
+            ...incomes.map((i: Income) => ({ ...i, type: 'income' as const, date: i.receivedAt })),
+            ...expenses.map((e: Expense) => ({ ...e, type: 'expense' as const, date: e.paidAt }))
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+
         return {
             monthlyData: filteredMonthlyData,
             totalIncome,
@@ -123,11 +139,7 @@ export function FinancialDashboard() {
             netProfit: totalIncome - totalExpense,
             incomeGrowth,
             expenseGrowth,
-            // Get last 5 transactions for recent activity
-            recentTransactions: [
-                ...incomes.map((i: any) => ({ ...i, type: 'income', date: i.date || i.receivedAt })),
-                ...expenses.map((e: any) => ({ ...e, type: 'expense', date: e.paidAt }))
-            ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
+            recentTransactions
         };
     }, [incomeData, expenseData, prevYearIncomeData, prevYearExpenseData, year, monthRange]);
 
@@ -156,7 +168,7 @@ export function FinancialDashboard() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <h2 className="text-xl font-semibold tracking-tight">Tổng quan tài chính</h2>
                 <div className="flex items-center gap-2 flex-wrap">
-                    <Select value={monthRange} onValueChange={(v: any) => setMonthRange(v)}>
+                    <Select value={monthRange} onValueChange={(v: 'all' | '3' | '6') => setMonthRange(v)}>
                         <SelectTrigger className="w-[140px]">
                             <SelectValue />
                         </SelectTrigger>
@@ -306,14 +318,14 @@ export function FinancialDashboard() {
                     <CardContent className="flex-1 overflow-auto pr-2">
                         <div className="space-y-4">
                             {stats.recentTransactions.length > 0 ? (
-                                stats.recentTransactions.map((t: any, idx: number) => (
+                                stats.recentTransactions.map((t, idx: number) => (
                                     <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
                                             <div className={`p-2 rounded-full flex-shrink-0 ${t.type === 'income' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
                                                 {t.type === 'income' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium line-clamp-1">{t.description || (t.type === 'income' ? 'Khoản thu' : 'Khoản chi')}</p>
+                                                <p className="text-sm font-medium line-clamp-1">{t.note || (t.type === 'income' ? 'Khoản thu' : 'Khoản chi')}</p>
                                                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                     <Calendar className="w-3 h-3" />
                                                     {new Date(t.date).toLocaleDateString('vi-VN')}

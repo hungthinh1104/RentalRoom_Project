@@ -11,6 +11,7 @@ import * as path from 'path';
 import { formatDate } from 'date-fns';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { ContractType } from '@prisma/client';
+import { CreateContractTemplateDto, UpdateContractTemplateDto } from '../../modules/contracts/dto/contract-template.dto';
 
 /**
  * ContractTemplateService
@@ -26,7 +27,7 @@ export class ContractTemplateService implements OnModuleInit, OnModuleDestroy {
   );
   private browser: puppeteer.Browser;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async onModuleInit() {
     // 1. Launch Puppeteer
@@ -90,23 +91,29 @@ export class ContractTemplateService implements OnModuleInit, OnModuleDestroy {
         });
 
         if (!exists) {
-          await this.prisma.contractTemplate.create({
-            data: {
-              name,
-              title: `Template ${handlebars.helpers.capitalize(name)}`,
-              content,
-              type,
-              version: 1,
-              isActive: false, // Default inactive until reviewed
-              isDefault: false,
-              status: 'REVIEWED', // Mark as REVIEWED initially for migration
-              description:
-                'Initial seed from file system. Pending Manual Activation.',
-              legalDisclaimer:
-                'Mẫu tham khảo, không thay thế xác nhận chính thức Cảnh sát PCCC',
-            },
-          });
-          this.logger.log(`Seeded contract template: ${name}`);
+          try {
+            await this.prisma.contractTemplate.create({
+              data: {
+                name,
+                title: `Template ${handlebars.helpers.capitalize(name)}`,
+                content,
+                type,
+                version: 1,
+                isActive: false, // Default inactive until reviewed
+                isDefault: false,
+                status: 'REVIEWED', // Mark as REVIEWED initially for migration
+                description:
+                  'Initial seed from file system. Pending Manual Activation.',
+                legalDisclaimer:
+                  'Mẫu tham khảo, không thay thế xác nhận chính thức Cảnh sát PCCC',
+              },
+            });
+            this.logger.log(`Seeded contract template: ${name}`);
+          } catch (e) {
+            if (e.code !== 'P2002') {
+              throw e;
+            }
+          }
         }
       }
     } catch (error) {
@@ -318,7 +325,7 @@ export class ContractTemplateService implements OnModuleInit, OnModuleDestroy {
   /**
    * Create a new template version
    */
-  async createTemplate(userId: string, dto: any) {
+  async createTemplate(userId: string, dto: CreateContractTemplateDto) {
     // Validate Handlebars syntax
     this.validateContent(dto.content);
 
@@ -411,7 +418,7 @@ export class ContractTemplateService implements OnModuleInit, OnModuleDestroy {
    * WAIT: The controller has PUT :id. This implies in-place update.
    * We will add audit log to it.
    */
-  async updateTemplate(userId: string, id: string, dto: any) {
+  async updateTemplate(userId: string, id: string, dto: UpdateContractTemplateDto) {
     const oldTemplate = await this.prisma.contractTemplate.findUnique({
       where: { id },
     });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,9 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Check, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { utilitiesApi, Service, MeterReading } from '../api/utilities-api';
 import { toast } from 'sonner';
 
@@ -66,7 +64,8 @@ export function MeterReadingForm({
     Record<string, string>
   >({});
 
-  const form = useForm({
+  const form = useForm<MeterReadingFormData>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(meterReadingSchema) as any,
     defaultValues: {
       readings: services
@@ -101,7 +100,7 @@ export function MeterReadingForm({
       }
 
       // Submit meter readings
-      const response = await utilitiesApi.submitMeterReadings({
+      await utilitiesApi.submitMeterReadings({
         contractId,
         month,
         readings: data.readings,
@@ -113,7 +112,7 @@ export function MeterReadingForm({
       onSuccess?.();
     } catch (error: unknown) {
       console.error('Error submitting meter readings:', error);
-      const message = error && typeof error === 'object' && 'response' in error ? 
+      const message = error && typeof error === 'object' && 'response' in error ?
         (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
       toast.error(
         message || 'Lỗi khi nhập chỉ số điện nước',
@@ -181,6 +180,7 @@ export function MeterReadingForm({
                               type="number"
                               placeholder="Nhập chỉ số hiện tại"
                               {...field}
+                              value={field.value as number}
                               className={error ? 'border-red-500' : ''}
                               disabled={isSubmitting}
                             />

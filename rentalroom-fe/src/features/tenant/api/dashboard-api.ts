@@ -1,4 +1,5 @@
 import api from '@/lib/api/client';
+import { FavoriteRoom } from '@/lib/api/favorites-api';
 
 export interface Contract {
   id: string;
@@ -20,10 +21,13 @@ export interface Payment {
 
 export interface RoomSummary {
   id: string;
-  name?: string;
-  pricePerMonth?: number;
+  name: string;
+  pricePerMonth: number;
   city?: string;
   ward?: string;
+  district?: string;
+  roomType?: string;
+  images?: string[];
 }
 
 interface PaginatedResponse<T> {
@@ -56,10 +60,10 @@ export const tenantDashboardApi = {
   },
 
   async getFavorites() {
-    const { data } = await api.get<any>('/favorites');
+    const { data } = await api.get<PaginatedResponse<FavoriteRoom>>('/favorites');
     return {
-      items: data?.items ?? [],
-      total: data?.total ?? 0,
+      items: data?.data ?? [],
+      total: data?.meta?.total ?? 0,
     };
   },
 
@@ -87,9 +91,10 @@ export const tenantDashboardApi = {
     // Handle both array and object responses
     const items = Array.isArray(data) ? data : data?.data ?? [];
     // Filter out completed/cancelled ones
-    const openItems = items.filter((item: any) =>
-      item.status !== 'COMPLETED' && item.status !== 'CANCELLED'
-    );
+    const openItems = items.filter((item: unknown) => {
+      const typedItem = item as { status?: string };
+      return typedItem.status !== 'COMPLETED' && typedItem.status !== 'CANCELLED';
+    });
     return {
       items: openItems,
       total: openItems.length,
@@ -103,9 +108,10 @@ export const tenantDashboardApi = {
     // Handle both array and object responses
     const items = Array.isArray(data) ? data : data?.data ?? [];
     // Filter active bookings (PENDING or APPROVED)
-    const activeItems = items.filter((item: any) =>
-      item.status === 'PENDING' || item.status === 'APPROVED'
-    );
+    const activeItems = items.filter((item: unknown) => {
+      const typedItem = item as { status?: string };
+      return typedItem.status === 'PENDING' || typedItem.status === 'APPROVED';
+    });
     return {
       items: activeItems,
       total: activeItems.length,

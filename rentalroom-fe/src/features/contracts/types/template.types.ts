@@ -36,3 +36,17 @@ export interface UpdateContractTemplateDto {
     isActive?: boolean;
     isDefault?: boolean;
 }
+
+export interface ContractHistoryLog {
+    id: string;
+    action: "CREATE" | "EDIT" | "DELETE" | string;
+    oldContent?: string;
+    newContent?: string;
+    timestamp: string;
+    user?: {
+        fullName: string;
+    };
+    admin?: {
+        fullName: string;
+    };
+}

@@ -5,6 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { taxService } from '@/features/tax/api/tax-api';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/lib/api/client';
+import { TaxYearSummary } from '@/types/tax';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -46,11 +48,10 @@ export function TaxYearClosing({ year }: TaxYearClosingProps) {
             });
         },
         onError: (error: unknown) => {
-            const message = error && typeof error === 'object' && 'response' in error ?
-                (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
+            const apiError = error as ApiError;
             toast({
                 title: 'Lỗi',
-                description: message || 'Không thể chốt sổ thuế',
+                description: apiError.message || 'Không thể chốt sổ thuế',
                 variant: 'destructive',
             });
         },
@@ -62,7 +63,7 @@ export function TaxYearClosing({ year }: TaxYearClosingProps) {
             const data = await taxService.exportTaxYear(year);
 
             // Create download link
-            const blob = new Blob([data as any], { type: 'text/csv' });
+            const blob = new Blob([data as string], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;

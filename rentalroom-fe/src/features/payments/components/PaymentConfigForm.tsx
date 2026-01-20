@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CreditCard, AlertCircle, CheckCircle2, Building2 } from 'lucide-react';
-import api from '@/lib/api/client';
+import api, { ApiError } from '@/lib/api/client';
 import {
   Form,
   FormControl,
@@ -115,11 +115,12 @@ export function PaymentConfigForm({ onSuccess }: PaymentConfigFormProps) {
           variant: 'destructive',
         });
       }
-    } catch (error: any) {
-      console.error('Payment config error:', error);
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
+      console.error('Payment config error:', apiError);
       toast({
         title: 'Lỗi',
-        description: error?.message || 'Không thể lưu cấu hình thanh toán',
+        description: apiError?.message || 'Không thể lưu cấu hình thanh toán',
         variant: 'destructive',
       });
     } finally {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/lib/api/client";
+import { fetchAdminUsersClient, banUser, unbanUser } from "@/features/admin/api";
 import {
     Table,
     TableBody,
@@ -44,27 +44,19 @@ export function UsersTable() {
 
     const { data: users, isLoading } = useQuery({
         queryKey: ["admin", "users", searchTerm],
-        queryFn: async () => {
-            // Assuming endpoint /users exists for Admin
-            const { data } = await api.get<User[]>(`/users?search=${searchTerm}`);
-            return data;
-        },
+        queryFn: () => fetchAdminUsersClient(1, searchTerm),
         staleTime: 5000
     });
 
     const banMutation = useMutation({
-        mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-            return api.post(`/users/${id}/ban`, { reason });
-        },
+        mutationFn: ({ id, reason }: { id: string; reason: string }) => banUser(id, reason),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
         }
     });
 
     const unbanMutation = useMutation({
-        mutationFn: async (id: string) => {
-            return api.post(`/users/${id}/unban`);
-        },
+        mutationFn: (id: string) => unbanUser(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
         }
@@ -143,7 +135,7 @@ export function UsersTable() {
                                                 <ShieldAlert className="h-3 w-3" /> Banned
                                             </Badge>
                                         ) : (
-                                            <Badge variant="outline" className="text-green-500 border-green-500/30 gap-1">
+                                            <Badge variant="outline" className="text-success border-success/30 gap-1">
                                                 <CheckCircle className="h-3 w-3" /> Active
                                             </Badge>
                                         )}
@@ -164,13 +156,13 @@ export function UsersTable() {
                                                 <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.id)}>
                                                     Copy ID
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-blue-400">Xem chi tiết</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-info">Xem chi tiết</DropdownMenuItem>
                                                 {user.isBanned ? (
-                                                    <DropdownMenuItem onClick={() => handleUnban(user.id)} className="text-green-500 font-medium">
+                                                    <DropdownMenuItem onClick={() => handleUnban(user.id)} className="text-success font-medium">
                                                         Mở khóa tài khoản
                                                     </DropdownMenuItem>
                                                 ) : (
-                                                    <DropdownMenuItem onClick={() => handleBan(user.id)} className="text-red-500 font-medium">
+                                                    <DropdownMenuItem onClick={() => handleBan(user.id)} className="text-destructive font-medium">
                                                         Chặn tài khoản
                                                     </DropdownMenuItem>
                                                 )}

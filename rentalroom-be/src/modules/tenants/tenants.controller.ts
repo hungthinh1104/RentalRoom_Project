@@ -11,7 +11,9 @@ import {
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto, UpdateTenantDto, FilterTenantsDto } from './dto';
 import { Auth } from '../../common/decorators/auth.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
+import { User } from '../users/entities';
 
 @Controller('tenants')
 export class TenantsController {
@@ -37,8 +39,12 @@ export class TenantsController {
 
   @Patch(':id')
   @Auth()
-  update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto) {
-    return this.tenantsService.update(id, updateTenantDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateTenantDto: UpdateTenantDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.tenantsService.update(id, updateTenantDto, user);
   }
 
   @Delete(':id')

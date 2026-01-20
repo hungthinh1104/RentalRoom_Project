@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import api from "@/lib/api/client";
 import type { ContractInput } from "../../schemas";
-import type { Room } from "@/types";
+import type { Room, Property } from "@/types";
 
 interface ContractRoomSelectionProps {
     form: UseFormReturn<ContractInput>;
@@ -28,7 +28,7 @@ export function ContractRoomSelection({ form }: ContractRoomSelectionProps) {
     const { data: properties } = useQuery({
         queryKey: ["properties"],
         queryFn: async () => {
-            const { data } = await api.get<{ data: any[] }>("/properties"); // Replace any with Property type if available
+            const { data } = await api.get<{ data: Property[] }>("/properties");
             return Array.isArray(data.data) ? data.data : [];
         },
     });
@@ -37,7 +37,7 @@ export function ContractRoomSelection({ form }: ContractRoomSelectionProps) {
     const { data: rooms, isLoading } = useQuery({
         queryKey: ["available-rooms", selectedPropertyId],
         queryFn: async () => {
-            const params: any = { status: "AVAILABLE" };
+            const params: Record<string, unknown> = { status: "AVAILABLE" };
             if (selectedPropertyId && selectedPropertyId !== "all") {
                 params.propertyId = selectedPropertyId;
             }
@@ -77,7 +77,7 @@ export function ContractRoomSelection({ form }: ContractRoomSelectionProps) {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">Tất cả nhà trọ</SelectItem>
-                        {properties?.map((property: any) => (
+                        {properties?.map((property: Property) => (
                             <SelectItem key={property.id} value={property.id}>
                                 {property.name}
                             </SelectItem>

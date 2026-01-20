@@ -103,7 +103,7 @@ export function TenantSearch({ onSelect, error, disabled }: TenantSearchProps) {
                             </div>
                         ) : (
                             <ul className="space-y-1">
-                                {tenants.map((tenant: any, index: number) => (
+                                {tenants.map((tenant: Tenant, index: number) => (
                                     <li
                                         key={`${tenant.id}-${index}`}
                                         onClick={() => handleSelect(tenant)}
@@ -114,13 +114,13 @@ export function TenantSearch({ onSelect, error, disabled }: TenantSearchProps) {
                                     >
                                         <div className="flex-1 overflow-hidden">
                                             <div className="flex items-center justify-between">
-                                                <p className="font-medium truncate">{tenant.fullName || tenant.user?.fullName}</p>
+                                                <p className="font-medium truncate">{tenant.user?.fullName}</p>
                                                 {selectedTenant?.id === tenant.id && (
                                                     <Check className="h-4 w-4 text-primary shrink-0 ml-2" />
                                                 )}
                                             </div>
                                             <p className="text-xs text-muted-foreground truncate">
-                                                {tenant.phoneNumber || tenant.user?.phoneNumber} • {tenant.email || tenant.user?.email}
+                                                {tenant.user?.phoneNumber} • {tenant.user?.email}
                                             </p>
                                         </div>
                                     </li>

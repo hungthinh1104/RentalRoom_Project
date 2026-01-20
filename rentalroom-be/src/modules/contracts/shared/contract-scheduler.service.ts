@@ -5,6 +5,8 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { EmailService } from 'src/common/services/email.service';
 import { ContractStatus } from '../entities';
 import { NotificationType } from '../../notifications/entities/notification.entity';
+import { ApplicationStatus } from '../entities';
+import { RoomStatus } from '../../rooms/entities/room.entity';
 
 @Injectable()
 export class ContractSchedulerService {
@@ -149,5 +151,86 @@ export class ContractSchedulerService {
     });
 
     this.logger.log(`Auto-expired ${expiredContracts.count} contracts`);
+  }
+
+  /**
+   * Auto-expire PENDING rental applications after 30 days
+   * UC_APP_01: Applications expire if landlord takes no action
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_2AM)
+  async autoExpireApplications() {
+    this.logger.log('Auto-expiring old pending applications...');
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const expiredApplications = await this.prisma.rentalApplication.findMany({
+      where: {
+        status: ApplicationStatus.PENDING,
+        applicationDate: {
+          lt: thirtyDaysAgo,
+        },
+      },
+      include: {
+        tenant: { include: { user: true } },
+        room: {
+          include: {
+            property: { include: { landlord: { include: { user: true } } } },
+          },
+        },
+      },
+    });
+
+    for (const app of expiredApplications) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          // Mark application as EXPIRED
+          await tx.rentalApplication.update({
+            where: { id: app.id },
+            data: {
+              status: ApplicationStatus.WITHDRAWN, // Use WITHDRAWN as proxy for expired
+              reviewedAt: new Date(),
+            },
+          });
+
+          // Check if room is still DEPOSIT_PENDING and no other active applications
+          const otherActiveApps = await tx.rentalApplication.count({
+            where: {
+              roomId: app.roomId,
+              status: { in: [ApplicationStatus.PENDING, ApplicationStatus.APPROVED] },
+              id: { not: app.id },
+            },
+          });
+
+          if (otherActiveApps === 0) {
+            await tx.room.update({
+              where: { id: app.roomId },
+              data: { status: RoomStatus.AVAILABLE },
+            });
+          }
+        });
+
+        // Notify tenant
+        await this.notificationsService.create({
+          userId: app.tenant.userId,
+          title: `Đơn thuê đã hết hạn - Phòng ${app.room.roomNumber}`,
+          content: `Đơn thuê của bạn đã tự động hết hạn sau 30 ngày không có phản hồi từ chủ nhà.`,
+          notificationType: NotificationType.APPLICATION,
+          relatedEntityId: app.id,
+          isRead: false,
+        });
+
+        this.logger.log(
+          `Expired application ${app.id} after 30 days (Room ${app.room.roomNumber})`,
+        );
+      } catch (error: unknown) {
+        const msg = (error as Error)?.message ?? String(error);
+        this.logger.error(`Failed to expire application ${app.id}: ${msg}`);
+      }
+    }
+
+    this.logger.log(
+      `Auto-expired ${expiredApplications.length} pending applications`,
+    );
   }
 }

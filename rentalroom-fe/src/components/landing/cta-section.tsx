@@ -5,143 +5,139 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import React from 'react';
 
 export default function CTASection() {
-  return (
-    <section id="cta" className="relative py-12 px-4 overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
-      </div>
+  const [sparkles, setSparkles] = React.useState<Array<{ top: string; left: string; duration: number; delay: number }>>([]);
 
-      <div className="container mx-auto max-w-7xl">
+  React.useEffect(() => {
+    setSparkles(
+      [...Array(8)].map(() => ({
+        top: `${Math.random() * 100}%`,
+        left: `${Math.random() * 100}%`,
+        duration: 3 + Math.random() * 2,
+        delay: Math.random() * 2,
+      }))
+    );
+  }, []);
+
+  return (
+    <section id="cta" className="relative py-24 px-4 overflow-hidden bg-background">
+      {/* Seamless Transition Gradient */}
+      <div className="absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b from-background to-transparent pointer-events-none" />
+
+      <div className="container mx-auto max-w-7xl relative z-10">
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
-          className="relative rounded-[3rem] overflow-hidden p-12 md:p-16 lg:p-20 bg-gradient-to-br from-primary to-primary/80 shadow-2xl shadow-primary/40"
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="relative rounded-[48px] overflow-hidden p-12 md:p-24 bg-gradient-to-br from-[#FF385C] to-[#E31C5F] shadow-[0_20px_100px_-20px_rgba(255,56,92,0.4)]"
         >
           {/* Decorative Elements */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
-            
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {/* Grain */}
+            <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-10 mix-blend-overlay" />
+
+            {/* Soft Glows */}
+            <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-white/20 blur-[150px] rounded-full mix-blend-soft-light" />
+            <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-black/20 blur-[150px] rounded-full mix-blend-soft-light" />
+
             {/* Animated Sparkles */}
-            {[...Array(6)].map((_, i) => (
+            {sparkles.map((sparkle, i) => (
               <motion.div
                 key={i}
                 className="absolute"
                 style={{
-                  top: `${15 + (i * 15)}%`,
-                  left: `${10 + (i * 13)}%`,
+                  top: sparkle.top,
+                  left: sparkle.left,
                 }}
                 animate={{
                   y: [0, -20, 0],
-                  opacity: [0.3, 1, 0.3],
-                  scale: [1, 1.2, 1]
+                  opacity: [0, 1, 0],
+                  scale: [0.5, 1.2, 0.5]
                 }}
                 transition={{
-                  duration: 4 + i * 0.5,
+                  duration: sparkle.duration,
                   repeat: Infinity,
-                  delay: i * 0.5
+                  delay: sparkle.delay
                 }}
               >
-                <Sparkles className="w-4 h-4 text-white" />
+                <Sparkles className="w-4 h-4 text-white mix-blend-overlay" />
               </motion.div>
             ))}
           </div>
 
           {/* Content */}
-          <div className="relative z-10 max-w-4xl mx-auto text-center space-y-8">
+          <div className="relative z-10 max-w-4xl mx-auto text-center space-y-10">
             <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              whileInView={{ opacity: 1, scale: 1 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2 }}
+              transition={{ delay: 0.2 }}
             >
-              <Badge className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm text-white border-white/30 hover:bg-white/25">
-                <Sparkles className="w-4 h-4" />
-                Ưu đãi đặc biệt cho người dùng mới
+              <Badge className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white/20 backdrop-blur-md text-white border-white/30 text-base font-medium shadow-lg">
+                <Sparkles className="w-4 h-4 fill-white" />
+                Ưu đãi đặc biệt hôm nay
               </Badge>
             </motion.div>
 
-            <motion.h2 
+            <motion.h2
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight"
+              transition={{ delay: 0.3 }}
+              className="text-5xl md:text-7xl font-black text-white leading-[1.1] tracking-tight drop-shadow-xl"
             >
-              Sẵn sàng tìm phòng trọ lý tưởng của bạn?
+              Tìm nhà trọ không khó,
+              <br />
+              đã có <span className="text-white underline decoration-wavy decoration-white/30 underline-offset-8">RentalRoom</span> lo.
             </motion.h2>
 
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed"
+              transition={{ delay: 0.4 }}
+              className="text-xl md:text-2xl text-white/90 max-w-2xl mx-auto font-light leading-relaxed"
             >
-              Hàng nghìn phòng trọ chất lượng đang chờ bạn. Bắt đầu hành trình tìm kiếm ngôi nhà mới ngay hôm nay!
+              Gia nhập cộng đồng 50,000+ người dùng và trải nghiệm phong cách sống mới ngay hôm nay.
             </motion.p>
 
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.5 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center pt-4"
+              transition={{ delay: 0.5 }}
+              className="flex flex-col sm:flex-row gap-6 justify-center pt-8"
             >
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  asChild 
+                <Button
+                  asChild
                   size="lg"
-                  className="w-full sm:w-auto gap-2 text-base h-14 px-8 bg-white hover:bg-white/90 text-foreground font-semibold shadow-xl rounded-xl"
+                  className="w-full sm:w-auto gap-3 text-lg h-16 px-10 bg-white text-primary-600 hover:bg-white/95 font-bold shadow-2xl rounded-2xl"
                 >
                   <Link href="/rooms">
                     <Sparkles className="w-5 h-5" />
-                    Khám phá ngay
+                    Bắt đầu miễn phí
                     <ArrowRight className="w-5 h-5" />
                   </Link>
                 </Button>
               </motion.div>
 
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button 
-                  asChild 
+                <Button
+                  asChild
                   size="lg"
                   variant="outline"
-                  className="w-full sm:w-auto gap-2 text-base h-14 px-8 bg-transparent hover:bg-white/10 text-white border-white/30 hover:border-white/50 font-semibold rounded-xl backdrop-blur-sm"
+                  className="w-full sm:w-auto gap-3 text-lg h-16 px-10 bg-white/10 text-white border-white/40 hover:bg-white/20 font-semibold rounded-2xl backdrop-blur-md"
                 >
                   <Link href="/contact">
-                    Liên hệ chúng tôi
+                    Liên hệ đối tác
                     <ArrowRight className="w-5 h-5" />
                   </Link>
                 </Button>
               </motion.div>
-            </motion.div>
-
-            {/* Trust Indicators */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-              className="pt-8 flex flex-wrap items-center justify-center gap-6 text-white/80 text-sm"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-green-400" />
-                <span>Miễn phí đăng ký</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-blue-400" />
-                <span>Thanh toán bảo mật</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-purple-400" />
-                <span>Hỗ trợ 24/7</span>
-              </div>
             </motion.div>
           </div>
         </motion.div>

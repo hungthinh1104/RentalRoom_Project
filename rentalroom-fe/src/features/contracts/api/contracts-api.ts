@@ -1,4 +1,5 @@
 import api from '@/lib/api/client';
+import { config } from '@/lib/config';
 import type {
 	Contract,
 	RentalApplication,
@@ -131,8 +132,13 @@ export const contractsApi = {
 		return data;
 	},
 
-	async terminateContract(id: string, data: { reason: string; noticeDays?: number }) {
+	async terminateContract(id: string, data: { reason: string; noticeDays?: number; terminationType?: string; refundAmount?: number }) {
 		const { data: result } = await api.patch<Contract>(`/contracts/${id}/terminate`, data);
+		return result;
+	},
+
+	async renewContract(id: string, data: { newEndDate: string; newRentPrice?: number; increasePercentage?: number }) {
+		const { data: result } = await api.post<Contract>(`/contracts/${id}/renew`, data);
 		return result;
 	},
 
@@ -140,14 +146,28 @@ export const contractsApi = {
 		await api.delete(`/contracts/${id}`);
 	},
 
+	// Residents
+	async addResident(id: string, data: { fullName: string; phoneNumber?: string; citizenId?: string; relationship?: string }) {
+		const { data: result } = await api.post(`/contracts/${id}/residents`, data);
+		return result;
+	},
+
+	async updateResident(id: string, residentId: string, data: { fullName?: string; phoneNumber?: string; citizenId?: string; relationship?: string }) {
+		const { data: result } = await api.patch(`/contracts/${id}/residents/${residentId}`, data);
+		return result;
+	},
+
+	async removeResident(id: string, residentId: string) {
+		await api.delete(`/contracts/${id}/residents/${residentId}`);
+	},
+
+	// Download signed PDF (returns Blob)
+
 	// Download signed PDF (returns Blob)
 	async downloadSigned(contractId: string) {
-		const baseUrl =
-			typeof window === 'undefined'
-				? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
-				: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3001';
+		const baseUrl = config.api.url;
 
-		const res = await fetch(`${baseUrl}/api/v1/contracts/${contractId}/download-signed`, {
+		const res = await fetch(`${baseUrl}/v1/contracts/${contractId}/download-signed`, {
 			method: 'GET',
 			credentials: 'include',
 		});

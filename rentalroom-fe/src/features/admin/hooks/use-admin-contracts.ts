@@ -48,6 +48,56 @@ interface PaginatedResponse<T> {
     limit: number;
 }
 
+interface BackendContract {
+    id: string;
+    contractNumber?: string;
+    tenant?: {
+        user?: {
+            fullName?: string;
+            email?: string;
+        };
+    };
+    tenantName?: string;
+    tenantEmail?: string;
+    room?: {
+        property?: {
+            name?: string;
+        };
+        roomNumber?: string;
+    };
+    propertyName?: string;
+    roomNumber?: string;
+    startDate: string;
+    endDate: string;
+    rentAmount?: number;
+    monthlyRent?: number;
+    status?: string;
+}
+
+interface BackendPayment {
+    id: string;
+    invoiceNumber?: string;
+    contract?: {
+        tenant?: {
+            user?: {
+                fullName?: string;
+            };
+        };
+        room?: {
+            property?: {
+                name?: string;
+            };
+        };
+    };
+    tenantName?: string;
+    propertyName?: string;
+    amount?: number;
+    totalAmount?: number;
+    dueDate: string;
+    paidAt?: string;
+    status?: string;
+}
+
 /**
  * Hook to fetch all contracts (admin view)
  */
@@ -61,7 +111,7 @@ export function useAdminContracts(params: { page?: number; search?: string; stat
             if (search) queryParams.search = search;
             if (status) queryParams.status = status;
 
-            const { data } = await api.get<Contract[] | PaginatedResponse<Contract>>("/contracts", { params: queryParams });
+            const { data } = await api.get<BackendContract[] | PaginatedResponse<BackendContract>>("/contracts", { params: queryParams });
 
             if (Array.isArray(data)) {
                 return {
@@ -97,7 +147,7 @@ export function useAdminPayments(params: { page?: number; search?: string; statu
             if (search) queryParams.search = search;
             if (status) queryParams.status = status;
 
-            const { data } = await api.get<Payment[] | PaginatedResponse<Payment>>("/invoices", { params: queryParams });
+            const { data } = await api.get<BackendPayment[] | PaginatedResponse<BackendPayment>>("/invoices", { params: queryParams });
 
             if (Array.isArray(data)) {
                 return {
@@ -155,7 +205,7 @@ export function useMarkPaymentPaid() {
 }
 
 // Normalize functions
-function normalizeContract(c: any): Contract {
+function normalizeContract(c: BackendContract): Contract {
     return {
         id: c.id,
         contractNumber: c.contractNumber || `CT-${c.id.slice(0, 8)}`,
@@ -170,7 +220,7 @@ function normalizeContract(c: any): Contract {
     };
 }
 
-function normalizePayment(p: any): Payment {
+function normalizePayment(p: BackendPayment): Payment {
     return {
         id: p.id,
         invoiceNumber: p.invoiceNumber || `INV-${p.id.slice(0, 8)}`,

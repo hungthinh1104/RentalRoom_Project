@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { InvoiceStatus } from '../billing/entities';
+import { ContractStatus } from '@prisma/client';
 
 export interface CashFlowAlert {
   type: 'overdue' | 'upcoming' | 'forecast' | 'success';
@@ -18,7 +19,9 @@ export interface CashFlowAlert {
  */
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(DashboardService.name);
+
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Get Cash Flow Summary - Core Survival Feature
@@ -68,19 +71,32 @@ export class DashboardService {
       return sum;
     }, 0);
 
+    // Helper predicate for overdue
+    const isOverdue = (inv: any) =>
+      inv.status === InvoiceStatus.OVERDUE ||
+      (inv.status === InvoiceStatus.PENDING &&
+        new Date(inv.dueDate) < new Date());
+
     const totalOverdue = invoices.reduce((sum, inv) => {
-      if (
-        inv.status === InvoiceStatus.OVERDUE ||
-        (inv.status === InvoiceStatus.PENDING &&
-          new Date(inv.dueDate) < new Date())
-      ) {
+      if (isOverdue(inv)) {
         return sum + Number(inv.totalAmount || 0);
       }
       return sum;
     }, 0);
 
     // 3. Expenses (MVP: simplified for now)
-    const totalExpense = 0;
+    // 3. Expenses
+    const expenses = await this.prisma.operationalExpense.findMany({
+      where: {
+        landlordId,
+        date: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+    });
+
+    const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
     // 4. Calculate balance
     const balance = totalIncome - totalExpense;
@@ -89,16 +105,12 @@ export class DashboardService {
     const alerts: CashFlowAlert[] = [];
 
     // Overdue payments
-    const overdueInvoices = invoices.filter(
-      (inv) =>
-        inv.status === InvoiceStatus.PENDING &&
-        new Date(inv.dueDate) < new Date(),
-    );
+    const overdueInvoices = invoices.filter(isOverdue);
 
     for (const inv of overdueInvoices.slice(0, 5)) {
       const daysOverdue = Math.floor(
         (new Date().getTime() - new Date(inv.dueDate).getTime()) /
-          (1000 * 60 * 60 * 24),
+        (1000 * 60 * 60 * 24),
       );
       alerts.push({
         type: 'overdue',
@@ -151,13 +163,14 @@ export class DashboardService {
     }
 
     // Cash flow forecast
+    // Corrected logic: "Forecast" here means expected outcome for this month
     const forecast = totalExpected - totalExpense;
     if (forecast < 0) {
       alerts.push({
         type: 'forecast',
         severity: 'high',
         amount: Math.abs(forecast),
-        message: `Dự báo thiếu hụt tháng sau: ${Math.abs(forecast).toLocaleString('vi-VN')} VNĐ`,
+        message: `Dự kiến thâm hụt tháng này: ${Math.abs(forecast).toLocaleString('vi-VN')} VNĐ`,
       });
     }
 
@@ -196,11 +209,13 @@ export class DashboardService {
     const totalProperties = properties.length;
     const totalRooms = properties.reduce((sum, p) => sum + p.rooms.length, 0);
 
-    // Count occupied rooms (with active contracts)
-    const occupiedRoomsCount = await this.prisma.contract.count({
+    // Count occupied rooms (rooms with at least one ACTIVE contract)
+    const occupiedRoomsCount = await this.prisma.room.count({
       where: {
-        landlordId,
-        status: 'ACTIVE',
+        property: { landlordId },
+        contracts: {
+          some: { status: ContractStatus.ACTIVE },
+        },
       },
     });
 
@@ -221,58 +236,9 @@ export class DashboardService {
    * Get payment trend for last 6 months
    */
   async getPaymentTrend(landlordId: string) {
-    const months: Array<{ month: string; amount: number }> = [];
     const now = new Date();
-
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthStr = date.toISOString().slice(0, 7);
-
-      const [year, month] = monthStr.split('-').map(Number);
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0, 23, 59, 59);
-
-      // Get paid amount for this month
-      const paidInvoices = await this.prisma.invoice.findMany({
-        where: {
-          contract: {
-            landlordId,
-          },
-          status: InvoiceStatus.PAID,
-          paidAt: {
-            gte: startDate,
-            lte: endDate,
-          },
-        },
-        select: {
-          totalAmount: true,
-        },
-      });
-
-      const totalPaid = paidInvoices.reduce(
-        (sum, inv) => sum + Number(inv.totalAmount || 0),
-        0,
-      );
-
-      months.push({
-        month: monthStr,
-        amount: totalPaid,
-      });
-    }
-
-    return months;
-  }
-
-  /**
-   * Admin Overview Stats
-   * - Global Revenue (Current Month)
-   * - Global Occupancy Rate
-   * - Active Users counts
-   */
-  async getAdminOverview() {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const endOfCurrentMonth = new Date(
       now.getFullYear(),
       now.getMonth() + 1,
       0,
@@ -281,204 +247,305 @@ export class DashboardService {
       59,
     );
 
-    // 1. Revenue
-    const monthInvoices = await this.prisma.invoice.findMany({
+    // Single query for 6 months duration
+    const paidInvoices = await this.prisma.invoice.findMany({
       where: {
+        contract: { landlordId },
         status: InvoiceStatus.PAID,
-        paidAt: { gte: startOfMonth, lte: endOfMonth },
+        paidAt: {
+          gte: sixMonthsAgo,
+          lte: endOfCurrentMonth,
+        },
       },
-      select: { totalAmount: true },
-    });
-    const totalRevenue = monthInvoices.reduce(
-      (sum, inv) => sum + Number(inv.totalAmount || 0),
-      0,
-    );
-
-    // 2. Global Occupancy
-    const totalRooms = await this.prisma.room.count();
-    const occupiedRooms = await this.prisma.contract.count({
-      where: { status: 'ACTIVE' },
-    });
-    const occupancyRate =
-      totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
-
-    // 3. Contracts
-    const expiringContracts = await this.prisma.contract.count({
-      where: {
-        status: 'ACTIVE',
-        endDate: { lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }, // Expiring in 30 days
+      select: {
+        paidAt: true,
+        totalAmount: true,
       },
     });
 
-    // 4. Users
-    const activeUsers = await this.prisma.user.count({
-      where: { isBanned: false },
-    });
-
-    // 5. Trends (Last 6 months revenue)
-    const trends: { date: string; revenue: number }[] = [];
+    // Initialize map with 0 for all 6 months
+    const monthMap = new Map<string, number>();
     for (let i = 5; i >= 0; i--) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const start = new Date(date.getFullYear(), date.getMonth(), 1);
-      const end = new Date(
-        date.getFullYear(),
-        date.getMonth() + 1,
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = d.toISOString().slice(0, 7); // YYYY-MM
+      monthMap.set(key, 0);
+    }
+
+    // Aggregate
+    paidInvoices.forEach((inv) => {
+      if (inv.paidAt) {
+        const key = inv.paidAt.toISOString().slice(0, 7);
+        if (monthMap.has(key)) {
+          monthMap.set(
+            key,
+            monthMap.get(key)! + Number(inv.totalAmount || 0),
+          );
+        }
+      }
+    });
+
+    return Array.from(monthMap.entries()).map(([month, amount]) => ({
+      month,
+      amount,
+    }));
+  }
+
+  /**
+   * Admin Overview Stats
+   * - Global Revenue (Current Month)
+   * - Global Occupancy Rate
+   * - Active Users counts
+   */
+
+  /**
+   * Admin Overview Stats
+   * - Global Revenue (Current Month)
+   * - Global Occupancy Rate
+   * - Active Users counts
+   */
+  async getAdminOverview() {
+    try {
+      this.logger.log('Getting Admin Overview stats...');
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
         0,
         23,
         59,
         59,
       );
 
-      const invs = await this.prisma.invoice.findMany({
-        where: { status: InvoiceStatus.PAID, paidAt: { gte: start, lte: end } },
+      // 1. Revenue
+      const monthInvoices = await this.prisma.invoice.findMany({
+        where: {
+          status: InvoiceStatus.PAID,
+          paidAt: { gte: startOfMonth, lte: endOfMonth },
+        },
         select: { totalAmount: true },
       });
-      const rev = invs.reduce((sum, i) => sum + Number(i.totalAmount || 0), 0);
-      trends.push({ date: start.toISOString(), revenue: rev });
-    }
+      const totalRevenue = monthInvoices.reduce(
+        (sum, inv) => sum + Number(inv.totalAmount || 0),
+        0,
+      );
 
-    return {
-      totalRevenue,
-      occupancyRate: Math.round(occupancyRate * 10) / 10,
-      expiringContracts,
-      activeUsers,
-      trends,
-      totalRooms,
-    };
+      // 2. Global Occupancy
+      const totalRooms = await this.prisma.room.count();
+      const occupiedRooms = await this.prisma.contract.count({
+        where: { status: ContractStatus.ACTIVE },
+      });
+      const occupancyRate =
+        totalRooms > 0 ? (occupiedRooms / totalRooms) * 100 : 0;
+
+      // 3. Contracts
+      const expiringContracts = await this.prisma.contract.count({
+        where: {
+          status: ContractStatus.ACTIVE,
+          endDate: { lte: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }, // Expiring in 30 days
+        },
+      });
+
+      // 4. Users
+      const activeUsers = await this.prisma.user.count({
+        where: { isBanned: false },
+      });
+
+      // 5. Trends (Last 6 months revenue)
+      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      const trendMap = new Map<string, number>();
+
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        // Normalize to start of month for consistent keys if needed, 
+        // but the query returns ISO string which varies. 
+        // Let's use start of month ISO as key/label.
+        const start = new Date(d.getFullYear(), d.getMonth(), 1);
+        trendMap.set(start.toISOString(), 0);
+      }
+
+      const trendInvoices = await this.prisma.invoice.findMany({
+        where: {
+          status: InvoiceStatus.PAID,
+          paidAt: { gte: sixMonthsAgo, lte: endOfMonth },
+        },
+        select: { paidAt: true, totalAmount: true },
+      });
+
+      trendInvoices.forEach((inv) => {
+        if (inv.paidAt) {
+          const d = new Date(inv.paidAt);
+          const key = new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+          if (trendMap.has(key)) {
+            trendMap.set(key, trendMap.get(key)! + Number(inv.totalAmount || 0));
+          }
+        }
+      });
+
+      const trends = Array.from(trendMap.entries()).map(([date, revenue]) => ({
+        date,
+        revenue,
+      }));
+
+      this.logger.log('Admin Overview stats calculated successfully');
+      return {
+        totalRevenue,
+        occupancyRate: Math.round(occupancyRate * 10) / 10,
+        expiringContracts,
+        activeUsers,
+        trends,
+        totalRooms,
+      };
+    } catch (error) {
+      this.logger.error('Error getting admin overview', error.stack);
+      throw error;
+    }
   }
 
   /**
    * Admin Top Performers
    */
   async getTopPerformers() {
-    // 1. Top Landlords by Revenue (This month)
-    // Note: Complex aggregation is better done in SQL, but for MVP we do logical aggregation
-    // Or fetch all landlords and map. Optimization: Fetch invoices and group by landlord.
+    try {
+      // 1. Top Landlords by Revenue (This month)
+      // Note: Complex aggregation is better done in SQL, but for MVP we do logical aggregation
+      // Or fetch all landlords and map. Optimization: Fetch invoices and group by landlord.
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Fix: Use correct include for Invoice
-    // Invoice -> Contract -> Room -> Property
-    // (Assuming Contract has direct relation to Property or via Room)
-    // Checking Schema: Invoice -> Contract. Contract -> Room. Room -> Property.
-    // Also Contract has Property? Let's check schema result.
-    // Based on typical schema: Contract -> Room -> Property.
-    // Contract -> Landlord (User) via `landlordId`.
+      // Fix: Use correct include for Invoice
+      // Invoice -> Contract -> Room -> Property
+      // (Assuming Contract has direct relation to Property or via Room)
+      // Checking Schema: Invoice -> Contract. Contract -> Room. Room -> Property.
+      // Also Contract has Property? Let's check schema result.
+      // Based on typical schema: Contract -> Room -> Property.
+      // Contract -> Landlord (User) via `landlordId`.
 
-    const paidInvoices = await this.prisma.invoice.findMany({
-      where: {
-        status: InvoiceStatus.PAID,
-        paidAt: { gte: startOfMonth },
-      },
-      include: {
-        contract: {
-          include: {
-            landlord: {
-              include: { user: true },
-            },
-            // Contract usually links to Room, and Room links to Property
-            room: {
-              include: { property: true },
+      const paidInvoices = await this.prisma.invoice.findMany({
+        where: {
+          status: InvoiceStatus.PAID,
+          paidAt: { gte: startOfMonth },
+        },
+        include: {
+          contract: {
+            include: {
+              landlord: {
+                include: { user: true },
+              },
+              // Contract usually links to Room, and Room links to Property
+              room: {
+                include: { property: true },
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    // Group by Landlord
-    const landlordMap = new Map<
-      string,
-      { name: string; revenue: number; properties: Set<string> }
-    >();
-    const propertyMap = new Map<
-      string,
-      { name: string; revenue: number; rooms: number; occupied: number }
-    >();
+      // Group by Landlord
+      const landlordMap = new Map<
+        string,
+        { name: string; revenue: number; properties: Set<string> }
+      >();
+      const propertyMap = new Map<
+        string,
+        { name: string; revenue: number; rooms: number; occupied: number }
+      >();
 
-    for (const inv of paidInvoices) {
-      const l = inv.contract.landlord;
-      // Access Property via Room
-      const p = inv.contract.room.property;
-      const amount = Number(inv.totalAmount || 0);
+      for (const inv of paidInvoices) {
+        try {
+          const l = inv.contract?.landlord;
+          // Access Property via Room
+          const p = inv.contract?.room?.property;
+          const amount = Number(inv.totalAmount || 0);
 
-      // Landlord Stats
-      if (l && l.user) {
-        if (!landlordMap.has(l.userId)) {
-          landlordMap.set(l.userId, {
-            name: l.user.fullName,
-            revenue: 0,
-            properties: new Set(),
-          });
+          // Landlord Stats - Add null checks
+          if (l && l.user && l.userId) {
+            if (!landlordMap.has(l.userId)) {
+              landlordMap.set(l.userId, {
+                name: l.user.fullName || 'Unknown Landlord',
+                revenue: 0,
+                properties: new Set(),
+              });
+            }
+            const lStats = landlordMap.get(l.userId)!;
+            lStats.revenue += amount;
+            if (p) lStats.properties.add(p.id);
+          }
+
+          // Property Stats
+          if (p) {
+            if (!propertyMap.has(p.id)) {
+              propertyMap.set(p.id, {
+                name: p.name,
+                revenue: 0,
+                rooms: 0,
+                occupied: 0,
+              });
+            }
+            const pStats = propertyMap.get(p.id)!;
+            pStats.revenue += amount;
+          }
+        } catch (invoiceError) {
+          this.logger.warn(
+            `Error processing invoice ${inv.id}: ${invoiceError instanceof Error ? invoiceError.message : String(invoiceError)}`,
+          );
+          continue; // Skip this invoice and continue processing others
         }
-        const lStats = landlordMap.get(l.userId)!;
-        lStats.revenue += amount;
-        if (p) lStats.properties.add(p.id);
       }
 
-      // Property Stats
-      if (p) {
-        if (!propertyMap.has(p.id)) {
-          propertyMap.set(p.id, {
+      // Post-process properties for occupancy
+      const topPropIds = Array.from(propertyMap.keys());
+      const propDetails = await this.prisma.property.findMany({
+        where: { id: { in: topPropIds } },
+        include: {
+          rooms: {
+            include: {
+              contracts: true, // Or 'contracts' depending on schema (usually plural 'contracts')
+            },
+          },
+        },
+      });
+
+      const properties = propDetails
+        .map((p) => {
+          const rev = propertyMap.get(p.id)?.revenue || 0;
+          const total = p.rooms?.length || 0;
+          // Check if any active contract exists in the room's contracts list
+          // Assuming Room -> Contracts[] (1-n)
+          const occupied = p.rooms?.filter((r) => {
+            // Check active contracts
+            return r.contracts?.some((c) => c.status === ContractStatus.ACTIVE);
+          }).length || 0;
+
+          return {
+            id: p.id,
             name: p.name,
-            revenue: 0,
-            rooms: 0,
-            occupied: 0,
-          });
-        }
-        const pStats = propertyMap.get(p.id)!;
-        pStats.revenue += amount;
-      }
+            revenue: rev,
+            rooms: total,
+            occupiedRooms: occupied,
+            occupancyRate: total > 0 ? (occupied / total) * 100 : 0,
+          };
+        })
+        .sort((a, b) => b.revenue - a.revenue);
+
+      const landlords = Array.from(landlordMap.entries())
+        .map(([id, data]) => ({
+          landlordId: id,
+          name: data.name,
+          properties: data.properties.size,
+          revenue: data.revenue,
+          occupancyRate: 0, // Simplification
+        }))
+        .sort((a, b) => b.revenue - a.revenue);
+
+      return {
+        landlords: landlords.slice(0, 5),
+        properties: properties.slice(0, 5),
+      };
+    } catch (error) {
+      this.logger.error('Error getting top performers', error instanceof Error ? error.stack : String(error));
+      throw error;
     }
-
-    // Post-process properties for occupancy
-    const topPropIds = Array.from(propertyMap.keys());
-    const propDetails = await this.prisma.property.findMany({
-      where: { id: { in: topPropIds } },
-      include: {
-        rooms: {
-          include: {
-            contracts: true, // Or 'contracts' depending on schema (usually plural 'contracts')
-          },
-        },
-      },
-    });
-
-    const properties = propDetails
-      .map((p) => {
-        const rev = propertyMap.get(p.id)?.revenue || 0;
-        const total = p.rooms.length;
-        // Check if any active contract exists in the room's contracts list
-        // Assuming Room -> Contracts[] (1-n)
-        const occupied = p.rooms.filter((r) => {
-          // Check active contracts
-          return r.contracts?.some((c) => c.status === 'ACTIVE');
-        }).length;
-
-        return {
-          id: p.id,
-          name: p.name,
-          revenue: rev,
-          rooms: total,
-          occupiedRooms: occupied,
-          occupancyRate: total > 0 ? (occupied / total) * 100 : 0,
-        };
-      })
-      .sort((a, b) => b.revenue - a.revenue);
-
-    const landlords = Array.from(landlordMap.entries())
-      .map(([id, data]) => ({
-        landlordId: id,
-        name: data.name,
-        properties: data.properties.size,
-        revenue: data.revenue,
-        occupancyRate: 0, // Simplification
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
-
-    return {
-      landlords: landlords.slice(0, 5),
-      properties: properties.slice(0, 5),
-    };
   }
 }

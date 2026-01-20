@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { semanticSearchApi } from '../api/semantic-search-api';
+import { semanticSearchApi, type UnifiedRoomSearchResult } from '../api/semantic-search-api';
 import { type RoomFilterInput } from '@/features/rooms/schemas';
 import { useDebounce } from '@/hooks/use-debounce';
 
@@ -9,6 +9,7 @@ interface UseAiSearchOptions {
   searchMode?: 'semantic' | 'hybrid' | 'standard';
   limit?: number;
   enabled?: boolean;
+  page?: number;
 }
 
 /**
@@ -34,6 +35,7 @@ export function useAiSearch(
     searchMode = 'hybrid',
     limit = 12,
     enabled = true,
+    page = 1,
   } = options;
 
   const queryClient = useQueryClient();
@@ -79,7 +81,7 @@ export function useAiSearch(
       setSearchMethod('standard');
       return semanticSearchApi.standardSearch(
         { ...(filters || {}), search: debouncedQuery },
-        1,
+        page,
         limit,
       );
     },
@@ -91,10 +93,10 @@ export function useAiSearch(
 
   // Standard search query (filters only, no semantic)
   const standardQuery = useQuery({
-    queryKey: ['rooms', 'standard-search', filters],
+    queryKey: ['rooms', 'standard-search', filters, page],
     queryFn: async () => {
       setSearchMethod('standard');
-      return semanticSearchApi.standardSearch(filters, 1, limit);
+      return semanticSearchApi.standardSearch(filters, page, limit);
     },
     enabled: enabled && !shouldUseSemanticSearch,
     staleTime: 2 * 60 * 1000, // 2 minutes cache
@@ -112,17 +114,26 @@ export function useAiSearch(
       // Fall back to standard search when semantic returned empty
       if (standardFallbackQuery.data) {
         return {
-          ...standardFallbackQuery.data,
-          method: 'STANDARD',
+          query: debouncedQuery,
+          method: 'STANDARD' as const,
+          count: standardFallbackQuery.data.count ?? 0,
+          results: standardFallbackQuery.data.results ?? []
         };
       }
     }
 
     if (standardQuery.data) {
-      return {
-        ...standardQuery.data,
-        method: 'STANDARD',
-      };
+      // Normalize PaginatedResponse to UnifiedRoomSearchResult if needed
+      if ('data' in standardQuery.data) {
+        const sData = standardQuery.data as any; // Temporary cast to handle PaginatedResponse structure
+        return {
+          query: '',
+          method: 'STANDARD' as const,
+          count: sData.meta?.total ?? sData.data?.length ?? 0,
+          results: sData.data ?? []
+        };
+      }
+      return standardQuery.data as unknown as UnifiedRoomSearchResult;
     }
     return null;
   }, [shouldUseSemanticSearch, semanticQuery.data, standardQuery.data, standardFallbackQuery.data]);
@@ -152,8 +163,8 @@ export function useAiSearch(
   return {
     // Results
     data,
-    rooms: (data && 'results' in data) ? data.results : data?.data || [],
-    totalCount: (data && 'results' in data) ? data.count : data?.meta?.total || 0,
+    rooms: data?.results || [],
+    totalCount: data?.count || 0,
 
     // Status
     isLoading,

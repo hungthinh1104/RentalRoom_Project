@@ -15,7 +15,7 @@ export function useAuditLogs(params: AuditLogParams) {
             const { data } = await snapshotsApi.getAll(params);
             return data;
         },
-        placeholderData: (previousData: any) => previousData, // Keep previous data while fetching new page
+        placeholderData: (previousData: unknown) => previousData, // Keep previous data while fetching new page
     });
 }
 

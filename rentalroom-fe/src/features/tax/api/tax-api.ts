@@ -1,10 +1,10 @@
 import api from '@/lib/api/client';
-import { CreateIncomePayload, ProjectionResponse, TaxYearSummary } from '@/types/tax';
+import { CreateIncomePayload, ProjectionResponse, TaxYearSummary, Income, Expense } from '@/types/tax';
 
 export const taxService = {
     // --- INCOME ---
-    createIncome: async (data: CreateIncomePayload) => {
-        const { data: result } = await api.post('/income', data);
+    createIncome: async (data: CreateIncomePayload): Promise<Income> => {
+        const { data: result } = await api.post<Income>('/income', data);
         return result;
     },
 
@@ -13,17 +13,16 @@ export const taxService = {
         return result;
     },
 
-    getIncomeList: async (year: number, month?: number) => {
+    getIncomeList: async (year: number, month?: number): Promise<Income[]> => {
         const params: Record<string, unknown> = { mode: 'list' };
         if (month !== undefined) params.month = month;
 
-        const { data: result } = await api.get(`/income/summary/${year}`, { params });
+        const { data: result } = await api.get<Income[]>(`/income/summary/${year}`, { params });
         return Array.isArray(result) ? result : [];
     },
 
-    deleteIncome: async (id: string, reason: string) => {
-        const { data: result } = await api.delete(`/income/${id}`, { body: { reason } });
-        return result;
+    deleteIncome: async (id: string, reason: string): Promise<void> => {
+        await api.delete(`/income/${id}`, { body: { reason } });
     },
 
     // --- TAX YEAR ---
@@ -32,34 +31,33 @@ export const taxService = {
         return result;
     },
 
-    closeTaxYear: async (year: number) => {
-        const { data: result } = await api.post(`/income/tax-year/close/${year}`);
+    closeTaxYear: async (year: number): Promise<TaxYearSummary> => {
+        const { data: result } = await api.post<TaxYearSummary>(`/income/tax-year/close/${year}`);
         return result;
     },
 
-    exportTaxYear: async (year: number) => {
-        const { data: result } = await api.get(`/income/tax-year/${year}/export`, { responseType: 'text' });
+    exportTaxYear: async (year: number): Promise<string> => {
+        const { data: result } = await api.get<string>(`/income/tax-year/${year}/export`, { responseType: 'text' });
         return result;
     },
 
     // --- EXPENSE ---
-    createExpense: async (data: { propertyId: string; categoryId: string; amount: number; description?: string; date: string }) => {
-        const { data: result } = await api.post('/income/expense', data);
+    createExpense: async (data: { propertyId: string; categoryId: string; amount: number; description?: string; date: string }): Promise<Expense> => {
+        const { data: result } = await api.post<Expense>('/income/expense', data);
         return result;
     },
 
-    deleteExpense: async (id: string) => {
-        const { data: result } = await api.delete(`/income/expense/${id}`);
-        return result;
+    deleteExpense: async (id: string): Promise<void> => {
+        await api.delete(`/income/expense/${id}`);
     },
 
-    getExpenses: async (year: number) => {
-        const { data: result } = await api.get(`/income/expense/list/${year}`);
+    getExpenses: async (year: number): Promise<Expense[]> => {
+        const { data: result } = await api.get<Expense[]>(`/income/expense/list/${year}`);
         return Array.isArray(result) ? result : [];
     },
 
-    getExpenseSummary: async (year: number) => {
-        const { data: result } = await api.get(`/income/expense/summary/${year}`);
-        return result;
+    getExpenseSummary: async (year: number): Promise<Record<string, unknown>> => {
+        const { data } = await api.get<Record<string, unknown>>(`/income/expense/summary/${year}`);
+        return data;
     },
 };

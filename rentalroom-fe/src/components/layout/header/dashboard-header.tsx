@@ -2,24 +2,24 @@
 
 import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Sheet, SheetContent,
-  SheetHeader,
   SheetTitle,
-  SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
-// import { NavMenu } from './nav-menu'; // Removed
-import { SidebarContent } from '@/components/layout/sidebar'; // Imported
+import { SidebarContent } from '@/components/layout/sidebar';
 import { UserMenu } from './user-menu';
 import { NotificationCenter } from '@/features/notifications';
 import { useSession } from 'next-auth/react';
 import { BrandLogo } from '@/components/brand-logo';
 import { useState, useEffect } from 'react';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export function DashboardHeader() {
   const { data: session } = useSession();
   const name = session?.user?.fullName || session?.user?.name || "bạn";
+  const role = session?.user?.role;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -27,47 +27,77 @@ export function DashboardHeader() {
     return () => clearTimeout(id);
   }, []);
 
+  // Role localization helper
+  const getRoleBadge = (role?: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return { label: 'Quản trị viên', color: 'bg-destructive/10 text-destructive border-destructive-light' };
+      case 'LANDLORD':
+        return { label: 'Chủ nhà', color: 'bg-indigo-500/10 text-indigo-600 border-indigo-200' };
+      case 'TENANT':
+        return { label: 'Khách thuê', color: 'bg-emerald-500/10 text-emerald-600 border-emerald-200' };
+      default:
+        return { label: 'Thành viên', color: 'bg-muted text-muted-foreground' };
+    }
+  };
+
+  const roleInfo = getRoleBadge(role);
+
   return (
-    <header style={{ height: 'var(--height-header)' }} className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/60 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between h-full gap-2 sm:gap-4">
-        {/* Logo */}
-        <BrandLogo href="/" className="py-2" />
+    <header className="sticky top-4 left-0 right-0 z-50 flex justify-center px-4 w-full pointer-events-none">
+      {/* Pointer events none on wrapper to let clicks pass through to sidebar if transparent, 
+           but pointer-events-auto on the actual header content container */}
+      <div
+        style={{ height: 'var(--height-header)' }}
+        className="w-full max-w-[1600px] pointer-events-auto rounded-full border bg-background/80 backdrop-blur-xl shadow-sm transition-all duration-300 hover:shadow-md supports-[backdrop-filter]:bg-background/60 flex items-center justify-between px-6 gap-4"
+      >
+        {/* Left: Logo & Mobile Menu */}
+        <div className="flex items-center gap-4">
+          {/* Mobile Menu Trigger */}
+          {mounted && (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden shrink-0 -ml-2">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 pt-10 p-0">
+                <SheetTitle className="sr-only">Menu điều hướng</SheetTitle>
+                <div className="h-full py-4 overflow-y-auto">
+                  <SidebarContent role={session?.user?.role} />
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
 
-        {/* Desktop Navigation REMOVED - Moved to Sidebar */}
-        <div className="hidden md:flex flex-1" />
+          <BrandLogo href="/" className="py-2" />
 
-        {/* Right side - Flex shrink 0 */}
-        <div className="flex-shrink-0 flex items-center justify-end gap-2 sm:gap-4">
+          {/* Desktop Role Badge */}
+          <div className="hidden md:flex items-center">
+            <div className="h-6 w-[1px] bg-border mx-4" />
+            <Badge variant="outline" className={`${roleInfo.color} border font-bold uppercase tracking-wider text-[10px] py-0.5 px-2`}>
+              {roleInfo.label}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Right side Actions */}
+        <div className="flex items-center justify-end gap-2 sm:gap-3">
           {name && (
-            <div className="hidden lg:flex flex-col items-end mr-2">
-              <span className="text-sm font-medium leading-none">Xin chào,</span>
-              <span className="text-xs text-muted-foreground max-w-[120px] truncate font-medium">{name}</span>
+            <div className="hidden lg:flex flex-col items-end mr-2 leading-tight">
+              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Xin chào</span>
+              <span className="text-sm font-bold max-w-[150px] truncate">{name}</span>
             </div>
           )}
 
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            {/* Notifications - Real-time with WebSocket fallback to polling */}
+          <div className="flex items-center gap-2 shrink-0">
+            <ThemeToggle />
+
+            {/* Notifications */}
             <NotificationCenter />
 
             {/* User Menu */}
             <UserMenu user={session?.user} />
-
-            {/* Mobile Menu - Only render after mount to avoid hydration mismatch */}
-            {mounted && (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden shrink-0">
-                    <Menu className="h-5 w-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-64 pt-10 p-0">
-                  <SheetTitle className="sr-only">Menu điều hướng</SheetTitle>
-                  <div className="h-full py-4 overflow-y-auto">
-                    <SidebarContent role={session?.user?.role} />
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )}
           </div>
         </div>
       </div>

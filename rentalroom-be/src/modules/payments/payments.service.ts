@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreatePaymentDto,
@@ -11,6 +11,7 @@ import { plainToClass } from 'class-transformer';
 import { PaymentStatus } from './entities';
 import { PaymentService } from './payment.service';
 import { PaymentVerificationResult } from './interfaces';
+import { User, UserRole } from '@prisma/client';
 
 @Injectable()
 export class PaymentsService {
@@ -145,18 +146,51 @@ export class PaymentsService {
     });
   }
 
-  async update(id: string, updatePaymentDto: UpdatePaymentDto) {
-    await this.findOne(id);
+  async update(id: string, updatePaymentDto: UpdatePaymentDto, user?: User) {
+    // Fetch payment with invoice and contract details for ownership validation
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: {
+        invoice: {
+          include: {
+            contract: {
+              include: {
+                room: {
+                  include: {
+                    property: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
 
-    const payment = await this.prisma.payment.update({
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    // 🔒 SECURITY: Ownership validation for landlords
+    // Admins can update any payment, but landlords can only update payments for their own contracts
+    if (user && user.role === UserRole.LANDLORD) {
+      const landlordId = payment.invoice?.contract?.room?.property?.landlordId;
+      if (landlordId !== user.id) {
+        throw new ForbiddenException(
+          'You can only update payments for your own contracts',
+        );
+      }
+    }
+
+    const updated = await this.prisma.payment.update({
       where: { id },
       data: updatePaymentDto,
     });
 
     // Convert Decimal to Number
     const cleaned = {
-      ...payment,
-      amount: payment.amount ? Number(payment.amount) : 0,
+      ...updated,
+      amount: updated.amount ? Number(updated.amount) : 0,
     };
 
     return plainToClass(PaymentResponseDto, cleaned, {
@@ -186,8 +220,41 @@ export class PaymentsService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(id: string, user?: User) {
+    // Fetch payment with invoice and contract details for ownership validation
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: {
+        invoice: {
+          include: {
+            contract: {
+              include: {
+                room: {
+                  include: {
+                    property: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+
+    // 🔒 SECURITY: Ownership validation for landlords
+    // Admins can delete any payment, but landlords can only delete payments for their own contracts
+    if (user && user.role === UserRole.LANDLORD) {
+      const landlordId = payment.invoice?.contract?.room?.property?.landlordId;
+      if (landlordId !== user.id) {
+        throw new ForbiddenException(
+          'You can only delete payments for your own contracts',
+        );
+      }
+    }
 
     await this.prisma.payment.delete({
       where: { id },

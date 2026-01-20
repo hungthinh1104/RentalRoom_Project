@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface BrandLogoProps {
   /** Target URL (default: "/") */
@@ -13,8 +14,10 @@ interface BrandLogoProps {
   subtitle?: string;
   /** Additional CSS classes */
   className?: string;
-  /** Always show text (ignore responsive hiding) */
+  /** always show text (ignore responsive hiding) */
   alwaysShowText?: boolean;
+  /** Color variant */
+  variant?: "default" | "white";
 }
 
 const sizeConfig = {
@@ -45,6 +48,7 @@ export function BrandLogo({
   subtitle,
   className,
   alwaysShowText = false,
+  variant = "default",
 }: BrandLogoProps) {
   const config = sizeConfig[size];
 
@@ -52,45 +56,63 @@ export function BrandLogo({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2 flex-shrink-0 group transition-transform hover:scale-[1.02]",
+        "flex items-center gap-2 flex-shrink-0 group relative",
         className
       )}
     >
-      {/* Icon Container */}
-      <div
-        className={cn(
-          config.icon,
-          "rounded-lg bg-gradient-to-br from-rose-600 to-pink-500 flex items-center justify-center text-white shadow-md group-hover:shadow-lg transition-shadow"
-        )}
+      <motion.div
+        className="flex items-center gap-2"
+        whileHover="hover"
+        initial="rest"
+        animate="rest"
       >
-        <Building2 className={config.iconInner} />
-      </div>
+        {/* Icon Container */}
+        <motion.div
+          variants={{
+            rest: { scale: 1, rotate: 0 },
+            hover: { scale: 1.1, rotate: -3 },
+          }}
+          transition={{ type: "spring", stiffness: 400, damping: 10 }}
+          className={cn(
+            config.icon,
+            "rounded-lg flex items-center justify-center shadow-md",
+            variant === "default"
+              ? "bg-gradient-to-br from-rose-600 to-pink-500 text-white"
+              : "bg-white/10 backdrop-blur-md border border-white/20 text-white"
+          )}
+        >
+          <Building2 className={config.iconInner} />
+        </motion.div>
 
-      {/* Text Container */}
-      {showText && (
-        <div className="flex flex-col leading-tight">
-          <span
-            className={cn(
-              config.text,
-              "font-bold bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent",
-              !alwaysShowText && "hidden sm:inline-block"
-            )}
-          >
-            RentalRoom
-          </span>
-          {subtitle && (
+        {/* Text Container */}
+        {showText && (
+          <div className="flex flex-col leading-tight">
             <span
               className={cn(
-                config.subtitle,
-                "text-muted-foreground",
+                config.text,
+                "font-bold",
+                variant === "default"
+                  ? "bg-gradient-to-r from-rose-600 to-pink-500 bg-clip-text text-transparent"
+                  : "text-white",
                 !alwaysShowText && "hidden sm:inline-block"
               )}
             >
-              {subtitle}
+              RentalRoom
             </span>
-          )}
-        </div>
-      )}
+            {subtitle && (
+              <span
+                className={cn(
+                  config.subtitle,
+                  "text-muted-foreground",
+                  !alwaysShowText && "hidden sm:inline-block"
+                )}
+              >
+                {subtitle}
+              </span>
+            )}
+          </div>
+        )}
+      </motion.div>
     </Link>
   );
 }

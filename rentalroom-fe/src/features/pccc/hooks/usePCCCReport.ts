@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import axios from '@/lib/api/client'; // Custom api client
+import api, { ApiError } from '@/lib/api/client'; // Custom api client
 import { CreatePCCCReportDto, PCCCReport } from '../types/pccc.types';
 
 export const usePCCCReport = () => {
@@ -13,13 +13,14 @@ export const usePCCCReport = () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.post<PCCCReport>(`/pccc/properties/${propertyId}/report`, data);
+            const response = await api.post<PCCCReport>(`/pccc/properties/${propertyId}/report`, data);
             setReport(response.data);
             return response.data;
-        } catch (err: any) {
-            const message = err.response?.data?.message || 'Có lỗi xảy ra khi tạo báo cáo.';
+        } catch (err: unknown) {
+            const apiError = err as ApiError;
+            const message = apiError.message || 'Có lỗi xảy ra khi tạo báo cáo.';
             setError(message);
-            throw err;
+            throw apiError;
         } finally {
             setLoading(false);
         }
@@ -28,11 +29,12 @@ export const usePCCCReport = () => {
     const getReport = async (reportId: string) => {
         setLoading(true);
         try {
-            const response = await axios.get<PCCCReport>(`/pccc/reports/${reportId}`);
+            const response = await api.get<PCCCReport>(`/pccc/reports/${reportId}`);
             setReport(response.data);
             return response.data;
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const apiError = err as ApiError;
+            setError(apiError.message);
         } finally {
             setLoading(false);
         }
@@ -40,7 +42,7 @@ export const usePCCCReport = () => {
 
     const downloadPDF = async (reportId: string, type: 'PC17' | 'PC19' | 'CHECKLIST') => {
         try {
-            const response = await axios.get<Blob>(`/pccc/reports/${reportId}/pdf`, {
+            const response = await api.get<Blob>(`/pccc/reports/${reportId}/pdf`, {
                 params: { type },
                 responseType: 'blob', // Important for file download
             });
@@ -58,9 +60,10 @@ export const usePCCCReport = () => {
             document.body.appendChild(link);
             link.click();
             link.remove();
-        } catch (err) {
+        } catch (err: unknown) {
             console.error('Download failed', err);
-            alert('Không thể tải file PDF. Vui lòng thử lại.');
+            const message = err instanceof Error ? err.message : 'Không thể tải file PDF. Vui lòng thử lại.';
+            alert(message);
         }
     };
 

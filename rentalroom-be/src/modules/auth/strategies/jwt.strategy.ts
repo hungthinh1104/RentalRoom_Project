@@ -9,6 +9,7 @@ export interface JwtPayload {
   sub: string; // user id
   email: string;
   role: string;
+  family?: string; // Token family for rotation tracking
 }
 
 @Injectable()
@@ -41,6 +42,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+
+    // Check if user is banned
+    if (user.isBanned) {
+      throw new UnauthorizedException('Account has been banned');
     }
 
     return {

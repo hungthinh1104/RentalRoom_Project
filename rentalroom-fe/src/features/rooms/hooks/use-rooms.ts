@@ -2,12 +2,12 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api/client";
-import { CreateRoomDto, Room, RoomStatus } from "../types";
+import { CreateRoomInput, BulkCreateRoomInput, Room, RoomStatus } from "../types";
 
 export const roomKeys = {
 	all: ["rooms"] as const,
 	lists: () => [...roomKeys.all, "list"] as const,
-	list: (filters: any) => [...roomKeys.lists(), { ...filters }] as const,
+	list: (filters: RoomFilters | undefined) => [...roomKeys.lists(), { ...filters }] as const,
 	details: () => [...roomKeys.all, "detail"] as const,
 	detail: (id: string) => [...roomKeys.details(), id] as const,
 };
@@ -30,7 +30,7 @@ export function useRooms(filters?: RoomFilters) {
 			if (filters?.status) params.append("status", filters.status);
 			if (filters?.search) params.append("search", filters.search);
 
-			const { data } = await api.get<{ data: Room[], meta: any }>(`/rooms?${params.toString()}`);
+			const { data } = await api.get<{ data: Room[], meta: Record<string, unknown> }>(`/rooms?${params.toString()}`);
 			return data;
 		},
 		staleTime: 60 * 1000,
@@ -39,7 +39,7 @@ export function useRooms(filters?: RoomFilters) {
 
 	// Create Single
 	const createMutation = useMutation({
-		mutationFn: async (newRoom: CreateRoomDto) => {
+		mutationFn: async (newRoom: CreateRoomInput) => {
 			const { data } = await api.post<Room>("/rooms", newRoom);
 			return data;
 		},
@@ -50,7 +50,7 @@ export function useRooms(filters?: RoomFilters) {
 
 	// Bulk Create
 	const bulkCreateMutation = useMutation({
-		mutationFn: async (input: CreateRoomDto) => {
+		mutationFn: async (input: BulkCreateRoomInput) => {
 			const { data } = await api.post<Room[]>("/rooms/bulk", input);
 			return data;
 		},

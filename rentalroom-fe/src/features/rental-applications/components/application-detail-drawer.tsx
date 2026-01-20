@@ -127,7 +127,7 @@ export function ApplicationDetailDrawer({ application, isOpen, onClose }: Props)
                             <span className="col-span-2">{application.tenant?.user?.phoneNumber ?? application.tenantPhone ?? "—"}</span>
 
                             <span className="text-muted-foreground">Lời nhắn</span>
-                            <span className="col-span-2 italic text-muted-foreground">"{application.message ?? "Không có lời nhắn"}"</span>
+                            <span className="col-span-2 italic text-muted-foreground">&quot;{application.message ?? "Không có lời nhắn"}&quot;</span>
                         </div>
                     </div>
 

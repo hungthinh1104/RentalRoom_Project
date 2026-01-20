@@ -71,13 +71,13 @@ export function PropertyWizard({ open, onOpenChange }: PropertyWizardProps) {
     };
 
     const nextStep = async () => {
-        const fields = step === 1
+        const fields = (step === 1
             ? ["name", "propertyType", "description"]
             : step === 2
                 ? ["address", "city", "ward"]
-                : [];
+                : []) as Array<keyof PropertyFormValues>;
 
-        const isValid = await form.trigger(fields as any);
+        const isValid = await form.trigger(fields);
         if (isValid) setStep((s) => s + 1);
     };
 

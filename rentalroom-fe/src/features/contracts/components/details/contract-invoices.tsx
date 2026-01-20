@@ -9,7 +9,7 @@ interface ContractInvoicesProps {
 }
 
 export function ContractInvoices({ contract }: ContractInvoicesProps) {
-    const isVisible = [ContractStatus.ACTIVE, ContractStatus.TERMINATED, ContractStatus.EXPIRED].includes(contract.status as any);
+    const isVisible = [ContractStatus.ACTIVE, ContractStatus.TERMINATED, ContractStatus.EXPIRED].includes(contract.status as ContractStatus);
 
     if (!isVisible) {
         return (
@@ -21,9 +21,7 @@ export function ContractInvoices({ contract }: ContractInvoicesProps) {
         );
     }
 
-    // Safety check just in case types are loose
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const invoices = (contract as any).invoices || [];
+    const invoices = contract.invoices || [];
 
     return (
         <div className="space-y-6">

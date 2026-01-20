@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { format, parse } from 'date-fns';
+import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +33,6 @@ export function UtilitiesDashboardPage({ contractId }: UtilitiesDashboardPagePro
   const [services, setServices] = useState<Service[]>([]);
   const [readings, setReadings] = useState<MeterReading[]>([]);
   const [lastReadings, setLastReadings] = useState<Record<string, MeterReading | undefined>>({});
-  const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [isLoadingReadings, setIsLoadingReadings] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
@@ -41,15 +40,12 @@ export function UtilitiesDashboardPage({ contractId }: UtilitiesDashboardPagePro
   useEffect(() => {
     const loadData = async () => {
       try {
-        setIsLoadingServices(true);
         // Here we would fetch services for the contract
         // For now, we'll initialize empty arrays
         setServices([]);
       } catch (error) {
         console.error('Error loading services:', error);
         toast.error('Lỗi khi tải dữ liệu dịch vụ');
-      } finally {
-        setIsLoadingServices(false);
       }
     };
 

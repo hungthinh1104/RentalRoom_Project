@@ -39,7 +39,7 @@ export const RiskScoreDisplay: React.FC<RiskScoreDisplayProps> = ({ score, statu
             </div>
             {status === 'FAIL' && (
                 <p className="mt-4 text-xs text-red-700 max-w-xs mx-auto">
-                    Phát hiện rủi ro nghiêm trọng. Vui lòng khắc phục "Chuồng cọp" hoặc mở lối thoát hiểm thứ 2.
+                    Phát hiện rủi ro nghiêm trọng. Vui lòng khắc phục &quot;Chuồng cọp&quot; hoặc mở lối thoát hiểm thứ 2.
                 </p>
             )}
         </div>

@@ -38,9 +38,9 @@ export interface CreateServiceDto {
     description?: string;
 }
 
-export interface UpdateServiceDto extends Partial<CreateServiceDto> { }
+export type UpdateServiceDto = Partial<CreateServiceDto>;
 
-export interface FilterServicesParams extends PaginationParams, Record<string, any> {
+export interface FilterServicesParams extends PaginationParams, Record<string, unknown> {
     propertyId?: string;
     serviceType?: ServiceType;
     billingMethod?: BillingMethod;

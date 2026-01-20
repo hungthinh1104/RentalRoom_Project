@@ -42,71 +42,76 @@ export class BillingService {
     createInvoiceDto: CreateInvoiceDto,
     actor: { id: string; role: UserRole },
   ) {
-    const invoice = await this.prisma.invoice.create({
-      data: createInvoiceDto,
-      include: {
-        contract: {
+    return await this.prisma
+      .$transaction(async (tx) => {
+        const invoice = await tx.invoice.create({
+          data: createInvoiceDto,
           include: {
-            tenant: true,
-            room: true,
-            landlord: true,
+            contract: {
+              include: {
+                tenant: true,
+                room: true,
+                landlord: true,
+              },
+            },
           },
-        },
-      },
-    });
+        });
 
-    // 📸 CREATE SNAPSHOT: Invoice Issued
-    try {
-      const snapshotId = await this.snapshotService.create({
-        actorId: actor.id,
-        actorRole: actor.role,
-        actionType: 'INVOICE_ISSUED',
-        entityType: 'INVOICE',
-        entityId: invoice.id,
-        metadata: {
-          invoiceNumber: invoice.invoiceNumber,
-          totalAmount: Number(invoice.totalAmount),
-          items: await this.prisma.invoiceLineItem.findMany({
-            where: { invoiceId: invoice.id },
-          }),
-        },
+        // 📸 CREATE SNAPSHOT: Invoice Issued (MANDATORY - fail-fast)
+        const snapshotId = await this.snapshotService.create(
+          {
+            actorId: actor.id,
+            actorRole: actor.role,
+            actionType: 'INVOICE_ISSUED',
+            entityType: 'INVOICE',
+            entityId: invoice.id,
+            metadata: {
+              invoiceNumber: invoice.invoiceNumber,
+              totalAmount: Number(invoice.totalAmount),
+              items: await tx.invoiceLineItem.findMany({
+                where: { invoiceId: invoice.id },
+              }),
+            },
+          },
+          tx,
+        );
+
+        // Update invoice with snapshotId
+        await tx.invoice.update({
+          where: { id: invoice.id },
+          data: { snapshotId },
+        });
+
+        return invoice;
+      })
+      .then((invoice) => {
+        // 🔔 TRIGGER NOTIFICATION: Invoice Generated (ASYNC - outside transaction)
+        try {
+          this.notificationsService
+            .create({
+              userId: invoice.contract.tenantId,
+              title: 'Hóa đơn mới đã được tạo',
+              content: `Hóa đơn ${invoice.invoiceNumber} cho phòng ${invoice.contract.room.roomNumber} với số tiền ${Number(invoice.totalAmount).toLocaleString('vi-VN')} VNĐ. Hạn thanh toán: ${new Date(invoice.dueDate).toLocaleDateString('vi-VN')}`,
+              notificationType: NotificationType.PAYMENT,
+              relatedEntityId: invoice.id,
+            })
+            .catch((err) =>
+              this.logger.error('Failed to send invoice notification', err),
+            );
+        } catch (error) {
+          this.logger.error('Notification service error', error);
+        }
+
+        // Convert Decimal to Number
+        const cleaned = {
+          ...invoice,
+          totalAmount: invoice.totalAmount ? Number(invoice.totalAmount) : 0,
+        };
+
+        return plainToClass(InvoiceResponseDto, cleaned, {
+          excludeExtraneousValues: true,
+        });
       });
-
-      // Update invoice with snapshotId
-      await this.prisma.invoice.update({
-        where: { id: invoice.id },
-        data: { snapshotId },
-      });
-    } catch (error) {
-      this.logger.error('Failed to create snapshot for invoice', error);
-      // Non-blocking
-    }
-
-    // 🔔 TRIGGER NOTIFICATION: Invoice Generated
-    try {
-      await this.notificationsService.create({
-        userId: invoice.contract.tenantId,
-        title: 'Hóa đơn mới đã được tạo',
-        content: `Hóa đơn ${invoice.invoiceNumber} cho phòng ${invoice.contract.room.roomNumber} với số tiền ${Number(invoice.totalAmount).toLocaleString('vi-VN')} VNĐ. Hạn thanh toán: ${new Date(invoice.dueDate).toLocaleDateString('vi-VN')}`,
-        notificationType: NotificationType.PAYMENT,
-        relatedEntityId: invoice.id,
-      });
-      this.logger.log(
-        `📬 Invoice notification sent to tenant ${invoice.contract.tenantId}`,
-      );
-    } catch (error) {
-      this.logger.error('Failed to send invoice notification', error);
-    }
-
-    // Convert Decimal to Number
-    const cleaned = {
-      ...invoice,
-      totalAmount: invoice.totalAmount ? Number(invoice.totalAmount) : 0,
-    };
-
-    return plainToClass(InvoiceResponseDto, cleaned, {
-      excludeExtraneousValues: true,
-    });
   }
 
   async addLineItem(
@@ -300,47 +305,47 @@ export class BillingService {
       }
     }
 
-    const updatedInvoice = await this.prisma.invoice.update({
-      where: { id },
-      data: {
-        status: InvoiceStatus.PAID,
-        paidAt: new Date(),
-      },
-      include: {
-        contract: {
-          include: {
-            landlord: true,
-            room: true,
+    const updatedInvoice = await this.prisma.$transaction(async (tx) => {
+      const paid = await tx.invoice.update({
+        where: { id },
+        data: {
+          status: InvoiceStatus.PAID,
+          paidAt: new Date(),
+        },
+        include: {
+          contract: {
+            include: {
+              landlord: true,
+              room: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // 📸 CREATE SNAPSHOT: Invoice Paid
-    try {
-      const snapshotId = await this.snapshotService.create({
-        actorId: user ? user.id : updatedInvoice.contract.landlordId, // Use user ID or Landlord ID
-        actorRole: user ? user.role : UserRole.LANDLORD,
-        actionType: 'INVOICE_PAID',
-        entityType: 'INVOICE',
-        entityId: updatedInvoice.id,
-        metadata: {
-          invoiceNumber: updatedInvoice.invoiceNumber,
-          paidAt: updatedInvoice.paidAt,
-          totalAmount: Number(updatedInvoice.totalAmount),
+      // 📸 CREATE SNAPSHOT: Invoice Paid (MANDATORY - fail-fast)
+      const paymentSnapshotId = await this.snapshotService.create(
+        {
+          actorId: user ? user.id : paid.contract.landlordId,
+          actorRole: user ? user.role : UserRole.LANDLORD,
+          actionType: 'INVOICE_PAID',
+          entityType: 'INVOICE',
+          entityId: paid.id,
+          metadata: {
+            invoiceNumber: paid.invoiceNumber,
+            paidAt: paid.paidAt,
+            totalAmount: Number(paid.totalAmount),
+          },
         },
-      });
+        tx,
+      );
       // Update invoice with snapshotId (Latest snapshot)
-      await this.prisma.invoice.update({
-        where: { id: updatedInvoice.id },
-        data: { snapshotId },
+      await tx.invoice.update({
+        where: { id: paid.id },
+        data: { snapshotId: paymentSnapshotId },
       });
-    } catch (error) {
-      this.logger.error('Failed to create snapshot for invoice payment', error);
-    }
 
-    // Note: Income should be created manually by Landlord
-    // Auto-creation removed to prevent duplicate income records
+      return paid;
+    });
 
     // Convert Decimal to Number
     const cleaned = {
@@ -384,14 +389,44 @@ export class BillingService {
     }
   }
 
-  async removeInvoice(id: string) {
-    await this.findOneInvoice(id);
+  async removeInvoice(id: string, user?: { id: string; role: UserRole }) {
+    const invoice = await this.findOneInvoice(id, user);
 
-    await this.prisma.invoice.delete({
-      where: { id },
+    // CRITICAL: Soft-delete with mandatory snapshot for audit trail
+    await this.prisma.$transaction(async (tx) => {
+      // Soft-delete invoice
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          deletedAt: new Date(),
+          status: InvoiceStatus.PENDING, // Mark as cancelled
+        },
+      });
+
+      // 📸 CREATE SNAPSHOT: Invoice Deleted (MANDATORY - fail-fast)
+      await this.snapshotService.create(
+        {
+          actorId: user?.id || 'system',
+          actorRole: user?.role || UserRole.ADMIN,
+          actionType: 'INVOICE_DELETED',
+          entityType: 'INVOICE',
+          entityId: id,
+          metadata: {
+            invoiceNumber: invoice.invoiceNumber,
+            originalAmount: Number(invoice.totalAmount),
+            originalStatus: invoice.status,
+            contractId: invoice.contractId,
+            tenantId: invoice.tenantId,
+            reason: 'Manual deletion',
+          },
+        },
+        tx,
+      );
     });
 
-    return { message: 'Invoice deleted successfully' };
+    return {
+      message: 'Invoice deleted successfully (soft-delete with audit trail)',
+    };
   }
 
   /**
@@ -817,35 +852,66 @@ export class BillingService {
       throw new Error('Cannot generate invoice with 0 total amount');
     }
 
-    // --- PERSIST ---
-
-    // Create invoice
-    const invoice = await this.prisma.invoice.create({
-      data: {
-        contractId,
-        tenantId: contract.tenantId,
-        invoiceNumber: `UTL-${month}-${contractId.substring(0, 8)}`,
-        issueDate: new Date(),
-        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days due
-        totalAmount,
-        status: InvoiceStatus.PENDING,
-      },
-    });
-
-    // Create line items
-    for (const item of lineItemsToCreate) {
-      await this.prisma.invoiceLineItem.create({
+    // --- PERSIST (WRAPPED IN TRANSACTION) ---
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Create invoice
+      const invoice = await tx.invoice.create({
         data: {
-          invoiceId: invoice.id,
-          ...item,
+          contractId,
+          tenantId: contract.tenantId,
+          invoiceNumber: `UTL-${month}-${contractId.substring(0, 8)}`,
+          issueDate: new Date(),
+          dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days due
+          totalAmount,
+          status: InvoiceStatus.PENDING,
         },
       });
-    }
+
+      // Create line items
+      for (const item of lineItemsToCreate) {
+        await tx.invoiceLineItem.create({
+          data: {
+            invoiceId: invoice.id,
+            ...item,
+          },
+        });
+      }
+
+      // 📸 CREATE SNAPSHOT: Utility Invoice Generated (MANDATORY - fail-fast)
+      const snapshotId = await this.snapshotService.create(
+        {
+          actorId: user?.id || contract.room.property.landlord.userId,
+          actorRole: UserRole.LANDLORD,
+          actionType: 'UTILITY_INVOICE_GENERATED',
+          entityType: 'INVOICE',
+          entityId: invoice.id,
+          metadata: {
+            contractId,
+            month,
+            invoiceNumber: invoice.invoiceNumber,
+            totalAmount: Number(totalAmount),
+            lineItemCount: lineItemsToCreate.length,
+            includedRent: options?.includeRent !== false,
+            includedFixedServices: options?.includeFixedServices !== false,
+            meterReadingCount: readings.length,
+          },
+        },
+        tx,
+      );
+
+      // Update invoice with snapshotId
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: { snapshotId },
+      });
+
+      return invoice;
+    });
 
     return {
       invoice: {
-        ...invoice,
-        totalAmount: Number(invoice.totalAmount),
+        ...result,
+        totalAmount: Number(result.totalAmount),
       },
       readings: readings.map((r) => ({
         ...r,
@@ -943,61 +1009,88 @@ export class BillingService {
       );
     }
 
-    // Create payment record
-    const payment = await this.prisma.payment.create({
-      data: {
-        invoiceId,
-        tenantId: invoice.tenantId,
-        amount,
-        paymentMethod,
-        status: PaymentStatus.COMPLETED,
-        paidAt: new Date(),
-      },
-    });
+    // CRITICAL: Wrap payment + status update in transaction with snapshot
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Create payment record
+      const payment = await tx.payment.create({
+        data: {
+          invoiceId,
+          tenantId: invoice.tenantId,
+          amount,
+          paymentMethod,
+          status: PaymentStatus.COMPLETED,
+          paidAt: new Date(),
+        },
+      });
 
-    // Calculate remaining amount
-    const paidTotal = await this.prisma.payment.aggregate({
-      where: {
-        invoiceId,
-        deletedAt: null,
-      },
-      _sum: {
-        amount: true,
-      },
-    });
+      // Calculate remaining amount
+      const paidTotal = await tx.payment.aggregate({
+        where: {
+          invoiceId,
+          deletedAt: null,
+        },
+        _sum: {
+          amount: true,
+        },
+      });
 
-    const totalPaid = Number(paidTotal._sum.amount || 0);
-    const invoiceTotal = Number(invoice.totalAmount);
+      const totalPaid = Number(paidTotal._sum.amount || 0);
+      const invoiceTotal = Number(invoice.totalAmount);
 
-    // Update invoice status
-    let newStatus = InvoiceStatus.PENDING;
-    if (totalPaid >= invoiceTotal) {
-      newStatus = InvoiceStatus.PAID;
-    } else if (totalPaid > 0) {
-      newStatus = InvoiceStatus.OVERDUE;
-    }
+      // Update invoice status
+      let newStatus = InvoiceStatus.PENDING;
+      if (totalPaid >= invoiceTotal) {
+        newStatus = InvoiceStatus.PAID;
+      } else if (totalPaid > 0) {
+        newStatus = InvoiceStatus.OVERDUE;
+      }
 
-    const updatedInvoice = await this.prisma.invoice.update({
-      where: { id: invoiceId },
-      data: {
-        status: newStatus,
-        paidAt: newStatus === InvoiceStatus.PAID ? new Date() : null,
-      },
-      include: {
-        payments: true,
-        lineItems: true,
-      },
+      const updatedInvoice = await tx.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          status: newStatus,
+          paidAt: newStatus === InvoiceStatus.PAID ? new Date() : null,
+        },
+        include: {
+          payments: true,
+          lineItems: true,
+        },
+      });
+
+      // 📸 CREATE SNAPSHOT: Utility Payment Recorded (MANDATORY - fail-fast)
+      await this.snapshotService.create(
+        {
+          actorId: user?.id || invoice.tenantId,
+          actorRole: user?.role || UserRole.TENANT,
+          actionType: 'UTILITY_PAYMENT_RECORDED',
+          entityType: 'PAYMENT',
+          entityId: payment.id,
+          metadata: {
+            invoiceId,
+            invoiceNumber: invoice.invoiceNumber,
+            paymentMethod,
+            amount: Number(amount),
+            totalPaid: Number(totalPaid),
+            invoiceTotal: Number(invoiceTotal),
+            newStatus,
+            isFullyPaid: totalPaid >= invoiceTotal,
+          },
+        },
+        tx,
+      );
+
+      return { payment, updatedInvoice };
     });
 
     return {
       payment: {
-        ...payment,
-        amount: Number(payment.amount),
+        ...result.payment,
+        amount: Number(result.payment.amount),
       },
       invoice: {
-        ...updatedInvoice,
-        totalAmount: Number(updatedInvoice.totalAmount),
-        lineItems: updatedInvoice.lineItems.map((item) => ({
+        ...result.updatedInvoice,
+        totalAmount: Number(result.updatedInvoice.totalAmount),
+        lineItems: result.updatedInvoice.lineItems.map((item) => ({
           ...item,
           amount: Number(item.amount),
         })),

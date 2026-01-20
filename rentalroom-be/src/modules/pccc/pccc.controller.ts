@@ -68,6 +68,7 @@ export class PCCCController {
 
   /**
    * Verify PCCC Report (Public endpoint for QR code scanning)
+   * 📋 Checks expiry + legal validity
    */
   @Get('verify/:reportId')
   async verifyReport(@Param('reportId') reportId: string) {
@@ -80,6 +81,28 @@ export class PCCCController {
       complianceScore: report.complianceScore,
       expiryDate: report.expiryDate,
       status: report.status,
+      pdfHash: report.pdfHash, // Hash for integrity verification
+    };
+  }
+
+  /**
+   * Verify PDF Integrity (Check if PDF has been tampered)
+   * 🔐 Returns hash - client computes local hash and compares
+   */
+  @Get('verify/:reportId/pdf-hash')
+  async verifyPDFHash(@Param('reportId') reportId: string) {
+    const report = await this.pcccService.getPCCCReport(reportId);
+
+    if (!report.pdfHash) {
+      return { error: 'PDF hash not available for this report' };
+    }
+
+    return {
+      reportId: report.id,
+      pdfHash: report.pdfHash,
+      hashAlgorithm: 'SHA-256',
+      instructions:
+        'Compute SHA-256 hash of downloaded PDF and compare with pdfHash',
     };
   }
 

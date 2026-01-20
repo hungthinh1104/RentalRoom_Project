@@ -259,9 +259,24 @@ export class BatchEmbeddingsResponseDto {
   failed: number;
 
   @ApiProperty({
-    description: 'Array of generated embeddings',
+    description: 'Array of generated embeddings with success/error per item',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        index: { type: 'number' },
+        embedding: { type: 'array', items: { type: 'number' } },
+        error: { type: 'string' },
+        success: { type: 'boolean' },
+      },
+    },
   })
-  embeddings: number[][];
+  embeddings: Array<{
+    index: number;
+    embedding?: number[];
+    error?: string;
+    success: boolean;
+  }>;
 
   @ApiProperty({
     description: 'Total processing time in milliseconds',

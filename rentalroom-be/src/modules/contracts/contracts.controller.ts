@@ -28,6 +28,8 @@ import {
   FilterContractsDto,
   TerminateContractDto,
   UpdateHandoverChecklistDto,
+  RenewContractDto,
+  UpdateContractResidentDto,
 } from './dto';
 import { CreateContractResidentDto } from './dto/create-contract-resident.dto';
 import { User, UserRole } from '../users/entities';
@@ -42,10 +44,11 @@ export class ContractsController {
     private readonly contractSigningService: ContractSigningService,
     private readonly pdfQueueService: PdfQueueService,
     private readonly contractPdfService: ContractPdfService,
-  ) {}
+  ) { }
 
   @Patch(':id/handover')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @UseGuards(ContractPartyGuard)
   updateHandoverChecklist(
     @Param('id') id: string,
     @Body() dto: UpdateHandoverChecklistDto,
@@ -57,7 +60,7 @@ export class ContractsController {
   // ===== RENTAL APPLICATIONS ENDPOINTS =====
 
   @Post('applications')
-  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @Auth(UserRole.TENANT) // Only tenants can create applications
   createApplication(
     @Body() createDto: CreateRentalApplicationDto,
     @CurrentUser() user: User,
@@ -79,14 +82,14 @@ export class ContractsController {
 
   @Patch('applications/:id/approve')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  approveApplication(@Param('id') id: string) {
-    return this.contractsService.approveApplication(id);
+  approveApplication(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contractsService.approveApplication(id, user);
   }
 
   @Patch('applications/:id/reject')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  rejectApplication(@Param('id') id: string) {
-    return this.contractsService.rejectApplication(id);
+  rejectApplication(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contractsService.rejectApplication(id, user);
   }
 
   @Patch('applications/:id/withdraw')
@@ -99,6 +102,7 @@ export class ContractsController {
 
   @Patch(':id/tenant-approve')
   @Auth(UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   tenantApproveContract(@Param('id') id: string, @CurrentUser() user: User) {
     return this.contractsService.tenantApproveContract(id, user.id);
   }
@@ -151,18 +155,21 @@ export class ContractsController {
 
   @Patch(':id/send')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
+  @UseGuards(ContractPartyGuard)
   send(@Param('id') id: string, @CurrentUser() user: User) {
     return this.contractsService.sendContract(id, user.id);
   }
 
   @Patch(':id/revoke')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   revoke(@Param('id') id: string, @CurrentUser() user: User) {
     return this.contractsService.revokeContract(id, user.id);
   }
 
   @Patch(':id/request-changes')
   @Auth(UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   @HttpCode(200)
   requestChanges(
     @Param('id') id: string,
@@ -175,12 +182,24 @@ export class ContractsController {
 
   @Patch(':id/terminate')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @UseGuards(ContractPartyGuard)
   terminate(
     @Param('id') id: string,
     @Body() terminateDto: TerminateContractDto,
     @CurrentUser() user: User,
   ) {
     return this.contractsService.terminate(id, user.id, terminateDto);
+  }
+
+  @Patch(':id/renew')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @UseGuards(ContractPartyGuard)
+  renew(
+    @Param('id') id: string,
+    @Body() renewDto: RenewContractDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.contractsService.renew(id, user.id, renewDto);
   }
 
   @Delete(':id')
@@ -192,6 +211,7 @@ export class ContractsController {
   // ===== RESIDENT MANAGEMENT (Occupancy) =====
   @Post(':id/residents')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @UseGuards(ContractPartyGuard)
   addResident(
     @Param('id') id: string,
     @Body() dto: CreateContractResidentDto,
@@ -202,12 +222,25 @@ export class ContractsController {
 
   @Delete(':id/residents/:residentId')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @UseGuards(ContractPartyGuard)
   removeResident(
     @Param('id') id: string,
     @Param('residentId') residentId: string,
     @CurrentUser() user: User,
   ) {
     return this.contractsService.removeResident(id, residentId, user.id);
+  }
+
+  @Patch(':id/residents/:residentId')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @UseGuards(ContractPartyGuard)
+  updateResident(
+    @Param('id') id: string,
+    @Param('residentId') residentId: string,
+    @Body() dto: UpdateContractResidentDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.contractsService.updateResident(id, residentId, dto, user.id);
   }
 
   // ===== DIGITAL SIGNATURE ENDPOINTS (Chữ ký số) =====
@@ -219,35 +252,42 @@ export class ContractsController {
    */
   @Post(':id/generate-pdf-async')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   async generatePDFAsync(
     @Param('id') id: string,
     @Body('templateName') templateName: string = 'rental-agreement',
   ) {
-    // Create job và trả về ngay
-    const jobId = await this.pdfQueueService.createJob(id, templateName);
+    // Create job (returns existing if pending/processing for this contract)
+    const { jobId, isNew } = await this.pdfQueueService.createJob(
+      id,
+      templateName,
+    );
 
-    // Process PDF in background (non-blocking)
-    setImmediate(() => {
-      void (async () => {
-        try {
-          await this.pdfQueueService.markProcessing(jobId);
-          const result = await this.contractSigningService.generateContractPDF(
-            id,
-            templateName,
-          );
-          await this.pdfQueueService.markCompleted(jobId, result);
-        } catch (error: unknown) {
-          const msg = (error as Error)?.message ?? String(error);
-          await this.pdfQueueService.markFailed(jobId, msg);
-        }
-      })();
-    });
+    // Process PDF in background (non-blocking) only if new job
+    if (isNew) {
+      setImmediate(() => {
+        void (async () => {
+          try {
+            await this.pdfQueueService.markProcessing(jobId);
+            const result = await this.contractSigningService.generateContractPDF(
+              id,
+              templateName,
+            );
+            await this.pdfQueueService.markCompleted(jobId, result);
+          } catch (error: unknown) {
+            const msg = (error as Error)?.message ?? String(error);
+            await this.pdfQueueService.markFailed(jobId, msg);
+          }
+        })();
+      });
+    }
 
     return {
       jobId,
-      status: 'pending',
-      message:
-        'PDF generation started. Check /contracts/jobs/:jobId for status',
+      status: isNew ? 'pending' : 'queued',
+      message: isNew
+        ? 'PDF generation started. Check /contracts/jobs/:jobId for status'
+        : 'PDF generation already in progress for this contract',
     };
   }
 
@@ -259,6 +299,7 @@ export class ContractsController {
    */
   @Post(':id/generate-pdf')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   async generateContractPDF(
     @Param('id') id: string,
     @Body('templateName') templateName: string = 'rental-agreement',
@@ -271,9 +312,13 @@ export class ContractsController {
    * - Ký file PDF bằng Private Key của hệ thống
    * - Embed chữ ký vào file
    * - Tạo audit log (ai ký, khi nào, từ đâu)
+   * 
+   * TODO: Validate contract state before signing (must have generated PDF, both parties approved)
+   * TODO: Prevent duplicate signatures
    */
   @Post(':id/sign')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   async signContract(
     @Param('id') id: string,
     @CurrentUser() user: User,
@@ -283,6 +328,9 @@ export class ContractsController {
       throw new BadRequestException('User information is required');
     }
 
+    // TODO: Parse real IP and UserAgent from request headers
+    // ipAddress: req.ip || req.headers['x-forwarded-for']
+    // userAgent: req.headers['user-agent']
     return this.contractSigningService.signContract(
       id,
       {
@@ -292,8 +340,8 @@ export class ContractsController {
         reason: body.reason || 'Contract signature',
       },
       {
-        ipAddress: 'N/A', // Nên parse từ request headers: req.ip
-        userAgent: 'N/A', // Nên parse từ request headers
+        ipAddress: 'N/A', // TODO: Parse from request.ip
+        userAgent: 'N/A', // TODO: Parse from request.headers['user-agent']
         deviceInfo: 'Web Browser',
       },
     );
@@ -306,6 +354,7 @@ export class ContractsController {
    */
   @Get(':id/verify')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   async verifyContract(@Param('id') id: string) {
     return this.contractSigningService.verifyContract(id);
   }
@@ -316,6 +365,7 @@ export class ContractsController {
    */
   @Get(':id/payment-status')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard) // Prevent unauthorized polling
   async verifyPaymentStatus(@Param('id') id: string) {
     return this.contractsService.verifyPaymentStatus(id);
   }
@@ -323,6 +373,7 @@ export class ContractsController {
   // ----- PDF Generation Endpoint -----
   @Get(':id/pdf')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   async getContractPdf(
     @Param('id') id: string,
     @CurrentUser() user: User,
@@ -343,6 +394,7 @@ export class ContractsController {
    */
   @Get(':id/download-signed')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD, UserRole.TENANT)
+  @UseGuards(ContractPartyGuard)
   async downloadSignedPDF(@Param('id') id: string, @Res() res: Response) {
     try {
       const { buffer, fileName } =

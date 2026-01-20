@@ -1,5 +1,5 @@
 import api from '@/lib/api/client';
-import { ContractTemplate, CreateContractTemplateDto, UpdateContractTemplateDto } from '../types/template.types';
+import { ContractTemplate, CreateContractTemplateDto, UpdateContractTemplateDto, ContractHistoryLog } from '../types/template.types';
 
 export const templatesApi = {
     getAll: async (type?: string) => {
@@ -25,6 +25,6 @@ export const templatesApi = {
     },
 
     getHistory: async (id: string) => {
-        return api.get<any[]>(`/admin/contract-templates/${id}/audit`);
+        return api.get<ContractHistoryLog[]>(`/admin/contract-templates/${id}/audit`);
     },
 };

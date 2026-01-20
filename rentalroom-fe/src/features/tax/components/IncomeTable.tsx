@@ -27,7 +27,7 @@ export function IncomeTable({ year, month }: IncomeTableProps) {
 
     if (isLoading) return <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" /> Đang tải dữ liệu...</div>;
 
-    const list: Income[] = Array.isArray(incomes) ? incomes : (incomes as any)?.list || [];
+    const list: Income[] = Array.isArray(incomes) ? incomes : [];
 
     if (list.length === 0) {
         return (

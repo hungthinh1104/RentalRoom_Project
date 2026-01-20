@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import { RegisterForm } from "@/features/auth/components/register-form";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 export const metadata: Metadata = {
   title: "Register | Rental Room",

@@ -1,0 +1,1011 @@
+[
+    {
+        "id": "UC_AUTH_01",
+        "module": "AuthService",
+        "title": "Secure Registration & Verification",
+        "actors": [
+            "Guest"
+        ],
+        "flow": [
+            "User submits Register DTO (email, password, role)",
+            "System validates Password Policy (8 chars, Upper, Lower, Num, Special)",
+            "System creates User (Pending) + Profile transactionally",
+            "System sends 6-digit OTP via EmailService",
+            "User submits OTP within 24 hours",
+            "System verifies and activates account",
+            "[CRITICAL for Contract Signing] User prompted to complete eKYC verification",
+            "User uploads CCCD/CMND front + back photos",
+            "System calls AI eKYC service (FPT.AI / VNPT eKYC) to extract info",
+            "System validates: Name, ID number, DOB, Photo match",
+            "System marks User.isVerified = true (required before signing contracts)"
+        ],
+        "error_flows": {
+            "weak_password": [
+                "User submits password not matching policy",
+                "System returns 400 Bad Request with specific requirement failed",
+                "User corrects password and resubmits"
+            ],
+            "email_already_exists": [
+                "User registers with existing email",
+                "System returns 409 Conflict",
+                "User redirects to login or password reset"
+            ],
+            "ekyc_verification_failed": [
+                "AI service detects fake/photoshopped CCCD",
+                "System rejects with 422: 'Identity verification failed. Please use original document.'",
+                "User can retry up to 3 times, then escalates to manual admin review"
+            ],
+            "ekyc_photo_mismatch": [
+                "Selfie photo does not match CCCD photo (liveness check fails)",
+                "System prompts user to retake selfie with better lighting",
+                "System allows 3 retries before blocking"
+            ],
+            "otp_invalid": [
+                "User submits wrong OTP",
+                "System rejects with message after 3 attempts",
+                "System locks registration for 10 minutes or sends new OTP"
+            ],
+            "otp_expired": [
+                "User submits OTP after 24 hours",
+                "System returns 410 Gone or 422 Unprocessable Entity",
+                "User must restart registration (automatic cleanup after 48h)"
+            ],
+            "email_service_failure": [
+                "System fails to send OTP email",
+                "System queues retry with exponential backoff (1m, 5m, 15m)",
+                "User notified with option to resend manually"
+            ]
+        },
+        "post_condition": "User.emailVerified = true AND User.status = ACTIVE AND User.isVerified = true (eKYC passed)",
+        "edge_cases": [
+            "Email with + or special characters (must support RFC 5321)",
+            "Password with unicode/emoji (should reject)",
+            "Concurrent registration attempts with same email (last write wins or 409)",
+            "eKYC optional for browsing but REQUIRED before contract signing",
+            "Expired CCCD (issue date >15 years) should be flagged but not rejected",
+            "User can skip eKYC during registration but forced to complete before first contract"
+        ],
+        "risk_prevention": "Prevents fake email spam, weak passwords, duplicate accounts, AND identity fraud via eKYC verification"
+    },
+    {
+        "id": "UC_AUTH_02",
+        "module": "AuthService",
+        "title": "Login & Session Management",
+        "actors": [
+            "User"
+        ],
+        "flow": [
+            "User submits credentials (email, password)",
+            "System validates email exists + password matches",
+            "System checks if User.isBanned = true (reject if banned)",
+            "System issues Access Token (1 day) + Refresh Token (7 days)",
+            "System tracks Token Family ID for rotation",
+            "User requests refresh with valid Refresh Token",
+            "System issues new Access Token + new Refresh Token with same Family ID",
+            "System rotates token family on next refresh"
+        ],
+        "error_flows": {
+            "invalid_credentials": [
+                "User submits wrong email/password",
+                "System returns 401 Unauthorized (generic message to prevent account enumeration)",
+                "User retries login"
+            ],
+            "user_banned": [
+                "User.isBanned = true in JWT strategy check",
+                "System returns 403 Forbidden with message 'Account has been suspended'",
+                "User cannot login until unbanned by Admin"
+            ],
+            "token_stolen": [
+                "Attacker uses old Refresh Token after theft detected",
+                "System detects Family ID mismatch in next rotation",
+                "System revokes entire Token Family (real user's next refresh fails)",
+                "Real user alerted and must login again"
+            ],
+            "refresh_token_expired": [
+                "User tries to refresh after 7 days",
+                "System returns 401 Unauthorized",
+                "User must login again"
+            ]
+        },
+        "post_condition": "Session active with valid token pair",
+        "edge_cases": [
+            "User tries to use expired Access Token (should return 401)",
+            "User tries to refresh using Access Token instead of Refresh Token (should reject)",
+            "User logs in from 2 devices simultaneously (both should work with separate token families)",
+            "User logs in, refreshes, then attacker tries old Access Token (should still work until expiry)"
+        ],
+        "timeout_handling": {
+            "access_token": "1 day (short-lived)",
+            "refresh_token": "7 days",
+            "token_rotation_on_refresh": "Each refresh generates new pair"
+        },
+        "risk_prevention": "Token Theft Detection via Family Revocation - if old token reused, entire family revoked"
+    },
+    {
+        "id": "UC_COT_01",
+        "module": "ContractLifecycleService",
+        "title": "Contract Creation & PDF Generation",
+        "actors": [
+            "Landlord"
+        ],
+        "flow": [
+            "Landlord approves Rental Application",
+            "System creates Contract Draft (PENDING_GENERATION status)",
+            "System locks Room status to DEPOSIT_PENDING (prevent re-booking)",
+            "System triggers async PDF generation with timeout (30s)",
+            "System generates PDF to AWS S3 or /tmp fallback",
+            "System updates Contract.status to PENDING_SIGNATURE",
+            "System sends notification to Tenant with sign link"
+        ],
+        "error_flows": {
+            "pdf_generation_timeout": [
+                "PDF generation exceeds 30 seconds",
+                "System returns error and uses cached template or fallback",
+                "Tenant can still sign with blank/default PDF or retry later"
+            ],
+            "pdf_storage_failure": [
+                "AWS S3 unavailable, /tmp also fails",
+                "System queues PDF generation retry (max 3 attempts, exponential backoff)",
+                "Tenant notified: 'Contract preparation in progress' with retry timestamp"
+            ],
+            "landlord_cancels_draft": [
+                "Landlord cancels contract before tenant signs",
+                "System rolls back Room to AVAILABLE",
+                "Tenant receives cancellation notification"
+            ]
+        },
+        "post_condition": "Contract.status = PENDING_SIGNATURE AND Room.status = DEPOSIT_PENDING",
+        "edge_cases": [
+            "Multiple PDFs requested concurrently (should deduplicate or queue)",
+            "PDF requested before previous one finished generating (return in-progress status)",
+            "Room gets booked by another application while PDF generating (should fail gracefully)"
+        ],
+        "timeout_handling": {
+            "pdf_generation": "30 seconds (async job with fallback)",
+            "notification_delivery": "Send immediately, retry up to 3 times"
+        },
+        "risk_prevention": "Double Booking: Transactional Room Lock during contract draft phase"
+    },
+    {
+        "id": "UC_COT_02",
+        "module": "ContractSigningService",
+        "title": "Digital Signing",
+        "actors": [
+            "Tenant"
+        ],
+        "flow": [
+            "Tenant clicks Sign Contract link",
+            "System retrieves Contract + PDF",
+            "System embeds visual signature + metadata (IP, User-Agent, timestamp)",
+            "System calculates SHA-256 hash of unsigned PDF as baseline",
+            "Tenant applies digital signature (e-signature provider)",
+            "System calculates SHA-256 hash of signed PDF",
+            "System stores signed PDF URL + hash + audit log",
+            "System updates Contract.status = SIGNED",
+            "System notifies Landlord + unlocks deposit payment step"
+        ],
+        "error_flows": {
+            "signature_provider_down": [
+                "E-signature provider returns error during signing",
+                "System returns error message with retry link",
+                "Tenant can retry within contract signing window (default 30 days)"
+            ],
+            "bait_and_switch_prevention": [
+                "Tenant loads signing page, sees contract version A (hash: ABC123)",
+                "Landlord edits contract to version B while Tenant reading",
+                "Tenant clicks Sign, frontend sends hash ABC123 to backend",
+                "Backend compares ABC123 vs current contract hash (DEF456)",
+                "System returns 409 Conflict: 'Contract modified. Please reload to review changes.'"
+            ],
+            "tenant_closes_without_signing": [
+                "Tenant closes signing page without completing",
+                "Contract remains PENDING_SIGNATURE",
+                "Tenant can return to link anytime within 30 days"
+            ],
+            "double_signing_attempt": [
+                "Tenant or attacker tries to sign already-signed contract",
+                "System detects Contract.status = SIGNED before processing new signature",
+                "System returns 409 Conflict or ignores request"
+            ],
+            "signature_replay_attack": [
+                "Attacker submits previously captured signature data",
+                "System validates hash mismatch (new PDF hash != old signature hash)",
+                "System rejects with 422 Unprocessable Entity"
+            ]
+        },
+        "post_condition": "Contract.status = SIGNED AND pdfHash stored with audit log",
+        "edge_cases": [
+            "Tenant signs from different IP/device (metadata recorded but accepted)",
+            "Signing window expired (30 days) - link should return 410 Gone",
+            "Concurrent sign attempts from multiple devices (lock mechanism needed)",
+            "Contract snapshot hash must be calculated when Tenant opens signing page",
+            "Signature submission includes frontend-calculated hash for backend verification"
+        ],
+        "timeout_handling": {
+            "signing_window": "30 days from PENDING_SIGNATURE status",
+            "auto_expire": "After 30 days, revert to PENDING_SIGNATURE if not signed"
+        },
+        "risk_prevention": "Non-repudiation: IP/Agent audit log embedded + SHA-256 hash prevents tampering"
+    },
+    {
+        "id": "UC_PAY_01",
+        "module": "PaymentsService",
+        "title": "Automated Deposit Reconciliation",
+        "actors": [
+            "Tenant",
+            "System"
+        ],
+        "flow": [
+            "Tenant views QR code generated from Contract deposit amount",
+            "System provides Transfer Info: Bank Account, Amount, Reference Code",
+            "Tenant transfers money via QR or manual entry",
+            "System polls bank transaction (every 10 seconds for 10 minutes, then hourly)",
+            "System receives Transaction: Amount + Reference Code + Timestamp",
+            "System performs Smart-Match: normalize bank reference (remove spaces, lowercase)",
+            "System matches against Contract deposit requirement",
+            "System verifies Amount >= Contract.deposit (reject if underpayment)",
+            "System marks Invoice.status = PAID",
+            "System updates Contract.status = ACTIVE",
+            "System updates Room.status = OCCUPIED",
+            "System notifies both Tenant + Landlord"
+        ],
+        "error_flows": {
+            "underpayment": [
+                "Tenant transfers less than required deposit",
+                "System rejects transaction with message: 'Insufficient amount. Required: X, Received: Y'",
+                "Tenant can transfer additional amount or initiate refund"
+            ],
+            "overpayment": [
+                "Tenant transfers more than required",
+                "System accepts (credits excess to first month rent or opens refund request)",
+                "System notifies tenant of overage"
+            ],
+            "wrong_reference_code": [
+                "Tenant transfers to correct account but different reference code",
+                "System fails smart-match after 1 day polling",
+                "System initiates manual verification: Landlord receives alert to confirm",
+                "Tenant receives message: 'Transfer detected but reference mismatch. Contact landlord.'"
+            ],
+            "replay_attack_prevention": [
+                "Tenant reuses old transaction receipt/screenshot with same reference code",
+                "System checks TransactionID already processed in payment_transactions table",
+                "System rejects with 409 Conflict: 'Transaction already processed'",
+                "System logs security event for audit"
+            ],
+            "double_spending_detection": [
+                "Network lag causes same transaction polled twice within 1 minute",
+                "System deduplicates using (TransactionID + Amount + Timestamp) fingerprint",
+                "System processes only first occurrence, ignores duplicate"
+            ],
+            "transaction_reversal": [
+                "Bank reverses transaction (tenant dispute, failed authorization)",
+                "System detects reversal on next poll",
+                "System reverts Invoice to PENDING, Room to DEPOSIT_PENDING",
+                "System notifies both parties"
+            ],
+            "payment_timeout": [
+                "Tenant doesn't pay within 30 days of contract signing",
+                "System sends reminder at day 20, day 25",
+                "System cancels contract and reverts room to AVAILABLE at day 30",
+                "Application.status reverts to PENDING (can be re-approved)"
+            ],
+            "polling_service_down": [
+                "Bank API or polling service unavailable",
+                "System queues check (exponential backoff: 1h, 4h, 1d max)",
+                "Tenant notified: 'Payment validation delayed but in progress'"
+            ]
+        },
+        "post_condition": "Invoice.status = PAID AND Contract.status = ACTIVE AND Room.status = OCCUPIED",
+        "edge_cases": [
+            "Multiple transfers from same tenant (system should aggregate and match)",
+            "Partial refund after overpayment (handle credit to next invoice)",
+            "Payment received before contract fully signed (system should queue and retry)",
+            "Duplicate transactions (same amount, same reference, within 1 minute) - should deduplicate",
+            "Reference code must be DYNAMIC per invoice/period: PAY-{ContractID}-{MonthYear} (not static)",
+            "TransactionID stored in payment_transactions table with UNIQUE constraint"
+        ],
+        "timeout_handling": {
+            "polling_interval": "10 seconds x 10 minutes, then hourly, then daily up to 30 days",
+            "payment_deadline": "30 days from Contract.status = SIGNED",
+            "reminder_schedule": "Day 20, Day 25 (before contract auto-cancellation)"
+        },
+        "risk_prevention": "Underpayment Rejected + Polling validation prevents webhook spoofing"
+    },
+    {
+        "id": "UC_AI_01",
+        "module": "AiController",
+        "title": "Hybrid Room Discovery",
+        "actors": [
+            "User"
+        ],
+        "flow": [
+            "User enters natural language search query (e.g., 'rooms near metro')",
+            "User optionally applies filters: Price range, Area range, Location, Amenities, Status",
+            "System converts text to Vector embedding via AI model",
+            "System queries SQL constraints: price BETWEEN ? AND ?, area >= ?, status = AVAILABLE",
+            "System performs vector similarity search (cosine distance threshold > 0.7)",
+            "System intersects results: (SQL results) ∩ (Vector results)",
+            "System ranks by relevance score + distance + price match",
+            "System returns paginated results (max 20 per page, sorted by relevance DESC)"
+        ],
+        "error_flows": {
+            "empty_results": [
+                "No rooms match combined criteria (SQL + vector)",
+                "System returns empty array with suggestion: 'No rooms found. Try adjusting filters.'",
+                "System suggests relaxing price/distance constraints"
+            ],
+            "ai_embedding_failure": [
+                "AI vector service timeout (>5 seconds)",
+                "System falls back to SQL-only search",
+                "Returns results ranked by basic matching (not semantic)"
+            ],
+            "invalid_filters": [
+                "User provides price_min > price_max",
+                "System returns 400 Bad Request with specific validation error",
+                "User corrects and retries"
+            ]
+        },
+        "post_condition": "Relevant rooms returned with relevance scores",
+        "edge_cases": [
+            "Zero filters provided (should return top N trending rooms)",
+            "Very broad query ('apartments') - should still work but may be slow",
+            "Special characters in search ('café', 'phố', emojis) - should normalize",
+            "Location boundary edge case (exactly on border) - should handle gracefully"
+        ],
+        "performance_constraints": {
+            "vector_embedding_timeout": "5 seconds",
+            "sql_query_timeout": "10 seconds",
+            "overall_search_timeout": "15 seconds (return SQL fallback if vector slow)"
+        },
+        "risk_prevention": "N/A"
+    },
+    {
+        "id": "UC_ADM_01",
+        "module": "UsersService",
+        "title": "User Moderation (Ban/Unban)",
+        "actors": [
+            "Admin"
+        ],
+        "flow": [
+            "Admin selects User to ban",
+            "Admin provides Ban Reason (text) + Duration (temporary/permanent)",
+            "System validates User exists + is not already banned",
+            "System updates User: isBanned=true, bannedAt=now(), bannedReason=..., bannedUntil=...",
+            "System revokes all Refresh Tokens (via token family revocation)",
+            "System terminates all active sessions",
+            "System sends notification to User: 'Account suspended for: [reason]'",
+            "User cannot login (JWT strategy rejects isBanned=true)"
+        ],
+        "error_flows": {
+            "user_already_banned": [
+                "Admin tries to ban user with isBanned=true",
+                "System returns 409 Conflict or 422 Unprocessable Entity",
+                "Admin can update ban reason/duration instead via PATCH"
+            ],
+            "user_not_found": [
+                "Admin provides invalid user ID",
+                "System returns 404 Not Found",
+                "Admin must re-enter user ID"
+            ],
+            "concurrent_ban_requests": [
+                "Two admins ban same user simultaneously",
+                "Database handles with UNIQUE constraint or optimistic locking",
+                "Last write wins"
+            ]
+        },
+        "unban_flow": [
+            "Admin navigates to banned users list",
+            "Admin selects User to unban",
+            "Admin provides Unban Reason",
+            "System updates User: isBanned=false, bannedAt=NULL, bannedReason=NULL",
+            "System sends notification to User: 'Account reactivated'",
+            "User can login again immediately"
+        ],
+        "post_condition": "User.isBanned = true AND all sessions terminated",
+        "edge_cases": [
+            "Admin bans own account (should prevent or allow with 2FA confirmation)",
+            "Banned user tries to login (return 403 with specific message)",
+            "Ban duration calculation (permanent vs time-limited) - timezone handling"
+        ],
+        "timeout_handling": {
+            "session_termination": "Immediate (within 1 second)",
+            "token_revocation": "Immediate for Refresh Token, Access Token expires naturally"
+        },
+        "risk_prevention": "Malicious Activity Stopped + Active sessions killed immediately"
+    },
+    {
+        "id": "UC_MNT_01",
+        "module": "MaintenanceService",
+        "title": "Maintenance Request Lifecycle",
+        "actors": [
+            "Tenant",
+            "Landlord"
+        ],
+        "flow": [
+            "Tenant submits Request: Issue details, Priority (Low/Medium/High), Photos via ImageKit",
+            "System validates photos are from ik.imagekit.io domain (prevent injection)",
+            "System sets MaintenanceRequest.status = PENDING",
+            "System sends notification to Landlord with estimated response time (based on priority)",
+            "Landlord receives notification + views request details",
+            "Landlord updates status: PENDING → IN_PROGRESS (with optional comment)",
+            "System sends status update notification to Tenant",
+            "Landlord completes work: IN_PROGRESS → COMPLETED (with completion date + cost if any)",
+            "System sends completion notification to Tenant with option to rate/comment",
+            "Tenant confirms within 7 days (auto-closes after 7 days if no feedback)",
+            "Tenant rates service (1-5 stars) + leaves optional comment"
+        ],
+        "error_flows": {
+            "landlord_inactive": [
+                "Landlord doesn't update status for 48 hours (PENDING requests)",
+                "System sends reminder notification to Landlord",
+                "System escalates to Property Manager if no action after 72 hours"
+            ],
+            "spam_abuse_prevention": [
+                "Tenant creates >3 active maintenance requests",
+                "System blocks new request creation with 429 Too Many Requests",
+                "System allows new request only after closing at least one existing request",
+                "Landlord can flag request as 'Spam/Minor' to lower priority"
+            ],
+            "tenant_doesnt_confirm": [
+                "Tenant doesn't confirm completion within 7 days",
+                "System auto-closes request with status = COMPLETED",
+                "Tenant can still leave rating afterward"
+            ],
+            "photo_upload_failed": [
+                "Tenant tries to upload photo not via ImageKit",
+                "System returns 422 Unprocessable Entity: 'Photo must be uploaded via platform'",
+                "Tenant retries"
+            ],
+            "invalid_priority": [
+                "Tenant selects invalid priority value",
+                "System returns 400 Bad Request",
+                "Tenant corrects and resubmits"
+            ]
+        },
+        "sla_handling": {
+            "low_priority": "Response within 5 business days",
+            "medium_priority": "Response within 2 business days",
+            "high_priority": "Response within 24 hours"
+        },
+        "post_condition": "MaintenanceRequest.status = COMPLETED AND Tenant has rated/auto-closed",
+        "edge_cases": [
+            "Multiple photos with same issue - should support array of images",
+            "Emergency request (fire/flood) - should bypass normal flow and escalate immediately",
+            "Request reopened if Tenant rates issue not fixed - should allow re-request",
+            "Cost disputes - Landlord estimates cost but Tenant disputes after completion"
+        ],
+        "timeout_handling": {
+            "response_sla": "Low (5d), Medium (2d), High (24h) from request creation",
+            "confirmation_window": "7 days from COMPLETED status",
+            "auto_close": "Auto-close as COMPLETED if no action after 7 days"
+        },
+        "risk_prevention": "Prevent maintenance abandonment via SLA tracking + auto-escalation"
+    },
+    {
+        "id": "UC_BIL_01",
+        "module": "BillingService",
+        "title": "Monthly Service Calculation",
+        "actors": [
+            "Landlord",
+            "System"
+        ],
+        "flow": [
+            "Landlord records current Index reading: Electricity, Water, etc. (with photo timestamp + location metadata)",
+            "System validates index > previous reading (prevent negative usage)",
+            "System calculates Usage: Current - Previous",
+            "System fetches Unit Price from ServiceConfig (based on month, service type, property)",
+            "System calculates Cost = Usage * UnitPrice",
+            "System generates Invoice LineItem with: Usage, UnitPrice, Cost, CalculationDetails",
+            "System bundles with Fixed Charges (rent, utilities management fee)",
+            "System generates Invoice.status = DRAFT (for landlord review)",
+            "Landlord reviews Invoice + can adjust if needed (add notes/justification)",
+            "Landlord confirms: Invoice.status = PENDING (sent to Tenant)",
+            "System sends Invoice to Tenant for payment"
+        ],
+        "error_flows": {
+            "index_lower_than_previous": [
+                "Current reading < previous reading (meter reset or data entry error)",
+                "System returns 422 Unprocessable Entity: 'Index cannot be lower than previous. Previous: X, Entered: Y'",
+                "Landlord reviews and corrects (if meter reset, should be noted)"
+            ],
+            "service_config_missing": [
+                "Unit price not configured for service/month/property",
+                "System returns 400 Bad Request: 'Unit price not found for [service] in [month]'",
+                "Admin must configure price before billing"
+            ],
+            "index_not_recorded": [
+                "Billing period ends but landlord hasn't recorded index",
+                "System sends reminder notification to Landlord",
+                "Auto-generates invoice using estimated usage (marked as ESTIMATED) after 7 days"
+            ],
+            "tenant_disputes_cost": [
+                "Tenant receives invoice but disputes calculation",
+                "Tenant can add dispute comment on Invoice",
+                "Landlord receives alert + can adjust invoice before Tenant pays",
+                "If already paid, system handles refund/credit workflow"
+            ]
+        },
+        "post_condition": "Invoice Created with LineItems AND Invoice.status = PENDING (ready for Tenant payment)",
+        "edge_cases": [
+            "Multiple services on same invoice (electricity, water, gas) - all calculated independently",
+            "Mid-month reading (partial period) - should handle proration",
+            "Price increase mid-month - should apply to usage after change date",
+            "Index wraps around (meter cycles from 999999 to 0) - system should detect and calculate correctly"
+        ],
+        "validation_rules": {
+            "index_increase_threshold": "Maximum 200% of average monthly usage (detect data entry errors)",
+            "price_decimal_precision": "2 decimal places (currency rounding)",
+            "usage_zero_threshold": "Allow 0 usage (legitimate)",
+            "currency_storage": "Store as INTEGER (cents/xu) NOT FLOAT to avoid 0.1+0.2=0.300000004 errors",
+            "calculation_library": "Use Decimal.js or BigDecimal for price calculations in backend"
+        },
+        "risk_prevention": "Calculation Error Prevention via audit trail + landlord review + dispute mechanism"
+    },
+    {
+        "id": "UC_CPL_01",
+        "module": "PCCCService",
+        "title": "Fire Safety Report Generation",
+        "actors": [
+            "Landlord"
+        ],
+        "flow": [
+            "Landlord navigates to Fire Safety section",
+            "Landlord inputs Property Data: Fire Extinguishers (quantity + location + type), Emergency Exits (count + location), etc.",
+            "System validates required fields are completed",
+            "System generates PC17 compliant PDF Report (from template)",
+            "System calculates Report.expiryDate = today + 365 days",
+            "System generates QR code linking to Public Verification endpoint",
+            "System stores QR in PDF header + generates text reference code",
+            "System marks Report.status = ACTIVE",
+            "System notifies Landlord: Download link + reference code for sharing"
+        ],
+        "error_flows": {
+            "incomplete_data": [
+                "Landlord submits form with missing required fields",
+                "System returns 422 Unprocessable Entity with specific missing fields highlighted",
+                "Landlord completes fields and resubmits"
+            ],
+            "pdf_generation_failure": [
+                "PDF generation service fails (timeout or service down)",
+                "System returns error: 'Report generation failed. Please retry or contact support.'",
+                "System queues retry (exponential backoff, max 3 attempts)"
+            ],
+            "qr_generation_failure": [
+                "QR code generation fails",
+                "System still generates PDF with text reference code",
+                "QR is optional but recommended"
+            ]
+        },
+        "public_verification_flow": [
+            "Public user scans QR or enters reference code",
+            "System retrieves Report + Landlord info",
+            "System displays: Property address, Report date, Expiry date, Fire safety details",
+            "System shows 'Valid' or 'Expired' status with visual indicator"
+        ],
+        "post_condition": "Report.status = ACTIVE AND Report.expiryDate = today + 365 days",
+        "edge_cases": [
+            "Landlord updates report before expiry (should create new version or amendment)",
+            "Report accessed after expiry date (show 'Report Expired' status)",
+            "QR code scanned after report expires (show expired status)",
+            "Multiple reports for same property (system should reference latest)"
+        ],
+        "timeout_handling": {
+            "report_validity": "365 days from creation",
+            "auto_expiry": "Report marked EXPIRED after 365 days (accessible but flagged)"
+        },
+        "risk_prevention": "Legal Compliance + Public Transparency via QR verification"
+    },
+    {
+        "id": "UC_CPL_02",
+        "module": "TaxService",
+        "title": "Revenue Snapshot for Tax",
+        "actors": [
+            "Landlord"
+        ],
+        "flow": [
+            "Landlord requests Tax Export via UI (select Year + Month + optional Property filter)",
+            "System validates user owns selected properties (IDOR check)",
+            "System aggregates all PAID Invoices within selected period",
+            "System calculates: Gross Income + Deductions + Net Income",
+            "System generates CSV format: Date, Property, Room, Tenant, Amount, InvoiceType, Notes",
+            "System adds Report Header: Generated date, Landlord name, Disclaimer",
+            "System adds Disclaimer: 'For tax reference only. Consult tax advisor for official filing.'",
+            "System exports CSV with timestamp",
+            "System sends download link to Landlord"
+        ],
+        "error_flows": {
+            "no_paid_invoices": [
+                "Selected period has no PAID invoices",
+                "System returns empty CSV with headers + disclaimer",
+                "Message: 'No paid invoices found for selected period'"
+            ],
+            "export_generation_failed": [
+                "CSV generation service fails",
+                "System returns error: 'Export failed. Retry or contact support.'",
+                "System queues retry"
+            ],
+            "idor_unauthorized_property": [
+                "Landlord tries to export another landlord's data",
+                "System returns 403 Forbidden: 'Unauthorized access to property data'",
+                "System logs security event for audit"
+            ]
+        },
+        "post_condition": "CSV Downloaded by Landlord",
+        "edge_cases": [
+            "Large dataset (>100k invoices) - pagination or async export with email delivery",
+            "Special characters in property/tenant names (Excel encoding issues)",
+            "Multi-currency transactions (should normalize to primary currency or show separately)",
+            "Partial payment tracking (split invoices) - handle correctly"
+        ],
+        "data_privacy": {
+            "idor_enforcement": "Strict owner check: user.id must match property.landlordId",
+            "audit_logging": "Log all tax exports with landlord ID + timestamp + export parameters",
+            "data_retention": "Keep export logs for 7 years (tax compliance)"
+        },
+        "risk_prevention": "Data Leakage (IDOR) via strict ownership validation + audit trail"
+    },
+    {
+        "id": "UC_APP_01",
+        "module": "RentalApplicationService",
+        "title": "Rental Application Submission & Review",
+        "actors": [
+            "Tenant",
+            "Landlord"
+        ],
+        "flow": [
+            "Tenant submits application (roomId, message, requestedMoveInDate)",
+            "System sets status = PENDING and notifies Landlord",
+            "Landlord reviews details, optional chat/clarification",
+            "Landlord approves or rejects (with reason)",
+            "On approve: System links application to Contract Draft (UC_COT_01)",
+            "On reject: System sets status = REJECTED and notifies Tenant"
+        ],
+        "error_flows": {
+            "duplicate_pending": [
+                "Tenant submits multiple PENDING apps for same room",
+                "System returns 409 Conflict or auto-withdraw older pending",
+                "Tenant can keep only one active application per room"
+            ],
+            "room_not_available": [
+                "Room status not AVAILABLE/DEPOSIT_PENDING",
+                "System returns 409 Conflict: 'Room not available'"
+            ],
+            "race_condition_double_booking": [
+                "Two tenants A and B submit applications for same room simultaneously",
+                "System uses SELECT ... FOR UPDATE to lock room row in transaction",
+                "First transaction commits successfully, second gets 409 Conflict",
+                "Losing tenant sees: 'Room just booked by another tenant. Try another room.'"
+            ],
+            "withdraw_after_approval": [
+                "Tenant withdraws after approval but before contract",
+                "System sets status = WITHDRAWN and unlocks room",
+                "Landlord notified"
+            ]
+        },
+        "edge_cases": [
+            "Application expires after 30 days if no landlord action",
+            "Landlord bulk-approves multiple apps for same room (should lock first approved)",
+            "Tenant resubmits after rejection (allowed)",
+            "Room table MUST have 'version' column for optimistic locking",
+            "Concurrent approval attempts from multiple landlords (only first succeeds)"
+        ],
+        "post_condition": "Application status in {APPROVED, REJECTED, WITHDRAWN} and room lock applied if approved",
+        "rbac": {
+            "TENANT": "Create/withdraw own applications",
+            "LANDLORD": "Review/approve/reject applications for own properties",
+            "ADMIN": "Override and view all"
+        }
+    }
+,
+    {
+        "id": "UC_COT_03",
+        "module": "ContractLifecycleService",
+        "title": "Contract Termination & Deposit Settlement",
+        "actors": [
+            "Tenant",
+            "Landlord",
+            "Admin"
+        ],
+        "flow": [
+            "Tenant or Landlord initiates termination request (reason, proposed date)",
+            "System checks notice period (default 30 days unless contract override)",
+            "System calculates prorated rent and outstanding invoices",
+            "Landlord performs move-out inspection and damage assessment",
+            "System determines refundable deposit = deposit - deductions",
+            "System processes refund or creates payment request for remaining dues",
+            "Contract status set to TERMINATED, Room set to AVAILABLE after handover"
+        ],
+        "error_flows": {
+            "notice_too_short": [
+                "Requested termination date violates notice period",
+                "System returns 422 with required earliest date",
+                "Tenant/Landlord selects valid date"
+            ],
+            "deposit_insufficient": [
+                "Deductions + unpaid invoices exceed deposit amount",
+                "System creates Bad Debt Invoice with remaining balance",
+                "System blocks Tenant account until debt settled",
+                "System notifies Landlord of outstanding debt and legal options"
+            ],
+            "dispute_on_deduction": [
+                "Tenant disputes damage deductions",
+                "System opens DISPUTE record (see UC_DISPUTE_01)",
+                "Funds held until resolution"
+            ],
+            "refund_payment_failure": [
+                "Bank transfer/ewallet refund fails",
+                "System retries with backoff, notifies both parties",
+                "Escalate to Admin if >3 failures"
+            ]
+        },
+        "edge_cases": [
+            "Early termination fee per contract terms",
+            "Overlapping new tenant move-in date (must block until handover done)",
+            "Partial-month proration rules (rounding)",
+            "Tenant withdraws all bank funds before deductions - track as bad debt",
+            "Tenant disputes charges but already moved out - enforce payment before next rental"
+        ],
+        "post_condition": "Contract.status = TERMINATED, deposit reconciled, room available",
+        "timeout_handling": {
+            "dispute_resolution": "Within 14 days",
+            "refund_processing": "Within 5 business days after agreement"
+        }
+    },
+    {
+        "id": "UC_AUTH_03",
+        "module": "AuthService",
+        "title": "Password Recovery",
+        "actors": [
+            "User"
+        ],
+        "flow": [
+            "User clicks Forgot Password and submits email",
+            "System issues 1-hour reset token (128-char, single-use)",
+            "User opens link, submits new password",
+            "System validates password policy and token validity",
+            "System updates password, invalidates all refresh tokens (family revoke)",
+            "System notifies user of password change"
+        ],
+        "error_flows": {
+            "email_not_found": [
+                "Email not registered",
+                "System returns 200 generic to avoid enumeration",
+                "No email sent"
+            ],
+            "email_access_lost": [
+                "User lost access to registered email (expired student email, deleted account)",
+                "User cannot receive reset link",
+                "System provides 'Backup Recovery' option: Phone OTP (if linked) or Manual KYC",
+                "Manual KYC: User submits CCCD/CMND photo to Admin for identity verification",
+                "Admin approves and resets email or password manually"
+            ],
+            "token_expired_or_used": [
+                "User submits after 1 hour or reused token",
+                "System returns 410/401 and prompts restart flow"
+            ],
+            "weak_new_password": [
+                "New password fails policy",
+                "System returns 400 with specific requirement"
+            ]
+        },
+        "edge_cases": [
+            "User sets same password as old (reject)",
+            "Multiple reset requests: last token wins",
+            "Device mismatch (no restriction, but notify)",
+            "Phone number must be collected during registration for SMS OTP backup",
+            "Manual KYC recovery flow requires admin approval within 24-48 hours"
+        ],
+        "post_condition": "Password updated, all sessions revoked, user can login with new password"
+    },
+    {
+        "id": "UC_ROOM_01",
+        "module": "PropertiesService",
+        "title": "Room Listing & Publishing",
+        "actors": [
+            "Landlord",
+            "Admin"
+        ],
+        "flow": [
+            "Landlord creates Room draft (DRAFT state) with details: price, area, amenities, images",
+            "System validates required fields: roomNumber, area, pricePerMonth, propertyId",
+            "System validates images are from ImageKit CDN (ik.imagekit.io domain)",
+            "System performs keyword filter (no banned words for safety)",
+            "Landlord clicks 'Request Publish' -> Room.status = PENDING (awaiting admin review)",
+            "Admin receives notification with room summary",
+            "Admin reviews: occupancy laws, pricing reasonableness, image quality, description clarity",
+            "Admin approves -> Room.status = AVAILABLE, indexes in search, notifies Landlord",
+            "System triggers cache invalidation for room search",
+            "Room now visible in tenant search results"
+        ],
+        "error_flows": {
+            "missing_required_fields": [
+                "Submission without price/area/location",
+                "System returns 422 with field list"
+            ],
+            "image_invalid_source": [
+                "Image not from ImageKit CDN",
+                "System rejects upload with 400: 'Images must be uploaded via official uploader'",
+                "System validates all image URLs start with: https://ik.imagekit.io/"
+            ],
+            "image_safety_violation": [
+                "AI detects NSFW content or privacy violations in images",
+                "System rejects with 422: 'Image contains prohibited content'"
+            ],
+            "banned_keywords": [
+                "Description contains keywords like (fake email, stolen, etc.)",
+                "System flags room as HIGH_RISK for admin review",
+                "Admin must approve or reject with reason"
+            ],
+            "price_outlier": [
+                "Room price is <50% or >300% of district average",
+                "System flags for admin review but allows submission",
+                "Admin can approve with warning or reject"
+            ],
+            "approval_rejected": [
+                "Admin rejects listing (policy violation, poor photos, spam)",
+                "System sets status = REJECTED with reason",
+                "Landlord edits and resubmits (keeps editing history)"
+            ],
+            "duplicate_room_detection": [
+                "System detects possible duplicate (same price, area, property)",
+                "System warns Landlord but allows submission",
+                "Admin can merge or flag as spam"
+            ]
+        },
+        "edge_cases": [
+            "Bulk upload rooms (batch validation, async processing, rate limit 100/day)",
+            "Price/area extreme values (validation caps per district)",
+            "Re-publish after unpublish (retain editing history, approval history)",
+            "Concurrent edits during PENDING review (lock PENDING state)",
+            "Admin rejects but Landlord resubmits immediately (add cooldown: 24h before resubmit)",
+            "Search indexing must cache invalidate on AVAILABLE->UNAVAILABLE transitions",
+            "Image deletion/replacement (audit trail of all image changes)"
+        ],
+        "post_condition": "Room status in {DRAFT, PENDING, REJECTED, AVAILABLE} and searchable if AVAILABLE",
+        "room_status_lifecycle": {
+            "DRAFT": "Initial state, not visible, only to creator",
+            "PENDING": "Submitted for review, visible only to admin, creator cannot edit",
+            "REJECTED": "Admin rejected, creator can edit and resubmit",
+            "AVAILABLE": "Approved by admin, visible in search, searchable, bookable",
+            "OCCUPIED": "Tenant move-in confirmed, not available for booking",
+            "UNAVAILABLE": "Landlord marked as not available (maintenance, etc.)"
+        },
+        "rbac": {
+            "LANDLORD": "Create/edit own rooms, request publish",
+            "ADMIN": "Approve/reject any room",
+            "TENANT": "View only"
+        }
+    },
+    {
+        "id": "UC_TENANT_01",
+        "module": "MoveOutService",
+        "title": "Tenant Move-Out & Handover",
+        "actors": [
+            "Tenant",
+            "Landlord"
+        ],
+        "flow": [
+            "Tenant schedules move-out date",
+            "System checks conflicts with next booking",
+            "Landlord performs inspection checklist (photos, meters, keys)",
+            "System compares deposits vs deductions (ties to UC_COT_03)",
+            "Tenant hands over keys, Landlord confirms",
+            "System sets Room.status = PENDING_HANDOVER (NOT immediately AVAILABLE)",
+            "Landlord verifies room empty and clicks 'Confirm Handover Complete'",
+            "System sets Room.status = AVAILABLE and closes maintenance tickets"
+        ],
+        "error_flows": {
+            "inspection_failed": [
+                "Damages found",
+                "Landlord records deductions with evidence",
+                "Tenant can dispute (UC_DISPUTE_01)"
+            ],
+            "schedule_conflict": [
+                "Move-out overlaps with next move-in",
+                "System prompts reschedule"
+            ]
+        },
+        "edge_cases": [
+            "Tenant no-show on move-out day",
+            "Partial handover (some keys missing)",
+            "Outstanding maintenance requests still open",
+            "Tenant refuses to leave (squatter) - room stays OCCUPIED until landlord confirms physical vacancy",
+            "Auto-switch to AVAILABLE on contract expiry is FORBIDDEN - manual confirmation required"
+        ],
+        "post_condition": "Handover completed, room freed, deposit settlement triggered"
+    },
+    {
+        "id": "UC_LANDLORD_01",
+        "module": "DashboardService",
+        "title": "Landlord Dashboard Metrics",
+        "actors": [
+            "Landlord"
+        ],
+        "flow": [
+            "Landlord opens dashboard",
+            "System aggregates metrics: occupancy rate, pending applications, unpaid invoices, maintenance SLAs",
+            "System displays alerts: expiring contracts, overdue payments, pending approvals",
+            "Landlord drills down to items and takes action (approve, remind, create invoice)"
+        ],
+        "error_flows": {
+            "metrics_service_down": [
+                "Aggregation service unavailable",
+                "System shows cached data + banner 'Data may be stale'"
+            ]
+        },
+        "edge_cases": [
+            "Very large portfolio (performance)",
+            "Time zone differences for due dates",
+            "Data lag between services (show last updated timestamp)"
+        ],
+        "post_condition": "Dashboard rendered with actionable metrics and links"
+    },
+    {
+        "id": "UC_DISPUTE_01",
+        "module": "DisputeService",
+        "title": "Deposit Dispute Resolution",
+        "actors": [
+            "Tenant",
+            "Landlord",
+            "Admin"
+        ],
+        "flow": [
+            "Tenant or Landlord opens dispute linked to Contract/Deposit",
+            "System records claim amount, evidence (photos, notes)",
+            "Counterparty uploads counter-evidence",
+            "System assigns resolution deadline (14 days)",
+            "Admin mediates or auto-rules based on policy",
+            "System updates resolution: APPROVED/REJECTED/PARTIAL and triggers refund/charge",
+            "System logs audit trail for compliance"
+        ],
+        "error_flows": {
+            "missing_evidence": [
+                "Submission without required evidence",
+                "System returns 422 with list of missing items"
+            ],
+            "deadline_passed": [
+                "Party submits after deadline",
+                "System auto-resolves in favor of respondent"
+            ]
+        },
+        "edge_cases": [
+            "Multiple disputes on same contract (allow only one open at a time)",
+            "Escalation to offline/legal (mark status ESCALATED)",
+            "Partial refunds"
+        ],
+        "post_condition": "Dispute resolved with financial outcome and audit log"
+    },
+    {
+        "id": "UC_RENEW_01",
+        "module": "ContractLifecycleService",
+        "title": "Contract Renewal / Extension",
+        "actors": [
+            "Tenant",
+            "Landlord"
+        ],
+        "flow": [
+            "System detects contract expiring in 30 days",
+            "System notifies Tenant and Landlord with renewal options",
+            "Landlord proposes new terms (rent, duration, deposit adjustments)",
+            "Tenant accepts or negotiates",
+            "System generates renewal addendum (PDF) and collects signatures (like UC_COT_02)",
+            "System updates Contract.endDate and status back to ACTIVE"
+        ],
+        "error_flows": {
+            "tenant_no_response": [
+                "Tenant does not respond by expiry",
+                "System auto-closes renewal and marks contract to terminate"
+            ],
+            "terms_not_agreed": [
+                "No agreement reached",
+                "System keeps original contract to expire"
+            ]
+        },
+        "edge_cases": [
+            "Rent increase caps (compliance)",
+            "Deposit adjustment needed on renewal",
+            "Overlapping renewal and new application (block new until decision)"
+        ],
+        "post_condition": "Contract renewed with signed addendum or scheduled to terminate"
+    }
+]

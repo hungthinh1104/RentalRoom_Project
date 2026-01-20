@@ -8,6 +8,8 @@ import {
   Query,
   BadRequestException,
   UnauthorizedException,
+  HttpStatus,
+  HttpCode,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,11 +25,13 @@ import { RegisterDto, AuthResponseDto, LoginDto } from './dto/auth.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/forgot-password.dto';
 import { LocalAuthGuard } from 'src/common/guards/local-auth.guard';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { Auth } from 'src/common/decorators/auth.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   @Post('register')
   @Throttle({ default: { limit: 3, ttl: 3600000 } }) // 3 registrations per hour
@@ -42,6 +46,7 @@ export class AuthController {
   }
 
   @Post('verify')
+  @HttpCode(HttpStatus.OK)
   @SkipThrottle() // Bypass global throttling for verification endpoint
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // Local limit if throttling is enabled elsewhere
   @ApiOperation({ summary: 'Verify email with verification code' })
@@ -60,6 +65,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 attempts per minute
   @ApiOperation({ summary: 'Resend verification email' })
   @ApiResponse({ status: 200, description: 'Verification email sent' })
@@ -82,6 +88,7 @@ export class AuthController {
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 900000 } }) // 5 login attempts per 15 minutes
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiBody({ type: LoginDto })
@@ -119,6 +126,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
   @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
@@ -183,9 +191,22 @@ export class AuthController {
   }
 
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
+  @Auth()
+  async logout(
+    @CurrentUser() user: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Clear refresh token family to invalidate all tokens
+    await this.authService.revokeTokenFamily(user.id);
+
+    // Clear cookies
     res.clearCookie('refresh_token', { path: '/' });
-    return { message: 'Logged out' };
+    res.clearCookie('access_token', { path: '/' });
+
+    return {
+      message: 'Logged out successfully',
+      statusCode: HttpStatus.OK,
+    };
   }
 
   @Post('forgot-password')

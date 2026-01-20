@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { StarRating } from "@/components/ui/star-rating";
-import { Room } from "@/types";
+import { Room, RoomAmenity } from "@/types";
 
 interface RoomCardProps {
   room: Room;
@@ -164,10 +164,10 @@ export const RoomCardLandlord = memo(function RoomCardLandlord({
             <div className="flex flex-wrap gap-1.5 pt-1">
               {room.amenities.filter(Boolean).slice(0, 3).map((amenity, index) => {
                 const amenityLabel = typeof amenity === 'object' && amenity !== null
-                  ? (amenity as any).amenityType
+                  ? (amenity as RoomAmenity).amenityType
                   : amenity;
                 const amenityKey = typeof amenity === 'object' && amenity !== null
-                  ? (amenity as any).id || index
+                  ? (amenity as RoomAmenity).id || index
                   : `${amenity}-${index}`;
 
                 return (

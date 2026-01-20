@@ -69,3 +69,14 @@ export interface CreateIncomePayload {
     note?: string;
     receiptNumber?: string;
 }
+
+export interface Expense {
+    id: string;
+    rentalUnitId?: string;
+    rentalUnit?: { name: string };
+    amount: number;
+    expenseType: ExpenseType;
+    paidAt: string;
+    note?: string;
+    receiptNumber?: string;
+}

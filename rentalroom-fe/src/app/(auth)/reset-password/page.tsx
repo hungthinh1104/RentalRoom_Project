@@ -53,8 +53,9 @@ function ResetPasswordForm() {
       setSuccess(true);
       toast.success('Đặt lại mật khẩu thành công!');
       setTimeout(() => router.push('/login'), 2000);
-    } catch (error: any) {
-      const message = error?.response?.data?.message || 'Token không hợp lệ hoặc đã hết hạn';
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } };
+      const message = err?.response?.data?.message || 'Token không hợp lệ hoặc đã hết hạn';
       setError(message);
       toast.error(message);
     } finally {

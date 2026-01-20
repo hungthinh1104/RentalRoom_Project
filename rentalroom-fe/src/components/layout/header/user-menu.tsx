@@ -62,7 +62,11 @@ export function UserMenu({ user }: UserMenuProps) {
             </p>
             <p className="text-xs text-muted-foreground mt-1">
 
-              Vai trò: <span className="font-medium">{user.role}</span>
+              Vai trò: <span className="font-medium">
+                {user.role === 'ADMIN' ? 'Quản trị viên' :
+                  user.role === 'LANDLORD' ? 'Chủ nhà' :
+                    user.role === 'TENANT' ? 'Khách thuê' : user.role}
+              </span>
             </p>
           </div>
         </DropdownMenuLabel>

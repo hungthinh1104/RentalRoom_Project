@@ -2,14 +2,18 @@ import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import * as crypto from 'crypto';
 import { Decimal } from '@prisma/client/runtime/library';
-import { UserRole } from '@prisma/client';
+import { UserRole, Prisma } from '@prisma/client';
+import { SnapshotService } from '../snapshots/snapshot.service';
 
 @Injectable()
 export class TaxService {
   private readonly logger = new Logger(TaxService.name);
   private readonly TAX_THRESHOLD = 500_000_000; // 500M VND/year
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private snapshotService: SnapshotService,
+  ) {}
 
   /**
    * Generate monthly revenue snapshot for a landlord
@@ -23,152 +27,216 @@ export class TaxService {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 1);
 
-    // Query all invoices paid in this month
-    const invoices = await this.prisma.invoice.findMany({
-      where: {
-        contract: {
-          landlordId,
+    return this.prisma.$transaction(async (tx) => {
+      // Query all invoices paid in this month
+      const invoices = await tx.invoice.findMany({
+        where: {
+          contract: {
+            landlordId,
+          },
+          paidAt: {
+            gte: startDate,
+            lt: endDate,
+          },
+          status: 'PAID',
         },
-        paidAt: {
-          gte: startDate,
-          lt: endDate,
-        },
-        status: 'PAID',
-      },
-      include: {
-        contract: {
-          include: {
-            room: {
-              select: {
-                id: true,
-                roomNumber: true,
+        include: {
+          contract: {
+            include: {
+              room: {
+                select: {
+                  id: true,
+                  roomNumber: true,
+                },
               },
             },
           },
         },
-      },
-    });
+      });
 
-    const totalRevenue = invoices.reduce(
-      (sum, inv) => sum + Number(inv.totalAmount),
-      0,
-    );
+      const totalRevenue = invoices.reduce(
+        (sum, inv) => sum + Number(inv.totalAmount),
+        0,
+      );
 
-    // Room-level breakdown
-    const breakdown = invoices.map((inv) => ({
-      roomId: inv.contract.room.id,
-      roomNumber: inv.contract.room.roomNumber,
-      revenue: Number(inv.totalAmount),
-    }));
+      // Room-level breakdown
+      const breakdown = invoices.map((inv) => ({
+        roomId: inv.contract.room.id,
+        roomNumber: inv.contract.room.roomNumber,
+        revenue: Number(inv.totalAmount),
+      }));
 
-    // Generate hash for immutability
-    const hash = this.generateHash({
-      landlordId,
-      year,
-      month,
-      totalRevenue,
-      invoiceCount: invoices.length,
-    });
+      // Regulation reference for hash integrity
+      const regulation = await this.getRegulationRefForYear(year, tx);
 
-    // Upsert snapshot
-    const snapshot = await this.prisma.landlordRevenueSnapshot.upsert({
-      where: {
-        landlordId_year_month: {
-          landlordId,
-          year,
-          month,
-        },
-      },
-      update: {
-        totalRevenue: new Decimal(totalRevenue),
-        invoiceCount: invoices.length,
-        breakdown: breakdown as any,
-        snapshotHash: hash,
-      },
-      create: {
+      // Generate hash for immutability (include breakdown + regulation)
+      const hash = this.generateHash({
         landlordId,
         year,
         month,
-        totalRevenue: new Decimal(totalRevenue),
+        totalRevenue,
         invoiceCount: invoices.length,
-        breakdown: breakdown as any,
-        snapshotHash: hash,
-      },
+        breakdown,
+        regulationVersion: regulation?.version || null,
+        regulationHash: regulation?.hash || null,
+      });
+
+      // Upsert snapshot
+      const snapshot = await tx.landlordRevenueSnapshot.upsert({
+        where: {
+          landlordId_year_month: {
+            landlordId,
+            year,
+            month,
+          },
+        },
+        update: {
+          totalRevenue: new Decimal(totalRevenue),
+          invoiceCount: invoices.length,
+          breakdown: breakdown as any,
+          snapshotHash: hash,
+        },
+        create: {
+          landlordId,
+          year,
+          month,
+          totalRevenue: new Decimal(totalRevenue),
+          invoiceCount: invoices.length,
+          breakdown: breakdown as any,
+          snapshotHash: hash,
+        },
+      });
+
+      // Create legal snapshot (immutable)
+      const { threshold } = await this.getEffectiveRegulation(year, tx);
+      await this.snapshotService.create(
+        {
+          actorId: landlordId,
+          actorRole: UserRole.LANDLORD,
+          actionType: 'TAX_SNAPSHOT_GENERATED',
+          entityType: 'LANDLORD_REVENUE',
+          entityId: landlordId,
+          metadata: {
+            year,
+            month,
+            totalRevenue,
+            invoiceCount: invoices.length,
+            threshold,
+            regulationVersion: regulation?.version || null,
+            regulationHash: regulation?.hash || null,
+          },
+        },
+        tx,
+      );
+
+      this.logger.log(
+        `Generated revenue snapshot for landlord ${landlordId} - ${year}/${month}: ${totalRevenue} VND`,
+      );
+
+      return snapshot;
     });
-
-    this.logger.log(
-      `Generated revenue snapshot for landlord ${landlordId} - ${year}/${month}: ${totalRevenue} VND`,
-    );
-
-    return snapshot;
   }
 
   /**
    * Generate annual snapshot (sum of all months)
    */
   async generateAnnualSnapshot(landlordId: string, year: number) {
-    const monthlySnapshots = await this.prisma.landlordRevenueSnapshot.findMany(
-      {
+    return this.prisma.$transaction(async (tx) => {
+      const monthlySnapshots = await tx.landlordRevenueSnapshot.findMany({
         where: {
           landlordId,
           year,
           month: { not: null },
         },
-      },
-    );
+      });
 
-    const totalRevenue = monthlySnapshots.reduce(
-      (sum, s) => sum + Number(s.totalRevenue),
-      0,
-    );
+      const totalRevenue = monthlySnapshots.reduce(
+        (sum, s) => sum + Number(s.totalRevenue),
+        0,
+      );
 
-    const hash = this.generateHash({
-      landlordId,
-      year,
-      month: null,
-      totalRevenue,
-      invoiceCount: monthlySnapshots.reduce(
+      const invoiceCountTotal = monthlySnapshots.reduce(
         (sum, s) => sum + s.invoiceCount,
         0,
-      ),
-    });
+      );
 
-    return this.prisma.landlordRevenueSnapshot.upsert({
-      where: {
-        landlordId_year_month: {
-          landlordId,
-          year,
-          month: undefined as any, // Annual snapshot (month omitted)
-        },
-      },
-      update: {
-        totalRevenue: new Decimal(totalRevenue),
-        invoiceCount: monthlySnapshots.reduce(
-          (sum, s) => sum + s.invoiceCount,
-          0,
-        ),
-        snapshotHash: hash,
-      },
-      create: {
+      const regulation = await this.getRegulationRefForYear(year, tx);
+
+      const hash = this.generateHash({
         landlordId,
         year,
-        // month is nullable, omit when creating annual snapshot
-        totalRevenue: new Decimal(totalRevenue),
-        invoiceCount: monthlySnapshots.reduce(
-          (sum, s) => sum + s.invoiceCount,
-          0,
-        ),
-        snapshotHash: hash,
-      },
+        month: null,
+        totalRevenue,
+        invoiceCount: invoiceCountTotal,
+        regulationVersion: regulation?.version || null,
+        regulationHash: regulation?.hash || null,
+      });
+
+      // Upsert-like behavior for month = null (cannot use composite upsert with null)
+      const existingAnnual = await tx.landlordRevenueSnapshot.findFirst({
+        where: { landlordId, year, month: null },
+      });
+
+      let snapshot;
+      if (existingAnnual) {
+        snapshot = await tx.landlordRevenueSnapshot.update({
+          where: { id: existingAnnual.id },
+          data: {
+            totalRevenue: new Decimal(totalRevenue),
+            invoiceCount: invoiceCountTotal,
+            snapshotHash: hash,
+          },
+        });
+      } else {
+        snapshot = await tx.landlordRevenueSnapshot.create({
+          data: {
+            landlordId,
+            year,
+            month: null,
+            totalRevenue: new Decimal(totalRevenue),
+            invoiceCount: invoiceCountTotal,
+            snapshotHash: hash,
+          },
+        });
+      }
+
+      // Create legal snapshot (immutable)
+      const { threshold } = await this.getEffectiveRegulation(year, tx);
+      await this.snapshotService.create(
+        {
+          actorId: landlordId,
+          actorRole: UserRole.LANDLORD,
+          actionType: 'TAX_SNAPSHOT_GENERATED',
+          entityType: 'LANDLORD_REVENUE',
+          entityId: landlordId,
+          metadata: {
+            year,
+            month: null,
+            totalRevenue,
+            invoiceCount: invoiceCountTotal,
+            threshold,
+            regulationVersion: regulation?.version || null,
+            regulationHash: regulation?.hash || null,
+          },
+        },
+        tx,
+      );
+
+      this.logger.log(
+        `Generated annual revenue snapshot for landlord ${landlordId} - ${year}: ${totalRevenue} VND`,
+      );
+
+      return snapshot;
     });
   }
 
   /**
    * Get effective regulation for a given year
    */
-  async getEffectiveRegulation(year: number) {
+  async getEffectiveRegulation(year: number, tx?: Prisma.TransactionClient) {
     // Find the latest active regulation for the given year
-    const regulation = await this.prisma.regulationVersion.findFirst({
+    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
+    const regulation = await prisma.regulationVersion.findFirst({
       where: {
         type: 'RENTAL_TAX',
         effectiveFrom: {
@@ -201,6 +269,28 @@ export class TaxService {
       threshold: Number(config?.threshold) || 100_000_000,
       taxRate: Number(config?.taxRate) || 0.1,
     };
+  }
+
+  /**
+   * Get regulation reference (version + hash) for a given year
+   */
+  private async getRegulationRefForYear(
+    year: number,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ type: string; version: string; hash: string } | null> {
+    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
+    const regulation = await prisma.regulationVersion.findFirst({
+      where: {
+        type: 'RENTAL_TAX',
+        effectiveFrom: { lte: new Date(year, 11, 31) },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: new Date(year, 0, 1) } }],
+        deletedAt: null,
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+
+    if (!regulation) return null;
+    return { type: regulation.type, version: regulation.version, hash: regulation.contentHash };
   }
 
   /**
@@ -253,6 +343,29 @@ export class TaxService {
     // Convert to number only for threshold comparison (safe after aggregation)
     const totalAsNumber = totalRevenue.toNumber();
     const exceedsThreshold = totalAsNumber > threshold;
+
+    // Create export legal snapshot (immutable)
+    await this.prisma.$transaction(async (tx) => {
+      const regulation = await this.getRegulationRefForYear(year, tx);
+      await this.snapshotService.create(
+        {
+          actorId: requestingUserId || landlordId,
+          actorRole: requestingUserRole || UserRole.LANDLORD,
+          actionType: 'TAX_DATA_EXPORTED',
+          entityType: 'LANDLORD_REVENUE',
+          entityId: landlordId,
+          metadata: {
+            year,
+            totalRevenue: totalAsNumber,
+            threshold,
+            months: snapshots.length,
+            regulationVersion: regulation?.version || null,
+            regulationHash: regulation?.hash || null,
+          },
+        },
+        tx,
+      );
+    });
 
     return {
       csv,

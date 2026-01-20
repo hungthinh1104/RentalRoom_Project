@@ -17,8 +17,10 @@ interface ImageUploadProps {
     fileNamePrefix?: string;
 }
 
-const urlEndpoint = process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT;
-const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY;
+import { config } from "@/lib/config";
+
+const urlEndpoint = config.imagekit.urlEndpoint;
+const publicKey = config.imagekit.publicKey;
 
 // Use internal Next.js API route for secure signature generation
 const authenticationEndpoint = "/api/imagekit/auth";
@@ -238,8 +240,8 @@ export function ImageUpload({ value = [], onChange, maxFiles = 5, fileNamePrefix
                                     onChange(value.filter(u => u !== url));
                                     try {
                                         // Call backend to delete file
-                                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-                                        const endpoint = apiUrl.endsWith("/api/v1") ? `${apiUrl}/upload/delete` : `${apiUrl}/api/v1/upload/delete`;
+                                        const apiUrl = config.api.url;
+                                        const endpoint = apiUrl.endsWith("/v1") ? `${apiUrl}/upload/delete` : `${apiUrl}/v1/upload/delete`;
                                         await fetch(`${endpoint}?url=${encodeURIComponent(url)}`);
                                         toast.success("Đã xóa ảnh.");
                                     } catch (e) {
@@ -343,7 +345,7 @@ export function ImageUpload({ value = [], onChange, maxFiles = 5, fileNamePrefix
                                                 <Image src={img} alt="" className="w-full h-full object-cover" fill sizes="100px" />
                                                 <button
                                                     onClick={() => setCapturedQueue(q => q.filter((_, i) => i !== idx))}
-                                                    className="absolute top-0 right-0 p-1 bg-red-500/80 hover:bg-red-600 text-white rounded-bl-md"
+                                                    className="absolute top-0 right-0 p-1 bg-destructive/80 hover:bg-destructive text-white rounded-bl-md"
                                                     type="button"
                                                 >
                                                     <X className="w-3 h-3" />
@@ -367,7 +369,7 @@ export function ImageUpload({ value = [], onChange, maxFiles = 5, fileNamePrefix
                                             type="button"
                                         >
                                             <div className="w-20 h-20 rounded-full border-4 border-white/30 flex items-center justify-center bg-transparent group-hover:border-white/50 transition-colors">
-                                                <div className="w-16 h-16 rounded-full bg-white group-active:bg-red-500 transition-colors shadow-lg" />
+                                                <div className="w-16 h-16 rounded-full bg-white group-active:bg-destructive transition-colors shadow-lg" />
                                             </div>
                                         </button>
                                     </div>

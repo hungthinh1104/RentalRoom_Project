@@ -22,11 +22,47 @@ import type {
 
 // ============ SSR-COMPATIBLE API HELPERS ============
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? "http://localhost:3000";
-const API_PREFIX = "/api/v1";
+const isServer = typeof window === "undefined";
+
+// On server, use internal backend URL. On client, use proxy path.
+import { config } from "@/lib/config";
+
+// Use centralized config.
+const API_BASE = config.api.url;
+
+// If direct backend access (absolute URL), we need the explicit global prefix /api/v1.
+// If using proxy (relative /api), the proxy rewrite adds /api/v1, so we avoid double prefixing.
+const API_PREFIX = API_BASE.startsWith("http") ? "/api/v1" : "";
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>) {
-  const url = new URL(`${API_BASE}${API_PREFIX}${path}`);
+  const fullPath = `${API_BASE}${API_PREFIX}${path}`;
+
+  // Handle relative URLs (client-side proxy usage)
+  if (!fullPath.startsWith("http")) {
+    if (isServer) {
+      // Technically this shouldn't happen if isServer logic above works, but safety net
+      // If somehow we end up with relative path on server, throw or try to fallback
+      // But throwing is better to detect config issues.
+      // However, for isomorphic stability, maybe we can just let it fail at fetch if needed,
+      // but let's try to construct a dummy base for validation or just rely on fetch handling relative?
+      // Node's fetch might require absolute.
+      // Let's stick to the proven fix pattern.
+      throw new Error(`Invalid server-side URL: ${fullPath}. Check BACKEND_API_URL.`);
+    }
+    // Client-side: use window.location.origin for new URL() validation if needed, or just string manip
+    // but using URL object is safer for query params.
+    const url = new URL(fullPath, window.location.origin);
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          url.searchParams.set(key, String(value));
+        }
+      });
+    }
+    return url.pathname + url.search;
+  }
+
+  const url = new URL(fullPath);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -183,9 +219,9 @@ export async function fetchAdminUsers(page = 1): Promise<AdminUser[]> {
  * Fetch admin users (Client version - for Client Components)
  * Use this in useEffect or client-side code
  */
-export async function fetchAdminUsersClient(page = 1): Promise<AdminUser[]> {
+export async function fetchAdminUsersClient(page = 1, search = ""): Promise<AdminUser[]> {
   try {
-    const { data } = await api.get<AdminUser[]>("/users", { params: { page, limit: 10 } });
+    const { data } = await api.get<AdminUser[]>("/users", { params: { page, limit: 10, search } });
     return z.array(adminUserSchema).parse(data);
   } catch (error) {
     console.error("[Admin] Failed to fetch users (client):", error);
@@ -253,3 +289,10 @@ export async function fetchAdminMarketInsights(): Promise<AdminMarketInsights | 
 }
 
 
+export async function banUser(id: string, reason: string): Promise<void> {
+  await api.post(`/users/${id}/ban`, { reason });
+}
+
+export async function unbanUser(id: string): Promise<void> {
+  await api.post(`/users/${id}/unban`);
+}

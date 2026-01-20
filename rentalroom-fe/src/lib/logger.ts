@@ -9,6 +9,12 @@ interface LoggerConfig {
   enableDebug: boolean;
   enableConsole: boolean;
   prefix?: string;
+  remoteLogger?: RemoteLogger;
+}
+
+export interface RemoteLogger {
+  captureException(error: unknown, context?: Record<string, unknown>): void;
+  captureMessage(message: string, context?: Record<string, unknown>): void;
 }
 
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -119,7 +125,7 @@ export class Logger {
   error(message: string, error?: unknown): void {
     if (!this.config.enableConsole) return;
     const formatted = this.formatMessage('error', message);
-    
+
     // In production, only log error message and stack, not full object
     let sanitized: unknown = error;
     if (IS_PROD && error instanceof Error) {
@@ -131,17 +137,25 @@ export class Logger {
     } else {
       sanitized = this.sanitize(error);
     }
-    
+
     console.error(formatted, sanitized || '');
   }
   /**
    * For critical production issues that need immediate attention
    */
-  fatal(message: string, error?: any): void {
+  fatal(message: string, error?: unknown): void {
     const formatted = this.formatMessage('error', `🔴 FATAL: ${message}`);
     const sanitized = this.sanitize(error);
     console.error(formatted, sanitized);
-    
-    // TODO: Send to external monitoring service (Sentry, LogRocket, etc.)
+
+    // Send to external monitoring service if configured
+    if (this.config.remoteLogger) {
+      this.config.remoteLogger.captureException(error, {
+        message,
+        timestamp: this.getTimestamp(),
+        level: 'fatal',
+        logger: this.name,
+      });
+    }
   }
 }

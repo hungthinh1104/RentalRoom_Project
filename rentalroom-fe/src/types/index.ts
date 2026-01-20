@@ -71,11 +71,14 @@ export interface Property {
 	address: string;
 	city: string;
 	cityCode?: string | null;
+	district?: string | null;
 	ward: string;
 	wardCode?: string | null;
 	propertyType: PropertyType;
 	totalRooms: number;
+	occupiedRooms?: number;
 	description: string | null;
+	images?: string[];
 	createdAt: string;
 	updatedAt: string;
 	rooms?: Room[];
@@ -181,6 +184,7 @@ export interface Contract {
 	depositDeadline?: string;
 	lastNegotiationNote?: string;
 	reviews?: RoomReview[]; // Reviews submitted by tenant for this contract
+	invoices?: Invoice[];
 	createdAt: string;
 	updatedAt: string;
 }

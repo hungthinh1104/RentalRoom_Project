@@ -40,6 +40,10 @@ import { LegalDocumentsModule } from './modules/legal-documents/legal-documents.
 import { HealthModule } from './modules/health/health.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PCCCModule } from './modules/pccc/pccc.module';
+import { DisputeModule } from './modules/dispute/dispute.module';
+import { eKycModule } from './shared/integration/ekyc/ekyc.module';
+import { UtilitiesModule } from './shared/utilities/utilities.module';
+import { OperationalExpensesModule } from './modules/operational-expenses/operational-expenses.module';
 
 @Module({
   imports: [
@@ -86,6 +90,10 @@ import { PCCCModule } from './modules/pccc/pccc.module';
     HealthModule, // Health checks for monitoring
     DashboardModule, // Survival feature: Cash flow dashboard
     PCCCModule, // PCCC compliance generator (PC17)
+    DisputeModule, // UC_DISPUTE_01: Deposit dispute resolution
+    eKycModule, // UC_AUTH_01: Identity verification (FPT.AI/VNPT)
+    UtilitiesModule, // Global utilities (ContractHashService, etc.)
+    OperationalExpensesModule,
   ],
   providers: [
     PrismaService,
@@ -101,4 +109,4 @@ import { PCCCModule } from './modules/pccc/pccc.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

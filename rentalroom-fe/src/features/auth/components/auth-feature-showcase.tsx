@@ -3,6 +3,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ShieldCheck, Zap, FileCheck, Building2, Users, Star, TrendingUp } from "lucide-react";
+import Image from "next/image";
 
 export function AuthFeatureShowcase() {
     const features = [
@@ -49,23 +50,35 @@ export function AuthFeatureShowcase() {
             setCurrentImage((prev) => (prev + 1) % images.length);
         }, 5000);
         return () => clearInterval(timer);
-    }, []);
+    }, [images.length]);
 
     return (
         <div className="relative w-full h-full bg-zinc-900 overflow-hidden">
             {/* Image Slider */}
             <div className="absolute inset-0">
-                <AnimatePresence mode="wait">
-                    <motion.img
+                <AnimatePresence mode="popLayout">
+                    <motion.div
                         key={currentImage}
-                        src={images[currentImage]}
-                        alt="Rental Room"
                         initial={{ opacity: 0, scale: 1.1 }}
                         animate={{ opacity: 0.6, scale: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 1.5 }}
-                        className="w-full h-full object-cover"
-                    />
+                        transition={{ duration: 1.2, ease: "easeOut" }}
+                        className="absolute inset-0 w-full h-full"
+                    >
+                        {/* Use standard img for smoothest cross-browser shared-element-like transitions, 
+                            or Next.js Image with 'fill'. Using img here for proven Framer Motion stability 
+                            but adding prefetching logic simply by React state would be better. 
+                            Since 3G opt is requested, we stick to <img> but use smaller quality or optimized component if available.
+                            Actually, let's use Next Image for caching benefits.
+                         */}
+                        <Image
+                            src={images[currentImage]}
+                            alt="Background"
+                            fill
+                            className="object-cover"
+                            priority
+                        />
+                    </motion.div>
                 </AnimatePresence>
                 {/* Overlay Gradient */}
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />

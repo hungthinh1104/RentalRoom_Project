@@ -1,6 +1,6 @@
 -- Add admin user for testing
 -- Password: password123 (bcrypt hash)
-INSERT INTO "User" (id, email, "fullName", "phoneNumber", "passwordHash", role, "emailVerified", "createdAt", "updatedAt")
+INSERT INTO "user" (id, email, "full_name", "phone_number", "password_hash", role, "email_verified", "created_at", "updated_at")
 VALUES (
   gen_random_uuid(),
   'admin@rentalroom.vn',

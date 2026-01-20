@@ -2,6 +2,7 @@
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 
 export function HeroSlideshow() {
     const [currentImage, setCurrentImage] = React.useState(0);
@@ -18,32 +19,36 @@ export function HeroSlideshow() {
             setCurrentImage((prev) => (prev + 1) % images.length);
         }, 6000);
         return () => clearInterval(timer);
-    }, []);
+    }, [images.length]);
 
     return (
         <div className="absolute inset-0 -z-10 bg-zinc-900 overflow-hidden">
-            {/* Image Slider */}
-            <AnimatePresence mode="popLayout">
-                <motion.img
-                    key={currentImage}
-                    src={images[currentImage]}
-                    alt="Rental Room Background"
-                    initial={{ opacity: 0, scale: 1.1 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
-                    className="absolute inset-0 w-full h-full object-cover"
-                />
-            </AnimatePresence>
+            {/* Image Slider - Optimized from AuthFeatureShowcase */}
+            <div className="absolute inset-0">
+                <AnimatePresence mode="popLayout">
+                    <motion.div
+                        key={currentImage}
+                        initial={{ opacity: 0, scale: 1.1 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
+                        className="absolute inset-0 w-full h-full will-change-transform"
+                    >
+                        <Image
+                            src={images[currentImage]}
+                            alt="Background"
+                            fill
+                            className="object-cover"
+                            priority
+                        />
+                    </motion.div>
+                </AnimatePresence>
+                {/* Overlay Gradient */}
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
+            </div>
 
-            {/* Overlays for readability */}
-            {/* Dark gradient from bottom */}
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-background/30" />
-
-            {/* Radial gradient to focus center */}
-            <div className="absolute inset-0 bg-radial-gradient-to-t from-transparent to-background/80 opacity-60" />
-
-            {/* Grid Pattern Overlay */}
+            {/* Additional Hero Overlays */}
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent opacity-80" />
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03] mix-blend-overlay" />
         </div>
     );

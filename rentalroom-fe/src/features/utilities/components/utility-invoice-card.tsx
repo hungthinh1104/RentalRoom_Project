@@ -11,11 +11,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  AlertCircle,
   CheckCircle2,
   Clock,
   AlertTriangle,
-  Download,
   CreditCard,
   Zap,
 } from 'lucide-react';

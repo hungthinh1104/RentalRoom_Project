@@ -31,7 +31,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Check, Loader2 } from 'lucide-react';
 import { Invoice } from '../api/utilities-api';
-import { PaymentMethod } from '@/types/enums';
 import { billingApi } from '../api/utilities-api';
 import { useQueryClient } from '@tanstack/react-query';
 

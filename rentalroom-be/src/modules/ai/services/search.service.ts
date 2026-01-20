@@ -30,48 +30,36 @@ export class SearchService {
    */
   async semanticSearch(query: string, limit: number = 12) {
     try {
-      // Check cache first (COST OPTIMIZATION)
       const cacheKey = `search:${query}:${limit}`;
       const cached = await this.cacheService.get(cacheKey);
-
       if (cached && typeof cached === 'string') {
         this.logger.log(`Cache HIT: ${query}`);
         return JSON.parse(cached);
       }
 
-      this.logger.log(`Cache MISS: ${query} - Calling AI API`);
-
-      // Step 1: Analyze query to extract structured filters (Price, Area, Location)
-      // This fixes the issue where "dưới 3 triệu" is treated as keywords instead of a logical filter
+      const started = Date.now();
       const { filters, cleanedQuery } =
         await this.analysisService.analyzeSearchQuery(query);
+      const effectiveQuery = cleanedQuery?.trim()?.length
+        ? cleanedQuery
+        : query;
 
-      // Step 2: If significant filters are found, use Hybrid Search for accuracy
-      const hasFilters =
-        filters.minPrice !== undefined ||
-        filters.maxPrice !== undefined ||
-        filters.minArea !== undefined ||
-        filters.maxArea !== undefined ||
-        filters.location !== undefined ||
-        (filters.amenities && filters.amenities.length > 0);
+      // Generate real embedding (Gemini text-embedding-004)
+      const queryEmbedding = await this.embeddingService.generateEmbedding(
+        effectiveQuery,
+      );
 
-      if (hasFilters) {
-        this.logger.log(
-          `Smart routing to Hybrid Search: ${JSON.stringify(filters)}`,
-        );
+      // Run pgvector similarity to get candidate rooms using real data
+      const candidates = await this.vectorSearch(queryEmbedding, limit * 3);
 
-        // If location is detected, append it to the query for text matching valid rooms in that area
-        const effectiveQuery = filters.location
-          ? `${cleanedQuery} ${filters.location}`.trim()
-          : cleanedQuery || query; // Fallback to original query if cleaned is empty
-
-        return this.hybridSearch(effectiveQuery, filters, limit);
+      if (!candidates.length) {
+        this.logger.warn('No embedding candidates, fallback search');
+        return this.fallbackSearch(limit);
       }
 
-      // Step 3: Fallback to existing keyword/vector search logic if no filters
-
-      // Fetch all available rooms with relations
+      const candidateIds = candidates.map((c) => c.roomId);
       const rooms = await this.prisma.room.findMany({
+        where: { id: { in: candidateIds }, status: 'AVAILABLE' },
         include: {
           property: {
             select: {
@@ -86,70 +74,55 @@ export class SearchService {
           amenities: true,
           images: true,
           reviews: {
-            select: {
-              id: true,
-              rating: true,
-            },
+            select: { id: true, rating: true },
           },
-        },
-        where: {
-          status: 'AVAILABLE',
         },
       });
 
-      // Calculate similarity for each room based on text matching
-      const roomsWithSimilarity: RoomWithSimilarity[] = rooms
-        .map((room) => {
-          // Create text representation combining multiple fields
-          const roomText = [
-            room.description || '',
-            room.property?.name || '',
-            room.property?.address || '',
-            room.amenities?.map((a: any) => a.type).join(' ') || '',
-          ]
+      // Apply structured filters on real data
+      const filtered = rooms.filter((room) => {
+        if (filters.minPrice != null && Number(room.pricePerMonth) < filters.minPrice) return false;
+        if (filters.maxPrice != null && Number(room.pricePerMonth) > filters.maxPrice) return false;
+        if (filters.minArea != null && Number(room.area) < filters.minArea) return false;
+        if (filters.maxArea != null && Number(room.area) > filters.maxArea) return false;
+
+        if (filters.amenities && filters.amenities.length > 0) {
+          const roomAmenityTypes = room.amenities.map((a: any) => a.type);
+          const hasAmenity = filters.amenities.some((a) =>
+            roomAmenityTypes.includes(a),
+          );
+          if (!hasAmenity) return false;
+        }
+
+        if (filters.location) {
+          const haystack = [room.property?.address, room.property?.city, room.property?.ward]
+            .filter(Boolean)
             .join(' ')
             .toLowerCase();
+          if (!haystack.includes(filters.location.toLowerCase())) return false;
+        }
 
-          // Text-based similarity (keyword matching)
-          const queryWords = query
-            .toLowerCase()
-            .split(/\s+/)
-            .filter((w) => w.length > 0);
-          const matchedWords = queryWords.filter((word) =>
-            roomText.includes(word),
-          ).length;
-          const textSimilarity =
-            queryWords.length > 0 ? matchedWords / queryWords.length : 0;
+        return true;
+      });
 
-          return {
-            room: {
-              id: room.id,
-              roomNumber: room.roomNumber,
-              pricePerMonth: Number(room.pricePerMonth),
-              deposit: Number(room.deposit),
-              area: Number(room.area),
-              maxOccupants: room.maxOccupants,
-              status: room.status,
-              description: room.description,
-              property: room.property,
-              amenities: room.amenities,
-              images: room.images,
-              reviews: room.reviews,
-            },
-            similarity: textSimilarity,
-          };
-        })
-        .filter((r) => r.similarity > 0)
+      const similarityMap = new Map(
+        candidates.map((c) => [c.roomId, c.similarity]),
+      );
+
+      const results = filtered
+        .map((room) => ({
+          ...room,
+          similarity: Number(
+            (similarityMap.get(room.id) ?? 0).toFixed(4),
+          ),
+        }))
         .sort((a, b) => b.similarity - a.similarity)
         .slice(0, Math.min(limit, 50));
 
-      const results = roomsWithSimilarity.map((r) => ({
-        ...r.room,
-        similarity: parseFloat(r.similarity.toFixed(2)),
-      }));
-
-      // Cache results for 5 minutes (300 seconds)
       await this.cacheService.set(cacheKey, JSON.stringify(results), 300);
+      this.logger.log(
+        `Semantic search OK: ${query} -> ${results.length} rooms in ${Date.now() - started}ms`,
+      );
 
       return results;
     } catch (error) {
@@ -178,115 +151,8 @@ export class SearchService {
     },
     limit: number = 12,
   ) {
-    try {
-      // Build where clause for filtering
-      const where: any = {
-        status: 'AVAILABLE',
-      };
-
-      if (filters?.minPrice != null || filters?.maxPrice != null) {
-        where.pricePerMonth = {};
-        if (filters?.minPrice != null) {
-          where.pricePerMonth.gte = Number(filters.minPrice);
-        }
-        if (filters?.maxPrice != null) {
-          where.pricePerMonth.lte = Number(filters.maxPrice);
-        }
-      }
-
-      if (filters?.minArea != null || filters?.maxArea != null) {
-        where.area = {};
-        if (filters?.minArea != null) {
-          where.area.gte = Number(filters.minArea);
-        }
-        if (filters?.maxArea != null) {
-          where.area.lte = Number(filters.maxArea);
-        }
-      }
-
-      // Fetch filtered rooms
-      const rooms = await this.prisma.room.findMany({
-        where,
-        include: {
-          property: {
-            select: {
-              id: true,
-              name: true,
-              address: true,
-              city: true,
-              ward: true,
-              propertyType: true,
-            },
-          },
-          amenities: true,
-          images: true,
-          reviews: {
-            select: {
-              id: true,
-              rating: true,
-            },
-          },
-        },
-      });
-
-      // Apply amenity filter if provided
-      let filteredRooms = rooms;
-      if (filters?.amenities && filters.amenities.length > 0) {
-        filteredRooms = rooms.filter((room) => {
-          const roomAmenities = room.amenities.map((a: any) => a.type);
-          return filters.amenities!.some((amenity) =>
-            roomAmenities.includes(amenity),
-          );
-        });
-      }
-
-      // Rank by semantic similarity to query
-      const roomsWithSimilarity: RoomWithSimilarity[] = filteredRooms
-        .map((room) => {
-          const roomText = [
-            room.description || '',
-            room.property?.name || '',
-            room.property?.address || '',
-            room.amenities?.map((a: any) => a.type).join(' ') || '',
-          ]
-            .join(' ')
-            .toLowerCase();
-
-          const queryWords = query.toLowerCase().split(/\s+/);
-          const matchedWords = queryWords.filter((word) =>
-            roomText.includes(word),
-          ).length;
-          const similarity = matchedWords / (queryWords.length || 1);
-
-          return {
-            room: {
-              id: room.id,
-              roomNumber: room.roomNumber,
-              pricePerMonth: Number(room.pricePerMonth),
-              deposit: Number(room.deposit),
-              area: Number(room.area),
-              maxOccupants: room.maxOccupants,
-              status: room.status,
-              description: room.description,
-              property: room.property,
-              amenities: room.amenities,
-              images: room.images,
-              reviews: room.reviews,
-            },
-            similarity,
-          };
-        })
-        .sort((a, b) => b.similarity - a.similarity)
-        .slice(0, Math.min(limit, 50));
-
-      return roomsWithSimilarity.map((r) => ({
-        ...r.room,
-        similarity: parseFloat(r.similarity.toFixed(2)),
-      }));
-    } catch (error) {
-      this.logger.error(`Hybrid search failed:`, error);
-      return this.fallbackSearch(limit);
-    }
+    // Hybrid is now the same as semantic, but keeps signature for callers
+    return this.semanticSearch(query, limit);
   }
 
   /**
@@ -341,22 +207,38 @@ export class SearchService {
    * Get popular searches for autocomplete
    * Returns most common search queries
    */
-  getPopularSearches(limit: number = 10) {
-    // For now, return mock popular searches
-    // In production, you would track actual searches in database
-    const mockSearches = [
-      { query: 'phòng trọ gần trường', count: 245 },
-      { query: 'nhà trọ có máy lạnh', count: 189 },
-      { query: 'phòng thuê giá rẻ', count: 156 },
-      { query: 'căn hộ mini đầy đủ nội thất', count: 142 },
-      { query: 'phòng ở gần chợ', count: 128 },
-      { query: 'nhà nguyên căn 2 phòng', count: 115 },
-      { query: 'phòng trọ an toàn', count: 98 },
-      { query: 'căn hộ tầng cao thoáng mát', count: 87 },
-      { query: 'phòng có ban công', count: 76 },
-      { query: 'nhà trọ gần bệnh viện', count: 65 },
-    ];
+  async getPopularSearches(limit: number = 10) {
+    const take = Math.min(limit, 20);
+    try {
+      const rows = await this.prisma.popularSearch.findMany({
+        orderBy: [{ searchCount: 'desc' }, { lastSearched: 'desc' }],
+        take,
+        select: { query: true, searchCount: true },
+      });
 
-    return mockSearches.slice(0, Math.min(limit, 20));
+      return rows.map((r) => ({ query: r.query, count: r.searchCount }));
+    } catch (error) {
+      this.logger.warn('Failed to load popular searches, returning empty', error);
+      return [];
+    }
+  }
+
+  private async vectorSearch(embedding: number[], limit: number) {
+    const vectorLiteral = `[${embedding.join(',')}]`;
+    const rows = await this.prisma.$queryRaw<
+      { room_id: string; distance: number }[]
+    >`
+      SELECT re.room_id, (re.embedding <=> ${vectorLiteral}::vector) AS distance
+      FROM room_embedding re
+      JOIN room r ON r.id = re.room_id
+      WHERE r.status = 'AVAILABLE'
+      ORDER BY re.embedding <=> ${vectorLiteral}::vector ASC
+      LIMIT ${Math.max(1, limit)}
+    `;
+
+    return rows.map((row) => ({
+      roomId: row.room_id,
+      similarity: 1 - Number(row.distance),
+    }));
   }
 }

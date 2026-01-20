@@ -8,6 +8,8 @@ import * as Sentry from '@sentry/node';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { SanitizePipe } from './common/pipes/sanitize.pipe';
+import { PaymentIdempotencyMiddleware } from './common/middleware/payment-idempotency.middleware';
+import { PrismaService } from './database/prisma/prisma.service';
 
 // Initialize Sentry for error monitoring (production only)
 if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
@@ -97,6 +99,10 @@ async function bootstrap() {
   } else {
     app.use(helmet());
   }
+
+  // Payment Idempotency Middleware (UC_PAY_01 - Replay Attack Prevention)
+  const prismaService = app.get(PrismaService);
+  app.use(new PaymentIdempotencyMiddleware(prismaService).use.bind(new PaymentIdempotencyMiddleware(prismaService)));
 
   // CORS
   const corsOrigins = process.env.CORS_ORIGIN

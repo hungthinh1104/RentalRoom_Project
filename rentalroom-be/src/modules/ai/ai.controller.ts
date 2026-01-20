@@ -49,6 +49,27 @@ export class AIController {
     status: 200,
     description: 'Service is healthy',
     type: HealthCheckResponseDto,
+    schema: {
+      example: {
+        status: 'healthy',
+        models: {
+          chat: 'gemini-2.5-flash',
+          embedding: 'text-embedding-004',
+        },
+        apiKey: {
+          configured: true,
+          valid: true,
+        },
+        metrics: {
+          embeddingCalls: 127,
+          analysisCalls: 45,
+          chatCalls: 234,
+          batchCalls: 8,
+        },
+        timestamp: '2026-01-20T10:30:45.123Z',
+        cached: false,
+      },
+    },
   })
   async healthCheck(): Promise<HealthCheckResponseDto> {
     return await this.aiService.healthCheck();
@@ -74,6 +95,14 @@ export class AIController {
     status: 200,
     description: 'Embedding generated successfully',
     type: EmbeddingResponseDto,
+    schema: {
+      example: {
+        embedding: [0.0234, -0.156, 0.892, 0.234, -0.567, 0.123, -0.456],
+        dimensions: 768,
+        model: 'text-embedding-004',
+        processingTime: 234,
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -118,6 +147,19 @@ export class AIController {
     status: 200,
     description: 'Batch embeddings generated',
     type: BatchEmbeddingsResponseDto,
+    schema: {
+      example: {
+        embeddings: [
+          { index: 0, embedding: [0.123, -0.456, 0.789], success: true },
+          { index: 1, embedding: [-0.234, 0.567, -0.890], success: true },
+          { index: 2, error: 'Text too long', success: false },
+        ],
+        successful: 2,
+        failed: 1,
+        total: 3,
+        processingTime: 1234,
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -137,9 +179,12 @@ export class AIController {
     );
     const processingTime = Date.now() - startTime;
 
+    const successful = embeddings.filter((r) => r.success).length;
+    const failed = embeddings.filter((r) => !r.success).length;
+
     return {
-      successful: embeddings.length,
-      failed: dto.texts.length - embeddings.length,
+      successful,
+      failed,
       embeddings,
       processingTime,
     };
@@ -172,6 +217,15 @@ export class AIController {
     status: 200,
     description: 'Room description analyzed successfully',
     type: RoomAnalysisResponseDto,
+    schema: {
+      example: {
+        amenities: ['wifi', 'air_conditioning', 'bed', 'furniture'],
+        sentiment: 'positive',
+        estimated_price_range: { min: 2500000, max: 3500000 },
+        room_type: 'phòng_trọ',
+        key_features: ['gần trường đại học', 'đầy đủ nội thất', 'sạch sẽ'],
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -215,6 +269,32 @@ export class AIController {
     status: 200,
     description: 'Chat response generated successfully',
     type: ChatResponseDto,
+    schema: {
+      example: {
+        response:
+          'Tôi sẽ giúp bạn tìm phòng gần trường ĐH trong tầm giá 3 triệu. Hiện tại có vài phòng phù hợp như phòng tại Quận 1 có máy lạnh, wifi, và gần trường. Bạn muốn xem chi tiết không?',
+        rooms: [
+          {
+            id: 'room_001',
+            roomNumber: 'A101',
+            price: 3200000,
+            propertyName: 'Nhà trọ Ánh Dương',
+            area: 25,
+            status: 'AVAILABLE',
+          },
+          {
+            id: 'room_002',
+            roomNumber: 'B205',
+            price: 2800000,
+            propertyName: 'Chung cư mini Hòa Bình',
+            area: 30,
+            status: 'AVAILABLE',
+          },
+        ],
+        processingTime: 1256,
+        timestamp: '2026-01-20T10:30:45.123Z',
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -259,6 +339,41 @@ export class AIController {
     status: 200,
     description: 'Search results returned',
     type: SemanticSearchResponseDto,
+    schema: {
+      example: {
+        query: 'phòng gần trường đại học có máy lạnh',
+        method: 'SEMANTIC',
+        count: 3,
+        results: [
+          {
+            id: 'room_001',
+            roomNumber: 'A101',
+            pricePerMonth: 3200000,
+            area: 25,
+            similarity: 0.89,
+            property: {
+              name: 'Nhà trọ Ánh Dương',
+              address: '123 Nguyễn Hữu Cảnh',
+              city: 'Hồ Chí Minh',
+            },
+          },
+          {
+            id: 'room_002',
+            roomNumber: 'B205',
+            pricePerMonth: 2800000,
+            area: 30,
+            similarity: 0.76,
+            property: {
+              name: 'Chung cư mini Hòa Bình',
+              address: '456 Trần Hưng Đạo',
+              city: 'Hồ Chí Minh',
+            },
+          },
+        ],
+        responseTime: '1234ms',
+        timestamp: '2026-01-20T10:30:45.123Z',
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -314,6 +429,29 @@ export class AIController {
     status: 200,
     description: 'Search results returned',
     type: SemanticSearchResponseDto,
+    schema: {
+      example: {
+        query: 'phòng dưới 3 triệu quận 1',
+        method: 'HYBRID',
+        count: 2,
+        results: [
+          {
+            id: 'room_005',
+            roomNumber: 'C310',
+            pricePerMonth: 2900000,
+            area: 28,
+            similarity: 0.85,
+            property: {
+              name: 'Nhà trọ Phú Quý',
+              address: '789 Nguyễn Thái Bình',
+              city: 'Hồ Chí Minh',
+            },
+          },
+        ],
+        responseTime: '856ms',
+        timestamp: '2026-01-20T10:30:45.123Z',
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -378,12 +516,24 @@ export class AIController {
     status: 200,
     description: 'Popular searches returned',
     type: PopularSearchesResponseDto,
+    schema: {
+      example: {
+        searches: [
+          { query: 'phòng trọ gần trường', count: 245 },
+          { query: 'nhà trọ có máy lạnh', count: 189 },
+          { query: 'phòng thuê giá rẻ', count: 156 },
+          { query: 'căn hộ mini đầy đủ nội thất', count: 142 },
+          { query: 'phòng ở gần chợ', count: 128 },
+        ],
+        period: 'last_7_days',
+      },
+    },
   })
-  getPopularSearches(
+  async getPopularSearches(
     @Query('limit') limit?: string,
-  ): PopularSearchesResponseDto {
+  ): Promise<PopularSearchesResponseDto> {
     const limitNum = limit ? Math.min(parseInt(limit, 10), 20) : 10;
-    const searches = this.searchService.getPopularSearches(limitNum);
+    const searches = await this.searchService.getPopularSearches(limitNum);
 
     return {
       searches,
@@ -406,6 +556,12 @@ export class AIController {
   @ApiResponse({
     status: 200,
     description: 'Feedback submitted successfully',
+    schema: {
+      example: {
+        success: true,
+        message: 'Feedback recorded successfully',
+      },
+    },
   })
   async submitFeedback(@Body() dto: SubmitAiFeedbackDto) {
     await this.aiService.submitFeedback(dto);

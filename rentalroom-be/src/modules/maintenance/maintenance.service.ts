@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SnapshotService } from '../snapshots/snapshot.service';
 import {
   CreateMaintenanceRequestDto,
   UpdateMaintenanceRequestDto,
@@ -25,26 +26,52 @@ export class MaintenanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly snapshotService: SnapshotService,
   ) {}
 
   async create(createDto: CreateMaintenanceRequestDto) {
-    const request = await this.prisma.maintenanceRequest.create({
-      data: createDto,
-      include: {
-        room: {
-          include: {
-            property: {
-              include: {
-                landlord: true,
+    const request = await this.prisma.$transaction(async (tx) => {
+      const req = await tx.maintenanceRequest.create({
+        data: createDto,
+        include: {
+          room: {
+            include: {
+              property: {
+                include: {
+                  landlord: true,
+                },
               },
             },
           },
+          tenant: true,
         },
-        tenant: true,
-      },
+      });
+
+      // 📸 CREATE SNAPSHOT: Maintenance Requested (MANDATORY - fail-fast)
+      await this.snapshotService.create(
+        {
+          actorId: req.tenantId,
+          actorRole: UserRole.TENANT,
+          actionType: 'MAINTENANCE_REQUESTED',
+          entityType: 'MAINTENANCE',
+          entityId: req.id,
+          metadata: {
+            roomId: req.roomId,
+            propertyId: req.room.property.id,
+            title: req.title,
+            description: req.description,
+            priority: req.priority,
+            category: req.category,
+            requestDate: req.requestDate.toISOString(),
+          },
+        },
+        tx,
+      );
+
+      return req;
     });
 
-    // 🔔 TRIGGER NOTIFICATION: Maintenance Request Submitted
+    // 🔔 TRIGGER NOTIFICATION: Maintenance Request Submitted (ASYNC - outside transaction)
     try {
       await this.notificationsService.create({
         userId: request.room.property.landlordId,
@@ -183,38 +210,94 @@ export class MaintenanceService {
     });
   }
 
-  async complete(id: string) {
-    await this.findOne(id);
-
-    const request = await this.prisma.maintenanceRequest.update({
+  async complete(id: string, user?: User) {
+    // Fetch request with room and property details for ownership validation
+    const request = await this.prisma.maintenanceRequest.findUnique({
       where: { id },
-      data: {
-        status: MaintenanceStatus.COMPLETED,
-        completedAt: new Date(),
-      },
       include: {
+        room: {
+          include: {
+            property: true,
+          },
+        },
         tenant: true,
-        room: true,
       },
     });
 
-    // 🔔 TRIGGER NOTIFICATION: Maintenance Completed
+    if (!request) {
+      throw new NotFoundException(
+        `Maintenance request with ID ${id} not found`,
+      );
+    }
+
+    // 🔒 SECURITY: Ownership validation for landlords
+    // Admins can complete any request, but landlords can only complete requests for their properties
+    if (user && user.role === UserRole.LANDLORD) {
+      if (request.room?.property?.landlordId !== user.id) {
+        throw new BadRequestException(
+          'You can only complete maintenance requests for your own properties',
+        );
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const completed = await tx.maintenanceRequest.update({
+        where: { id },
+        data: {
+          status: MaintenanceStatus.COMPLETED,
+          completedAt: new Date(),
+        },
+        include: {
+          tenant: true,
+          room: true,
+        },
+      });
+
+      // 📸 CREATE SNAPSHOT: Maintenance Completed (MANDATORY - fail-fast)
+      await this.snapshotService.create(
+        {
+          actorId: user?.id || request.room.property.landlordId,
+          actorRole: user?.role || UserRole.LANDLORD,
+          actionType: 'MAINTENANCE_COMPLETED',
+          entityType: 'MAINTENANCE',
+          entityId: id,
+          metadata: {
+            roomId: request.roomId,
+            propertyId: request.room.property.id,
+            title: request.title,
+            priority: request.priority,
+            category: request.category,
+            requestDate: request.requestDate.toISOString(),
+            completedAt: new Date().toISOString(),
+            durationDays: Math.ceil(
+              (new Date().getTime() - request.requestDate.getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          },
+        },
+        tx,
+      );
+
+      return completed;
+    });
+
+    // 🔔 TRIGGER NOTIFICATION: Maintenance Completed (ASYNC - outside transaction)
     try {
       await this.notificationsService.create({
-        userId: request.tenantId,
+        userId: updated.tenantId,
         title: '✅ Bảo trì hoàn tất',
-        content: `Yêu cầu bảo trì "${request.title}" cho phòng ${request.room.roomNumber} đã được hoàn tất.`,
+        content: `Yêu cầu bảo trì "${updated.title}" cho phòng ${updated.room.roomNumber} đã được hoàn tất.`,
         notificationType: 'MAINTENANCE' as any,
-        relatedEntityId: request.id,
+        relatedEntityId: updated.id,
       });
       this.logger.log(
-        `📬 Maintenance completion notification sent to tenant ${request.tenantId}`,
+        `📬 Maintenance completion notification sent to tenant ${updated.tenantId}`,
       );
     } catch (error) {
       this.logger.error('Failed to send completion notification', error);
     }
 
-    return plainToClass(MaintenanceRequestResponseDto, request, {
+    return plainToClass(MaintenanceRequestResponseDto, updated, {
       excludeExtraneousValues: true,
     });
   }
@@ -231,21 +314,55 @@ export class MaintenanceService {
     return { message: 'Maintenance request deleted successfully' };
   }
 
-  async submitFeedback(id: string, feedbackDto: CreateMaintenanceFeedbackDto) {
+  async submitFeedback(
+    id: string,
+    feedbackDto: CreateMaintenanceFeedbackDto,
+    userId?: string,
+  ) {
     const request = await this.prisma.maintenanceRequest.findUnique({
       where: { id },
+      include: {
+        room: {
+          include: {
+            property: true,
+          },
+        },
+      },
     });
 
     if (!request) {
       throw new NotFoundException('Maintenance request not found');
     }
 
-    return this.prisma.maintenanceRequest.update({
-      where: { id },
-      data: {
-        rating: feedbackDto.rating,
-        feedback: feedbackDto.feedback,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.maintenanceRequest.update({
+        where: { id },
+        data: {
+          rating: feedbackDto.rating,
+          feedback: feedbackDto.feedback,
+        },
+      });
+
+      // 📸 CREATE SNAPSHOT: Maintenance Feedback (MANDATORY - fail-fast)
+      await this.snapshotService.create(
+        {
+          actorId: userId || request.tenantId,
+          actorRole: UserRole.TENANT,
+          actionType: 'MAINTENANCE_FEEDBACKED',
+          entityType: 'MAINTENANCE',
+          entityId: id,
+          metadata: {
+            roomId: request.roomId,
+            propertyId: request.room.property.id,
+            rating: feedbackDto.rating,
+            feedback: feedbackDto.feedback,
+            completedAt: request.completedAt?.toISOString(),
+          },
+        },
+        tx,
+      );
+
+      return updated;
     });
   }
 }

@@ -10,7 +10,7 @@ import api from '@/lib/api/client';
 
 export const PCCCForm = () => {
     const { generateReport, report, loading, error, downloadPDF } = usePCCCReport();
-    const [properties, setProperties] = useState<any[]>([]);
+    const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
     const [showWaiverModal, setShowWaiverModal] = useState(false);
 
     // Form State
@@ -38,9 +38,16 @@ export const PCCCForm = () => {
     useEffect(() => {
         const fetchProperties = async () => {
             try {
-                const res = await api.get<{ data: any[] }>('/properties');
+                const res = await api.get<{ data: { id: string; name: string }[] }>('/properties');
                 const data = res.data;
-                setProperties(Array.isArray(data) ? data : (data as any).data);
+                // Standardize handling of potentially nested or flat data from API
+                if (Array.isArray(data)) {
+                    setProperties(data);
+                } else if (data && typeof data === 'object' && 'data' in data && Array.isArray((data as any).data)) {
+                    setProperties((data as any).data);
+                } else {
+                    console.warn("Unexpected properties API response format", data);
+                }
             } catch (e) {
                 console.error("Failed to fetch properties", e);
             }
@@ -160,7 +167,7 @@ export const PCCCForm = () => {
                                     onChange={(e) => setFormData({ ...formData, hasCage: e.target.checked })}
                                     className="w-5 h-5 text-red-600 focus:ring-red-500 rounded"
                                 />
-                                <span className="text-sm font-medium text-red-900">Nhà có "Chuồng Cọp" (Không lối thoát)</span>
+                                <span className="text-sm font-medium text-red-900">Nhà có &quot;Chuồng Cọp&quot; (Không lối thoát)</span>
                             </label>
                         </div>
 
@@ -169,7 +176,7 @@ export const PCCCForm = () => {
                             <select
                                 className="w-full p-2 border rounded-lg"
                                 value={formData.scenarioType}
-                                onChange={(e) => setFormData({ ...formData, scenarioType: e.target.value as any })}
+                                onChange={(e) => setFormData({ ...formData, scenarioType: e.target.value as CreatePCCCReportDto['scenarioType'] })}
                             >
                                 <option value="ELECTRICAL_FIRE">Cháy do chập điện</option>
                                 <option value="GAS_LEAK">Rò rỉ khí Gas</option>
@@ -214,7 +221,7 @@ export const PCCCForm = () => {
                 {!report && (
                     <div className="bg-gray-50 border border-gray-200 border-dashed rounded-xl p-8 text-center text-gray-400">
                         <div className="text-4xl mb-2">📄</div>
-                        <p>Điền thông tin và nhấn "Tạo Hồ Sơ" để xem kết quả</p>
+                        <p>Điền thông tin và nhấn &quot;Tạo Hồ Sơ&quot; để xem kết quả</p>
                     </div>
                 )}
             </div>

@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { config } from '@/lib/config';
 import { Logger } from '@/lib/logger';
 import type { NotificationResponse } from '@/lib/api/notificationsApi';
 
@@ -16,7 +17,7 @@ export function initializeNotificationSocket(token: string): Socket {
     return socket;
   }
 
-  const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  const socketUrl = config.socket.url;
 
   socket = io(`${socketUrl}/notifications`, {
     auth: {
@@ -75,7 +76,7 @@ export function subscribeToNotifications(
 ): () => void {
   if (!socket) {
     logger.error('Socket not initialized');
-    return () => {};
+    return () => { };
   }
 
   socket.on('notification', callback);

@@ -8,12 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useRooms } from "../hooks/use-rooms";
 import { RoomStatus, AmenityType } from "../types";
 import { Loader2, Plus, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { ApiError } from "@/lib/api/client";
 import { Switch } from "@/components/ui/switch";
 import { ImageUpload } from "@/components/common/ImageUpload";
 
@@ -121,8 +121,9 @@ export function AddRoomDialog({ open, onOpenChange, propertyId }: AddRoomDialogP
             toast.success(`Đã tạo ${roomsPayload.length} phòng thành công!`);
             onOpenChange(false);
             form.reset();
-        } catch (error: any) {
-            toast.error("Lỗi khi tạo phòng", { description: error?.response?.data?.message || "Vui lòng thử lại" });
+        } catch (error: unknown) {
+            const apiError = error as ApiError;
+            toast.error("Lỗi khi tạo phòng", { description: apiError.message || "Vui lòng thử lại" });
         }
     };
 

@@ -130,8 +130,12 @@ export class PaymentsController {
 
   @Patch(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  update(@Param('id') id: string, @Body() updatePaymentDto: UpdatePaymentDto) {
-    return this.paymentsService.update(id, updatePaymentDto);
+  update(
+    @Param('id') id: string,
+    @Body() updatePaymentDto: UpdatePaymentDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.paymentsService.update(id, updatePaymentDto, user);
   }
 
   @Post(':id/check')
@@ -148,8 +152,8 @@ export class PaymentsController {
 
   @Delete(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  remove(@Param('id') id: string) {
-    return this.paymentsService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.paymentsService.remove(id, user);
   }
 
   /**

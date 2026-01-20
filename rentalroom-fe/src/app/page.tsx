@@ -1,4 +1,5 @@
 import HeroSection from '@/components/landing/hero-section';
+import ShowcaseSection from '@/components/landing/showcase-section';
 import FeaturesSection from '@/components/landing/features-section';
 import MapSection from '@/components/landing/map-section';
 import TestimonialsSection from '@/components/landing/testimonials-section';
@@ -12,6 +13,7 @@ export default function Home() {
       <Header />
       <main className="flex-1 bg-gradient-to-br from-page-gradient-from to-page-gradient-to">
         <HeroSection />
+        <ShowcaseSection />
         <FeaturesSection />
         <MapSection />
         <TestimonialsSection />

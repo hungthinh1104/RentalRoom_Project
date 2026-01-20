@@ -11,18 +11,18 @@ const formatCurrency = (value: number) =>
 
 export function SummaryCards({ summary }: SummaryCardsProps) {
 	const items = [
-		{ label: "Người dùng", value: summary.totalUsers, icon: Users, color: "text-blue-500" },
-		{ label: "Chủ nhà", value: summary.totalLandlords, icon: Home, color: "text-indigo-500" },
-		{ label: "Người thuê", value: summary.totalTenants, icon: Key, color: "text-green-500" },
-		{ label: "BĐS", value: summary.totalProperties, icon: Building2, color: "text-orange-500" },
-		{ label: "Phòng", value: summary.totalRooms, icon: Home, color: "text-purple-500" },
-		{ label: "Hợp đồng", value: summary.activeContracts, icon: FileText, color: "text-cyan-500" },
+		{ label: "Người dùng", value: summary.totalUsers, icon: Users, color: "text-info" },
+		{ label: "Chủ nhà", value: summary.totalLandlords, icon: Home, color: "text-chart-2" },
+		{ label: "Người thuê", value: summary.totalTenants, icon: Key, color: "text-success" },
+		{ label: "BĐS", value: summary.totalProperties, icon: Building2, color: "text-warning" },
+		{ label: "Phòng", value: summary.totalRooms, icon: Home, color: "text-chart-5" },
+		{ label: "Hợp đồng", value: summary.activeContracts, icon: FileText, color: "text-chart-4" },
 	];
 
 	return (
 		<div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
 			{items.map((item, i) => (
-				<Card key={item.label} className="border-muted/50 hover:border-pink-500/50 transition-colors duration-300">
+				<Card key={item.label} className="border-muted/50 hover:border-primary/50 transition-colors duration-300">
 					<CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
 						<CardTitle className="text-sm font-medium text-muted-foreground">{item.label}</CardTitle>
 						<item.icon className={`h-4 w-4 ${item.color}`} />

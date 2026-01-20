@@ -10,6 +10,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/brand-logo';
 import { useState, useEffect } from 'react';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 export function PublicHeader() {
   const { data: session } = useSession();
@@ -39,127 +40,134 @@ export function PublicHeader() {
   };
 
   return (
-    <header style={{ height: 'var(--height-header)' }} className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-2 md:grid-cols-3 items-center gap-4 h-full">
-        {/* Logo */}
-        <BrandLogo href="/" className="py-2 pl-2" />
+    <header className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4">
+      <div
+        style={{ height: 'var(--height-header)' }}
+        className="w-full max-w-7xl rounded-full border bg-background/70 backdrop-blur-xl shadow-lg transition-all duration-300 hover:bg-background/80 supports-[backdrop-filter]:bg-background/60"
+      >
+        <div className="h-full px-6 grid grid-cols-2 md:grid-cols-3 items-center gap-4">
+          {/* Logo */}
+          <BrandLogo href="/" className="py-2 pl-2" aria-label="RentalRoom Trang chủ" />
 
-        {/* Desktop Navigation (centered) */}
-        <nav className="hidden md:flex justify-center items-center gap-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                'px-3 py-2 text-sm font-medium transition-colors rounded-md',
-                isActive(link.href)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+          {/* Desktop Navigation (centered) */}
+          <nav className="hidden md:flex justify-center items-center gap-1">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  'px-3 py-2 text-sm font-medium transition-colors rounded-md',
+                  isActive(link.href)
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
-        {/* Right side actions */}
-        <div className="flex items-center justify-end gap-2 sm:gap-3">
-          {session?.user ? (
-            <>
-              <span className="hidden lg:inline text-sm text-muted-foreground max-w-[150px] truncate min-w-0 mr-3">
-                Xin chào, {name}
-              </span>
-              <div className="hidden sm:flex items-center gap-2 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  asChild
-                >
-                  <Link href={`/dashboard/${session.user.role?.toLowerCase()}`}>
-                    Bảng điều khiển
-                  </Link>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleLogout}
-                  title="Đăng xuất"
-                >
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="hidden sm:flex items-center gap-2 shrink-0">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/login" onClick={() => saveCallbackUrl(pathname)}>Đăng nhập</Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link href="/register">Đăng ký</Link>
-                </Button>
-              </div>
-            </>
-          )}
-
-          {/* Mobile Menu - Only render after mount to avoid hydration mismatch */}
-          {mounted && (
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-72 pt-10">
-                <div className="flex flex-col space-y-4 mt-4">
-                  <nav className="flex flex-col gap-2">
-                    {navLinks.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        className={cn(
-                          'px-3 py-2 text-sm font-medium transition-colors rounded-md',
-                          isActive(link.href)
-                            ? 'bg-accent text-accent-foreground'
-                            : 'hover:bg-accent hover:text-accent-foreground'
-                        )}
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
-                  </nav>
-
-                  {session ? (
-                    <>
-                      <div className="border-t pt-4">
-                        <div className="px-3 py-2 text-sm">
-                          <p className="font-medium">{name}</p>
-                          <p className="text-xs text-muted-foreground">{session.user?.email}</p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-start"
-                        onClick={handleLogout}
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Đăng xuất
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="flex flex-col gap-2 border-t pt-4">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href="/login" onClick={() => saveCallbackUrl(pathname)}>Đăng nhập</Link>
-                      </Button>
-                      <Button size="sm" asChild>
-                        <Link href="/register">Đăng ký</Link>
-                      </Button>
-                    </div>
-                  )}
+          {/* Right side actions */}
+          <div className="flex items-center justify-end gap-2 sm:gap-3">
+            <ThemeToggle />
+            {session?.user ? (
+              <>
+                <span className="hidden lg:inline text-sm text-muted-foreground max-w-[150px] truncate min-w-0 mr-3">
+                  Xin chào, {name}
+                </span>
+                <div className="hidden sm:flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                  >
+                    <Link href={`/dashboard/${session.user.role?.toLowerCase()}`}>
+                      Bảng điều khiển
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleLogout}
+                    title="Đăng xuất"
+                    aria-label="Đăng xuất"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
                 </div>
-              </SheetContent>
-            </Sheet>
-          )}
+              </>
+            ) : (
+              <>
+                <div className="hidden sm:flex items-center gap-2 shrink-0">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/login" onClick={() => saveCallbackUrl(pathname)}>Đăng nhập</Link>
+                  </Button>
+                  <Button size="sm" asChild>
+                    <Link href="/register">Đăng ký</Link>
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Mobile Menu - Only render after mount to avoid hydration mismatch */}
+            {mounted && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-72 pt-10">
+                  <div className="flex flex-col space-y-4 mt-4">
+                    <nav className="flex flex-col gap-2">
+                      {navLinks.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          className={cn(
+                            'px-3 py-2 text-sm font-medium transition-colors rounded-md',
+                            isActive(link.href)
+                              ? 'bg-accent text-accent-foreground'
+                              : 'hover:bg-accent hover:text-accent-foreground'
+                          )}
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </nav>
+
+                    {session ? (
+                      <>
+                        <div className="border-t pt-4">
+                          <div className="px-3 py-2 text-sm">
+                            <p className="font-medium">{name}</p>
+                            <p className="text-xs text-muted-foreground">{session.user?.email}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={handleLogout}
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Đăng xuất
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="flex flex-col gap-2 border-t pt-4">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href="/login" onClick={() => saveCallbackUrl(pathname)}>Đăng nhập</Link>
+                        </Button>
+                        <Button size="sm" asChild>
+                          <Link href="/register">Đăng ký</Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+          </div>
         </div>
       </div>
     </header>

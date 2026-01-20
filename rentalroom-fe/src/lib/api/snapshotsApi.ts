@@ -10,6 +10,18 @@ export interface AuditLogParams {
     endDate?: string;
 }
 
+export interface SnapshotRegulation {
+    type: string;
+    version: string;
+    hash: string;
+}
+
+export interface SnapshotDocument {
+    type: string;
+    version: string;
+    hash: string;
+}
+
 export interface Snapshot {
     id: string;
     actorId: string;
@@ -21,9 +33,9 @@ export interface Snapshot {
     ipAddress?: string;
     userAgent?: string;
     dataHash: string;
-    metadata: Record<string, any>;
-    regulations: any[];
-    documentVersions: any[];
+    metadata: Record<string, unknown>;
+    regulations: SnapshotRegulation[];
+    documentVersions: SnapshotDocument[];
 }
 
 export interface VerifyResponse {

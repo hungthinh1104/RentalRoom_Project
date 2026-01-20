@@ -5,10 +5,9 @@
 
 import { getSession } from 'next-auth/react';
 
-const baseUrl =
-	typeof window === 'undefined'
-		? process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000'
-		: process.env.NEXT_PUBLIC_API_URL ?? process.env.API_URL ?? 'http://localhost:3000';
+import { config } from '@/lib/config';
+
+const baseUrl = config.api.url;
 const apiPrefix = ''; // Vercel proxy already includes /api/v1 in rewrite destination
 
 // Custom error class
@@ -56,16 +55,27 @@ async function request<T>(
 		...(options?.headers ?? {}),
 	};
 
-	// Get JWT token from NextAuth session (client-side only)
+	// Get JWT token from NextAuth session
 	if (typeof window !== 'undefined') {
+		// Client-side: use getSession from next-auth/react
 		try {
 			const session = await getSession();
 			if (session?.accessToken) {
 				headers['Authorization'] = `Bearer ${session.accessToken}`;
 			}
 		} catch (error) {
-			// Silently fail if session retrieval fails
-			console.error('[API Client] Failed to get session:', error);
+			console.error('[API Client] Failed to get client session:', error);
+		}
+	} else {
+		// Server-side: use auth from @/auth (dynamically imported to avoid client bundle issues)
+		try {
+			const { auth } = await import('@/auth');
+			const session = await auth();
+			if (session?.accessToken) {
+				headers['Authorization'] = `Bearer ${session.accessToken}`;
+			}
+		} catch (error) {
+			console.error('[API Client] Failed to get server session:', error);
 		}
 	}
 

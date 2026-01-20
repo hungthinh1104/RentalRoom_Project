@@ -36,15 +36,19 @@ export class SnapshotService {
    * Create immutable legal snapshot
    * Core principle: Capture what happened, when, and under what regulations
    *
+   * ⚠️ CRITICAL: Snapshot MUST succeed or transaction fails
+   * Legal audit trail is non-negotiable. Failure = rollback everything.
+   *
    * @param dto Snapshot data
-   * @param tx Optional Prisma transaction for atomic operations
+   * @param tx Prisma transaction (REQUIRED - snapshot must be atomic with action)
+   * @throws Error if snapshot creation fails
    */
   async create(
     dto: CreateSnapshotDto,
-    tx?: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient,
   ): Promise<string> {
     const timestamp = dto.timestamp || new Date();
-    const prisma = tx || this.prisma;
+    const prisma = tx;
 
     // 1. Lookup active regulations at this timestamp
     const regulations = await this.getActiveRegulations(timestamp, prisma);

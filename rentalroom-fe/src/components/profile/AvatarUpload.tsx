@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Upload, User, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { config } from '@/lib/config';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
 
@@ -59,16 +60,16 @@ export function AvatarUpload({ currentAvatar, onUploadComplete, disabled }: Avat
             // Validates: JPEG/PNG/WebP, max 5MB
             // Returns: { message, avatarUrl }
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/v1/users/me/avatar`, {
+            const response = await fetch(`${config.api.url}/v1/users/me/avatar`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include',
             });
-            
+
             if (!response.ok) {
                 throw new Error('Upload failed');
             }
-            
+
             const data = await response.json();
             onUploadComplete(data.avatarUrl || reader.result as string);
             toast({
