@@ -1806,7 +1806,7 @@ model PaymentTransaction {
   id            Int       @id @default(autoincrement())
   transactionId String    @unique @map("transaction_id") @db.VarChar(100)
   status        String    @db.VarChar(20) // PENDING | SUCCESS | FAILED
-  amount        BigInt // Amount in cents/dong for precision
+  amount        Decimal @db.Decimal(16, 2) // Amount in VND (2dp)
   paymentMethod String?   @map("payment_method") @db.VarChar(50)
   referenceCode String    @unique @map("reference_code") @db.VarChar(100)
   responseData  Json?     @map("response_data")
@@ -1827,10 +1827,10 @@ model Dispute {
   contractId       String    @map("contract_id") @db.Uuid
   claimantId       String    @map("claimant_id") @db.Uuid
   claimantRole     String    @map("claimant_role") @db.VarChar(20) // TENANT | LANDLORD
-  claimAmount      BigInt    @map("claim_amount") // Amount in cents/dong
+  claimAmount      Decimal   @map("claim_amount") @db.Decimal(16, 2)
   description      String    @db.Text
   status           String    @db.VarChar(20) // OPEN | APPROVED | REJECTED | PARTIAL | ESCALATED
-  approvedAmount   BigInt?   @map("approved_amount")
+  approvedAmount   Decimal?  @map("approved_amount") @db.Decimal(16, 2)
   deadline         DateTime
   resolvedAt       DateTime? @map("resolved_at")
   resolvedBy       String?   @map("resolved_by") @db.Uuid
@@ -1876,12 +1876,12 @@ model BadDebtInvoice {
   id                 Int       @id @default(autoincrement())
   tenantId           String    @map("tenant_id") @db.Uuid
   contractId         String    @map("contract_id") @db.Uuid
-  amount             BigInt // Amount in cents/dong
+  amount             Decimal   @db.Decimal(16, 2)
   reason             String    @db.Text
   status             String    @db.VarChar(20) // ACTIVE | COLLECTION | WRITTEN_OFF
   dueDate            DateTime? @map("due_date")
   paidAt             DateTime? @map("paid_at")
-  paidAmount         BigInt?   @map("paid_amount")
+  paidAmount         Decimal?  @map("paid_amount") @db.Decimal(16, 2)
   collectionAttempts Int       @default(0) @map("collection_attempts")
   collectionNotes    String?   @map("collection_notes") @db.Text
   createdAt          DateTime  @default(now()) @map("created_at")

@@ -10,6 +10,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { SnapshotService } from '../snapshots/snapshot.service';
 // import { AuditLogger } from '../../shared/audit/audit-logger';
 import { DisputeStatus, DisputeResolution } from './dispute.types';
+import { Decimal } from 'decimal.js';
 
 @Injectable()
 export class DisputeService {
@@ -99,7 +100,7 @@ export class DisputeService {
           contractId: dto.contractId,
           claimantId: userId,
           claimantRole: dto.claimantRole,
-          claimAmount: dto.claimAmount,
+          claimAmount: new Decimal(dto.claimAmount),
           description: dto.description,
           status: 'OPEN',
           deadline,
@@ -125,7 +126,7 @@ export class DisputeService {
           entityId: dispute.id,
           metadata: {
             contractId: dto.contractId,
-            claimAmount: dto.claimAmount,
+            claimAmount: parseFloat(new Decimal(dto.claimAmount).toString()),
             claimantRole: dto.claimantRole,
             deadline: deadline.toISOString(),
             evidenceCount: dto.evidenceUrls.length,
@@ -244,7 +245,7 @@ export class DisputeService {
     }
 
     // Validate approved amount
-    if (dto.approvedAmount < 0 || dto.approvedAmount > dispute.claimAmount) {
+    if (dto.approvedAmount < 0 || dto.approvedAmount > Number(dispute.claimAmount)) {
       throw new BadRequestException(
         'Approved amount must be between 0 and claim amount',
       );
@@ -256,7 +257,7 @@ export class DisputeService {
         where: { id: disputeId },
         data: {
           status: dto.resolution, // Maps APPROVED/REJECTED to status
-          approvedAmount: dto.approvedAmount,
+          approvedAmount: new Decimal(dto.approvedAmount),
           resolvedAt: new Date(),
           resolvedBy: adminId,
           resolutionReason: dto.reason,
@@ -276,8 +277,8 @@ export class DisputeService {
           entityId: disputeId,
           metadata: {
             resolution: dto.resolution,
-            approvedAmount: dto.approvedAmount,
-            claimAmount: dispute.claimAmount,
+            approvedAmount: parseFloat(new Decimal(dto.approvedAmount).toString()),
+            claimAmount: parseFloat(new Decimal(dispute.claimAmount).toString()),
             reason: dto.reason,
             contractId: dispute.contractId,
           },
@@ -406,7 +407,7 @@ export class DisputeService {
       id: string;
       contractId: string;
       status: string; // Changed from resolution
-      approvedAmount: bigint | null;
+      approvedAmount: string | number | Decimal | null;
       resolutionReason: string | null;
     },
   ) {
@@ -416,8 +417,11 @@ export class DisputeService {
       // This is a placeholder - you need to create this model
       // For now, log to audit instead of creating DB record
       // TODO: Implement actual refund processing
+      const approvedAmt = dispute.approvedAmount 
+        ? new Decimal(dispute.approvedAmount.toString()).toNumber()
+        : 0;
       console.warn(
-        `[FINANCIAL] Dispute ${dispute.id} requires refund: ${dispute.approvedAmount}`,
+        `[FINANCIAL] Dispute ${dispute.id} requires refund: ${approvedAmt}`,
       );
     }
     // REJECTED: no refund

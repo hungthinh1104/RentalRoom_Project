@@ -47,12 +47,12 @@ export class PaymentService {
    * Uses appropriate gateway based on landlord configuration
    *
    * @param contract Contract with payment details
-   * @param expectedAmount Expected payment amount
+   * @param expectedAmount Expected payment amount (supports Decimal)
    * @returns Verification result with transaction details
    */
   async verifyPayment(
     contract: any,
-    expectedAmount: number,
+    expectedAmount: string | number,
   ): Promise<PaymentVerificationResult> {
     try {
       const gateway = await this.getGatewayForContract(contract);

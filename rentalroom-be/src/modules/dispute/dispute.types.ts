@@ -12,10 +12,10 @@ export interface DisputeEntity {
   contractId: string;
   claimantId: string;
   claimantRole: 'TENANT' | 'LANDLORD';
-  claimAmount: number;
+  claimAmount: string | number; // Decimal from Prisma
   description: string;
   status: DisputeStatus;
-  approvedAmount?: number;
+  approvedAmount?: string | number; // Decimal from Prisma
   deadline: Date;
   evidence: DisputeEvidenceEntity[];
   resolvedAt?: Date;

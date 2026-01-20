@@ -74,12 +74,17 @@ export class DisputeController {
     @Body()
     dto: {
       resolution: 'APPROVED' | 'REJECTED' | 'PARTIAL';
-      approvedAmount: number;
+      approvedAmount: number | string; // Support Decimal from req
       reason: string;
     },
     @Req() req: any,
   ) {
-    return this.disputeService.resolveDispute(disputeId, dto, req.user.id);
+    return this.disputeService.resolveDispute(disputeId, {
+      ...dto,
+      approvedAmount: typeof dto.approvedAmount === 'string'
+        ? parseFloat(dto.approvedAmount)
+        : dto.approvedAmount,
+    }, req.user.id);
   }
 
   /**

@@ -30,9 +30,9 @@ export interface PaymentVerificationResult {
   transactionDate?: Date;
 
   /**
-   * Amount received (if found)
+   * Amount received (if found) - Decimal for precision
    */
-  amount?: number;
+  amount?: string | number;
 
   /**
    * Gateway-specific metadata (bank code, reference, etc.)
@@ -50,7 +50,7 @@ export interface PaymentVerificationResult {
  */
 export interface PaymentTransaction {
   id: string;
-  amount: number;
+  amount: string | number; // Decimal for precision
   content: string;
   date: Date;
   bankCode?: string;
@@ -92,12 +92,12 @@ export interface IPaymentGateway {
   /**
    * Verify if payment has been received for a contract
    * @param contract Contract with payment details
-   * @param expectedAmount Amount to verify
+   * @param expectedAmount Amount to verify (Decimal for precision)
    * @returns Payment verification result with metadata
    */
   verifyPayment(
     contract: any,
-    expectedAmount: number,
+    expectedAmount: string | number,
   ): Promise<PaymentVerificationResult>;
 
   /**
