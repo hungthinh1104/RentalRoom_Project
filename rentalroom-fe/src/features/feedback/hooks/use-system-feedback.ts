@@ -29,12 +29,33 @@ export function useSystemFeedback() {
         },
     });
 
+    const replyMutation = useMutation({
+        mutationFn: ({ id, response }: { id: string; response: string }) =>
+            systemFeedbackApi.addResponse(id, response),
+        onSuccess: () => {
+            toast.success('Gửi phản hồi thành công!');
+            queryClient.invalidateQueries({ queryKey: ['feedback'] });
+        },
+        onError: () => {
+            toast.error('Không thể gửi phản hồi.');
+        },
+    });
+
     return {
         submitFeedback: submitMutation.mutate,
         updateStatus: updateStatusMutation.mutate,
+        replyToFeedback: replyMutation.mutate,
         isSubmitting: submitMutation.isPending,
         isUpdating: updateStatusMutation.isPending,
+        isReplying: replyMutation.isPending,
     };
+}
+
+export function useMyFeedback() {
+    return useQuery({
+        queryKey: ['feedback', 'my'],
+        queryFn: () => systemFeedbackApi.getMine(),
+    });
 }
 
 export function useAdminFeedback(params?: {

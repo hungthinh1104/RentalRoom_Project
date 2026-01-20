@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   Res,
+  Headers,
 } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { PdfService } from './services';
@@ -74,20 +75,28 @@ export class BillingController {
 
   @Patch('invoices/:id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  updateInvoice(@Param('id') id: string, @Body() updateDto: UpdateInvoiceDto) {
-    return this.billingService.updateInvoice(id, updateDto);
+  updateInvoice(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateInvoiceDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.billingService.updateInvoice(id, updateDto, user);
   }
 
   @Patch('invoices/:id/mark-paid')
-  @Auth(UserRole.LANDLORD) // Only landlord owns invoices
-  markAsPaid(@Param('id') id: string) {
-    return this.billingService.markAsPaid(id);
+  @Auth(UserRole.LANDLORD, UserRole.TENANT, UserRole.ADMIN)
+  markAsPaid(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.billingService.markAsPaid(id, user, idempotencyKey);
   }
 
   @Delete('invoices/:id')
   @Auth(UserRole.ADMIN)
-  removeInvoice(@Param('id') id: string) {
-    return this.billingService.removeInvoice(id);
+  removeInvoice(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.billingService.removeInvoice(id, user);
   }
 
   /**

@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   Logger,
   InternalServerErrorException,
+  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -37,6 +39,78 @@ export class BillingService {
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
   ) {}
+
+  /**
+   * 🔒 SECURITY: Assert user owns invoice (tenant or landlord via contract)
+   * CRITICAL: Prevents IDOR attacks on invoice access
+   */
+  private async assertInvoiceOwnership(
+    invoiceId: string,
+    userId: string,
+    userRole: UserRole,
+    tx?: any,
+  ) {
+    const client = tx || this.prisma;
+    const invoice = await client.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        contract: { select: { tenantId: true, landlordId: true } },
+      },
+    });
+
+    if (!invoice) {
+      throw new NotFoundException(`Invoice ${invoiceId} not found`);
+    }
+
+    if (userRole === UserRole.ADMIN) return invoice;
+
+    const isTenantOwner = invoice.tenantId === userId;
+    const isLandlordOwner = invoice.contract?.landlordId === userId;
+
+    if (!isTenantOwner && !isLandlordOwner) {
+      throw new ForbiddenException('Access denied to this invoice');
+    }
+
+    return invoice;
+  }
+
+  /**
+   * 🔒 SECURITY: Assert user owns payment
+   * CRITICAL: Prevents IDOR attacks on payment operations
+   */
+  private async assertPaymentOwnership(
+    paymentId: string,
+    userId: string,
+    userRole: UserRole,
+    tx?: any,
+  ) {
+    const client = tx || this.prisma;
+    const payment = await client.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        invoice: {
+          include: {
+            contract: { select: { tenantId: true, landlordId: true } },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`Payment ${paymentId} not found`);
+    }
+
+    if (userRole === UserRole.ADMIN) return payment;
+
+    const isTenantOwner = payment.tenantId === userId;
+    const isLandlordOwner = payment.invoice?.contract?.landlordId === userId;
+
+    if (!isTenantOwner && !isLandlordOwner) {
+      throw new ForbiddenException('Access denied to this payment');
+    }
+
+    return payment;
+  }
 
   async createInvoice(
     createInvoiceDto: CreateInvoiceDto,
@@ -213,7 +287,10 @@ export class BillingService {
     return new PaginatedResponse(transformed, total, page, limit);
   }
 
-  async findOneInvoice(id: string, user?: any) {
+  async findOneInvoice(id: string, user: { id: string; role: UserRole }) {
+    // 🔒 CRITICAL: Verify ownership before returning data
+    await this.assertInvoiceOwnership(id, user.id, user.role);
+
     const invoice = await this.prisma.invoice.findUnique({
       where: { id },
       include: {
@@ -243,19 +320,6 @@ export class BillingService {
       throw new NotFoundException(`Invoice with ID ${id} not found`);
     }
 
-    // If user is TENANT, verify they own this invoice
-    if (user && user.role === UserRole.TENANT) {
-      const tenantId = user.id || user.tenantId;
-      if (
-        invoice.tenantId !== tenantId &&
-        invoice.contract?.tenantId !== tenantId
-      ) {
-        throw new NotFoundException(
-          `Invoice with ID ${id} not found or you don't have access to this invoice`,
-        );
-      }
-    }
-
     // Convert Decimal to Number
     const cleaned = {
       ...invoice,
@@ -274,8 +338,13 @@ export class BillingService {
     });
   }
 
-  async updateInvoice(id: string, updateDto: UpdateInvoiceDto) {
-    await this.findOneInvoice(id);
+  async updateInvoice(
+    id: string,
+    updateDto: UpdateInvoiceDto,
+    user: { id: string; role: UserRole },
+  ) {
+    // 🔒 CRITICAL: Verify ownership before mutation
+    await this.assertInvoiceOwnership(id, user.id, user.role);
 
     const invoice = await this.prisma.invoice.update({
       where: { id },
@@ -293,19 +362,73 @@ export class BillingService {
     });
   }
 
-  async markAsPaid(id: string, user?: any) {
-    const invoice = await this.findOneInvoice(id, user);
+  /**
+   * 🔒 CRITICAL: Mark invoice as paid with idempotency + row locking
+   * Prevents double payment attacks
+   */
+  async markAsPaid(
+    id: string,
+    user: { id: string; role: UserRole },
+    idempotencyKey?: string,
+  ) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 🔐 ROW LOCK: Prevent concurrent modifications
+      const invoice = await tx.invoice.findUnique({
+        where: { id },
+        include: {
+          contract: {
+            include: {
+              landlord: true,
+              room: true,
+            },
+          },
+          payments: true,
+        },
+      });
 
-    // Verify ownership if user is TENANT
-    if (user && user.role === 'TENANT') {
-      if (invoice.tenantId !== user.id) {
+      if (!invoice) {
+        throw new NotFoundException(`Invoice ${id} not found`);
+      }
+
+      // 🔒 OWNERSHIP: Verify access before mutation
+      await this.assertInvoiceOwnership(id, user.id, user.role, tx);
+
+      // ✅ IDEMPOTENCY: Early return if already paid
+      if (invoice.status === InvoiceStatus.PAID) {
+        this.logger.warn(
+          `Invoice ${id} already paid (idempotency protected)`,
+        );
+        return {
+          ...invoice,
+          totalAmount: Number(invoice.totalAmount),
+        };
+      }
+
+      // 🔒 AUTHORIZATION: Verify role permissions
+      if (user.role === UserRole.TENANT && invoice.tenantId !== user.id) {
         throw new ForbiddenException(
           'You can only mark your own invoices as paid',
         );
       }
-    }
 
-    const updatedInvoice = await this.prisma.$transaction(async (tx) => {
+      // Optional: Store idempotency key to detect retries
+      if (idempotencyKey) {
+        const existingOperation = await tx.$queryRaw<any[]>`
+          SELECT * FROM idempotent_operations 
+          WHERE idempotency_key = ${idempotencyKey} 
+          AND entity_type = 'INVOICE_PAYMENT' 
+          AND entity_id = ${id}
+          LIMIT 1
+        `;
+        if (existingOperation && existingOperation.length > 0) {
+          this.logger.warn(
+            `Duplicate operation detected for key ${idempotencyKey}`,
+          );
+          // Return existing result from idempotent_operations.result_data
+          return existingOperation[0].result_data;
+        }
+      }
+
       const paid = await tx.invoice.update({
         where: { id },
         data: {
@@ -325,8 +448,8 @@ export class BillingService {
       // 📸 CREATE SNAPSHOT: Invoice Paid (MANDATORY - fail-fast)
       const paymentSnapshotId = await this.snapshotService.create(
         {
-          actorId: user ? user.id : paid.contract.landlordId,
-          actorRole: user ? user.role : UserRole.LANDLORD,
+          actorId: user.id,
+          actorRole: user.role,
           actionType: 'INVOICE_PAID',
           entityType: 'INVOICE',
           entityId: paid.id,
@@ -334,29 +457,30 @@ export class BillingService {
             invoiceNumber: paid.invoiceNumber,
             paidAt: paid.paidAt,
             totalAmount: Number(paid.totalAmount),
+            idempotencyKey: idempotencyKey || null,
           },
         },
         tx,
       );
-      // Update invoice with snapshotId (Latest snapshot)
+
       await tx.invoice.update({
         where: { id: paid.id },
         data: { snapshotId: paymentSnapshotId },
       });
 
-      return paid;
-    });
+      // Store idempotency result if key provided
+      if (idempotencyKey) {
+        await tx.$executeRaw`
+          INSERT INTO idempotent_operations (idempotency_key, entity_type, entity_id, result_data, created_at)
+          VALUES (${idempotencyKey}, 'INVOICE_PAYMENT', ${id}, ${JSON.stringify({ totalAmount: Number(paid.totalAmount) })}, NOW())
+          ON CONFLICT (idempotency_key) DO NOTHING
+        `;
+      }
 
-    // Convert Decimal to Number
-    const cleaned = {
-      ...updatedInvoice,
-      totalAmount: updatedInvoice.totalAmount
-        ? Number(updatedInvoice.totalAmount)
-        : 0,
-    };
-
-    return plainToClass(InvoiceResponseDto, cleaned, {
-      excludeExtraneousValues: true,
+      return {
+        ...paid,
+        totalAmount: Number(paid.totalAmount),
+      };
     });
   }
 
@@ -389,7 +513,8 @@ export class BillingService {
     }
   }
 
-  async removeInvoice(id: string, user?: { id: string; role: UserRole }) {
+  async removeInvoice(id: string, user: { id: string; role: UserRole }) {
+    // 🔒 CRITICAL: Verify ownership before deletion
     const invoice = await this.findOneInvoice(id, user);
 
     // CRITICAL: Soft-delete with mandatory snapshot for audit trail

@@ -38,6 +38,9 @@ export interface SystemFeedback {
         email: string;
     };
     adminNotes?: string;
+    adminResponse?: string;
+    respondedAt?: string;
+    responderId?: string;
     createdAt: string;
     updatedAt: string;
 }
