@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationOutboxService } from '../notifications/outbox.service';
 import { NotificationType } from '../notifications/entities';
 import { IncomeService } from '../income/income.service';
 import { IncomeType } from '../income/entities/income.entity';
@@ -37,6 +38,7 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly notificationOutbox: NotificationOutboxService,
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
     private readonly stateLogger: StateTransitionLogger,
@@ -125,7 +127,11 @@ export class BillingService {
           include: {
             contract: {
               include: {
-                tenant: true,
+                tenant: {
+                  include: {
+                    user: true,
+                  },
+                },
                 room: true,
                 landlord: true,
               },
@@ -158,10 +164,33 @@ export class BillingService {
           data: { snapshotId },
         });
 
+        // 📧 ENQUEUE EMAIL: Add to outbox for at-least-once delivery
+        // CRITICAL: This happens INSIDE transaction for atomicity
+        const tenantUser = invoice.contract.tenant.user;
+
+        if (tenantUser && tenantUser.email) {
+          await this.notificationOutbox.enqueueNotification(
+            tenantUser.email,
+            `[Smart Room] Hóa đơn mới - ${invoice.invoiceNumber}`,
+            `
+              <h2>Hóa đơn mới đã được tạo</h2>
+              <p>Hóa đơn <strong>${invoice.invoiceNumber}</strong> cho phòng <strong>${invoice.contract.room.roomNumber}</strong></p>
+              <h3>Số tiền: ${Number(invoice.totalAmount).toLocaleString('vi-VN')} VNĐ</h3>
+              <p><strong>Hạn thanh toán:</strong> ${new Date(invoice.dueDate).toLocaleDateString('vi-VN')}</p>
+              <a href="${process.env.FRONTEND_URL}/dashboard/tenant/invoices/${invoice.id}" 
+                 style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                Xem & Thanh toán
+              </a>
+            `,
+            NotificationType.PAYMENT,
+            invoice.contract.tenantId,
+          );
+        }
+
         return invoice;
       })
       .then((invoice) => {
-        // 🔔 TRIGGER NOTIFICATION: Invoice Generated (ASYNC - outside transaction)
+        // 🔔 TRIGGER NOTIFICATION: Also send via WebSocket (real-time, no persistence)
         try {
           this.notificationsService
             .create({
@@ -172,10 +201,10 @@ export class BillingService {
               relatedEntityId: invoice.id,
             })
             .catch((err) =>
-              this.logger.error('Failed to send invoice notification', err),
+              this.logger.error('Failed to send real-time notification', err),
             );
         } catch (error) {
-          this.logger.error('Notification service error', error);
+          this.logger.error('Notification gateway error', error);
         }
 
         // Convert Decimal to Number
