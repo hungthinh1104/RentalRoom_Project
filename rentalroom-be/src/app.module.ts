@@ -43,6 +43,7 @@ import { PCCCModule } from './modules/pccc/pccc.module';
 import { DisputeModule } from './modules/dispute/dispute.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { eKycModule } from './shared/integration/ekyc/ekyc.module';
+import { LegalInfrastructureModule } from './shared/legal-infrastructure.module';
 import { UtilitiesModule } from './shared/utilities/utilities.module';
 import { OperationalExpensesModule } from './modules/operational-expenses/operational-expenses.module';
 
@@ -93,6 +94,7 @@ import { OperationalExpensesModule } from './modules/operational-expenses/operat
     PCCCModule, // PCCC compliance generator (PC17)
     DisputeModule, // UC_DISPUTE_01: Deposit dispute resolution
     AlertsModule, // UC_SEC_05: Critical event alerting system
+      LegalInfrastructureModule, // UC_LEGAL_*: Legal-grade infrastructure (event sourcing, state machine, audit)
     eKycModule, // UC_AUTH_01: Identity verification (FPT.AI/VNPT)
     UtilitiesModule, // Global utilities (ContractHashService, etc.)
     OperationalExpensesModule,
