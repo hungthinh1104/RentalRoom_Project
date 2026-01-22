@@ -12,8 +12,9 @@ import {
   NotFoundException,
   HttpCode,
   UseGuards,
+  Req,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 import {
   ContractPdfService,
   ContractSigningService,
@@ -36,6 +37,7 @@ import { User, UserRole } from '../users/entities';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { ContractPartyGuard } from '../../common/guards/contract-party.guard';
+import { AdminAuditService } from 'src/shared/audit/admin-audit.service';
 
 @Controller('contracts')
 export class ContractsController {
@@ -44,6 +46,7 @@ export class ContractsController {
     private readonly contractSigningService: ContractSigningService,
     private readonly pdfQueueService: PdfQueueService,
     private readonly contractPdfService: ContractPdfService,
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   @Patch(':id/handover')
@@ -204,7 +207,25 @@ export class ContractsController {
 
   @Delete(':id')
   @Auth(UserRole.ADMIN)
-  remove(@Param('id') id: string) {
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Req() req: Request,
+  ) {
+    // 📝 ADMIN AUDIT: Log contract deletion before executing
+    const contract = await this.contractsService.findOne(id);
+    
+    await this.adminAudit.logAdminAction({
+      adminId: user.id,
+      action: 'DELETE_CONTRACT',
+      entityType: 'CONTRACT',
+      entityId: id,
+      beforeValue: contract,
+      reason: `Admin deleted contract for room ${contract.room?.roomNumber || 'N/A'}, tenant: ${contract.tenant?.user?.fullName || 'N/A'}`,
+      ipAddress: req.ip,
+      timestamp: new Date(),
+    });
+
     return this.contractsService.remove(id);
   }
 

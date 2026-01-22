@@ -11,6 +11,7 @@ import {
   NotFoundException,
   Logger,
   Headers,
+  Req,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import {
@@ -26,6 +27,8 @@ import { User } from '../users/entities';
 import { SepayService } from './sepay.service';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { PaymentService } from './payment.service';
+import type { Request } from 'express';
+import { AdminAuditService } from 'src/shared/audit/admin-audit.service';
 
 @Controller('payments')
 export class PaymentsController {
@@ -36,6 +39,7 @@ export class PaymentsController {
     private readonly sepayService: SepayService,
     private readonly paymentService: PaymentService,
     private readonly prisma: PrismaService,
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   @Post()
@@ -157,7 +161,25 @@ export class PaymentsController {
 
   @Delete(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  remove(@Param('id') id: string, @CurrentUser() user: User) {
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Req() req: Request,
+  ) {
+    // 📝 ADMIN AUDIT: Log payment deletion before executing
+    const payment = await this.paymentsService.findOne(id);
+    
+    await this.adminAudit.logAdminAction({
+      adminId: user.id,
+      action: 'DELETE_PAYMENT',
+      entityType: 'PAYMENT',
+      entityId: id,
+      beforeValue: payment,
+      reason: `Admin deleted payment ${payment.transactionId || id}, status: ${payment.status}, amount: ${payment.amount}`,
+      ipAddress: req.ip,
+      timestamp: new Date(),
+    });
+
     return this.paymentsService.remove(id, user);
   }
 

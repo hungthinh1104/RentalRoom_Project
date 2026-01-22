@@ -9,10 +9,11 @@ import {
   Query,
   Res,
   Headers,
+  Req,
 } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { PdfService } from './services';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 import { Header } from '@nestjs/common';
 import {
   CreateInvoiceDto,
@@ -23,12 +24,14 @@ import {
 import { UserRole } from '../users/entities';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { AdminAuditService } from 'src/shared/audit/admin-audit.service';
 
 @Controller('billing')
 export class BillingController {
   constructor(
     private readonly billingService: BillingService,
     private readonly pdfService: PdfService,
+    private readonly adminAudit: AdminAuditService,
   ) {}
 
   @Post('invoices')
@@ -95,7 +98,25 @@ export class BillingController {
 
   @Delete('invoices/:id')
   @Auth(UserRole.ADMIN)
-  removeInvoice(@Param('id') id: string, @CurrentUser() user: any) {
+  async removeInvoice(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Req() req: Request,
+  ) {
+    // 📝 ADMIN AUDIT: Log invoice deletion before executing
+    const invoice = await this.billingService.findOneInvoice(id, user);
+    
+    await this.adminAudit.logAdminAction({
+      adminId: user.id,
+      action: 'DELETE_INVOICE',
+      entityType: 'INVOICE',
+      entityId: id,
+      beforeValue: invoice,
+      reason: `Admin deleted invoice ${invoice.invoiceNumber}, status: ${invoice.status}, amount: ${invoice.totalAmount}`,
+      ipAddress: req.ip,
+      timestamp: new Date(),
+    });
+
     return this.billingService.removeInvoice(id, user);
   }
 

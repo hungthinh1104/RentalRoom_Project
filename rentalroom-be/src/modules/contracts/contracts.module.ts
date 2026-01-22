@@ -14,6 +14,8 @@ import {
 import { ContractHashService } from './contract-hash.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from 'src/common/common.module';
+import { DocumentsModule } from '../documents/documents.module';
+
 
 import { PaymentsModule } from '../payments/payments.module';
 import { SnapshotsModule } from '../snapshots/snapshots.module';
@@ -33,8 +35,11 @@ import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutabil
     NotificationsModule,
     CommonModule,
     PaymentsModule,
+    PaymentsModule,
     SnapshotsModule,
+    DocumentsModule,
   ],
+
   controllers: [ContractsController, ContractTemplatesController],
   providers: [
     ContractsService,
@@ -60,4 +65,4 @@ import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutabil
     ContractHashService,
   ],
 })
-export class ContractsModule {}
+export class ContractsModule { }

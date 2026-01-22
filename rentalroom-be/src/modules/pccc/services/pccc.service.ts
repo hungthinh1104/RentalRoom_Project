@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { SnapshotService } from 'src/modules/snapshots/snapshot.service';
+import { DocumentsService } from 'src/modules/documents/documents.service';
+
 import { CreatePCCCReportDto } from '../dto/create-pccc-report.dto';
 import PDFDocument from 'pdfkit';
 import * as QRCode from 'qrcode';
@@ -20,7 +22,9 @@ export class PCCCService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly snapshotService: SnapshotService,
-  ) {}
+    private readonly documentsService: DocumentsService,
+  ) { }
+
 
   /**
    * Generate PCCC Compliance Report (PC17 Template)
@@ -56,7 +60,8 @@ export class PCCCService {
     const complianceScore = this.calculateComplianceScore(requirements);
 
     // 3️⃣ ATOMIC TRANSACTION: DB create + PDF generation + hash + snapshot
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
+
       // Create PCCC report record
       const report = await tx.pCCCReport.create({
         data: {
@@ -156,6 +161,23 @@ export class PCCCService {
         expiryDate: updatedReport.expiryDate,
       };
     });
+
+    // Create UserDocument (Sync with new Document Management System)
+    try {
+      await this.documentsService.create(landlordId, {
+        title: `Chứng nhận PCCC - ${property.name}`,
+        type: 'PCCC_CERTIFICATE' as any,
+        fileUrl: result.pdfUrl,
+        propertyId: propertyId,
+        expiryDate: result.expiryDate.toISOString(),
+        description: `Tự động tạo từ báo cáo PCCC #${result.reportId.substring(0, 8)}`,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to auto-create UserDocument for PCCC report ${result.reportId}`, error);
+      // Don't fail the main request, just log error
+    }
+
+    return result;
   }
 
   /**

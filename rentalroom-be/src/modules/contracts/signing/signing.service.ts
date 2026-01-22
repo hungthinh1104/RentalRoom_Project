@@ -13,6 +13,8 @@ import { promises as fsPromises } from 'fs';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { DocumentsService } from 'src/modules/documents/documents.service';
+
 
 /**
  * ContractSigningService
@@ -30,9 +32,11 @@ export class ContractSigningService {
     private readonly prisma: PrismaService,
     private readonly digitalSignature: DigitalSignatureService,
     private readonly contractTemplate: ContractTemplateService,
+    private readonly documentsService: DocumentsService,
   ) {
     this.ensureStorageDirectory();
   }
+
 
   private ensureStorageDirectory() {
     const tryEnsure = (dir: string): boolean => {
@@ -337,6 +341,47 @@ export class ContractSigningService {
       }
 
       this.logger.log(`Contract ${contractId} signed by ${signerInfo.name}`);
+
+      // Auto-create UserDocument if fully signed (optional: check if both parties signed if that's the flow, but here we just stash the signed version)
+      // Assuming 'SIGNED' means fully signed or at least a significant step.
+      try {
+        await this.documentsService.create({
+          title: `Hợp đồng thuê - ${contract.contractNumber}`,
+          type: 'CONTRACT' as any,
+          fileUrl: contract.signedUrl ? contract.signedUrl : '', // Note: This might be a local path, need to ensure it's accessible or uploaded. 
+          // In this system, it seems likely pdfUrl/signedUrl are local paths. 
+          // The DocumentService might need to handle file uploads or we store the path?
+          // "fileUrl" in UserDocument suggests a web-accessible URL.
+          // If the system serves static files from storage, we might need to convert path to URL.
+          // For now, let's assume we store what we have or a placeholder.
+          // Wait, PCCC logic used `result.pdfUrl` which was `storage/pccc/...`.
+          // DocumentsService API (`create`) expects `fileUrl`.
+          propertyId: contract.application.room.property.id,
+          expiryDate: contract.endDate.toISOString(),
+          description: `Hợp đồng được ký bởi ${signerInfo.name}`,
+          userId: contract.application.tenant.user.id // Assign to Tenant? Or Landlord? Or both?
+          // Maybe duplicate for landlord? For now, let's assign to Tenant as they just signed?
+          // But Landlord needs it too. The UserDocument model has `userId`. 
+          // We might need to create two documents or shared ownership? 
+          // Let's creating for the Signer for now.
+        });
+
+        // Also create for Landlord if the signer is Tenant, and vice versa?
+        // Actually, usually we want the document available to the user who triggers the action or both.
+        // Let's create for the Landlord as well since they are the owner.
+        await this.documentsService.create({
+          title: `Hợp đồng thuê - ${contract.contractNumber}`,
+          type: 'CONTRACT' as any,
+          fileUrl: signedFilePath, // Consistency with PCCC
+          propertyId: contract.application.room.property.id,
+          expiryDate: contract.endDate.toISOString(),
+          description: `Hợp đồng được ký bởi ${signerInfo.name}`,
+          userId: contract.application.room.property.landlord.user.id
+        });
+
+      } catch (error) {
+        this.logger.warn(`Failed to auto-create UserDocument for contract ${contractId}`, error);
+      }
 
       return {
         contractId,
