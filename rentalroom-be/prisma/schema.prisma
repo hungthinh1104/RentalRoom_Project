@@ -379,6 +379,7 @@ model User {
   disputesResolved        Dispute[]               @relation("DisputeResolver")
   alertsReceived          Alert[]                 @relation("AlertRecipient") // UC_SEC_05
   alertsAcknowledged      Alert[]                 @relation("AlertAcknowledgedBy") // Alerts acknowledged by user
+  documents               UserDocument[]
 
   @@index([email])
   @@index([ekycVerified])
@@ -432,14 +433,14 @@ model Landlord {
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  user               User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  properties         Property[]
-  rentalApplications RentalApplication[]
-  contracts          Contract[]
-  revenueSnapshots   LandlordRevenueSnapshot[] // Tax dashboard (Phase 2)
-  rentalUnits        RentalUnit[]              @relation("LandlordRentalUnits")
-  taxYearSummaries   TaxYearSummary[]          @relation("LandlordTaxSummaries")
-  pcccReports        PCCCReport[]
+  user                User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  properties          Property[]
+  rentalApplications  RentalApplication[]
+  contracts           Contract[]
+  revenueSnapshots    LandlordRevenueSnapshot[] // Tax dashboard (Phase 2)
+  rentalUnits         RentalUnit[]              @relation("LandlordRentalUnits")
+  taxYearSummaries    TaxYearSummary[]          @relation("LandlordTaxSummaries")
+  pcccReports         PCCCReport[]
   operationalExpenses OperationalExpense[]
 
   @@index([userId])
@@ -466,11 +467,12 @@ model Property {
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  landlord    Landlord     @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
-  rooms       Room[]
-  services    Service[]
-  pcccReports PCCCReport[]
+  landlord            Landlord             @relation(fields: [landlordId], references: [userId], onDelete: Cascade)
+  rooms               Room[]
+  services            Service[]
+  pcccReports         PCCCReport[]
   operationalExpenses OperationalExpense[]
+  documents           UserDocument[]
 
   @@unique([landlordId, name]) // Prevent duplicate property names per landlord
   @@index([landlordId])
@@ -648,16 +650,16 @@ model Contract {
   residents    ContractResident[]
 
   // Relations
-  application     RentalApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
-  room            Room              @relation(fields: [roomId], references: [id])
-  tenant          Tenant            @relation(fields: [tenantId], references: [userId])
-  landlord        Landlord          @relation(fields: [landlordId], references: [userId])
-  terminatedBy    User?             @relation("ContractTerminatedBy", fields: [terminatedByUserId], references: [id], onDelete: SetNull)
+  application     RentalApplication   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  room            Room                @relation(fields: [roomId], references: [id])
+  tenant          Tenant              @relation(fields: [tenantId], references: [userId])
+  landlord        Landlord            @relation(fields: [landlordId], references: [userId])
+  terminatedBy    User?               @relation("ContractTerminatedBy", fields: [terminatedByUserId], references: [id], onDelete: SetNull)
   invoices        Invoice[]
   reviews         RoomReview[]
-  meterReadings   MeterReading[]    @relation("MeterReadings")
-  disputes        Dispute[]         @relation("ContractDisputes") // UC_DISPUTE_01
-  badDebtInvoices BadDebtInvoice[]  @relation("ContractBadDebt") // UC_COT_03
+  meterReadings   MeterReading[]      @relation("MeterReadings")
+  disputes        Dispute[]           @relation("ContractDisputes") // UC_DISPUTE_01
+  badDebtInvoices BadDebtInvoice[]    @relation("ContractBadDebt") // UC_COT_03
   signatures      ContractSignature[] @relation("ContractSignatures") // UC_SEC_04: PDF signature verification
 
   @@index([roomId])
@@ -676,31 +678,31 @@ model Contract {
 // Stores cryptographic signatures for contract tamper detection
 // SHA-256 hash + HMAC for authenticity + QR code for mobile verification
 model ContractSignature {
-  id        String   @id @default(uuid()) @db.Uuid
-  contractId String  @map("contract_id") @db.Uuid
-  
+  id         String @id @default(uuid()) @db.Uuid
+  contractId String @map("contract_id") @db.Uuid
+
   // Cryptographic Signatures
-  hash      String   @map("hash") @db.VarChar(64) // SHA-256 hash of contract content
-  hmac      String   @map("hmac") @db.VarChar(128) // HMAC-SHA256 for authenticity
-  qrCode    String   @map("qr_code") @db.Text // QR code data for mobile verification
-  
+  hash   String @map("hash") @db.VarChar(64) // SHA-256 hash of contract content
+  hmac   String @map("hmac") @db.VarChar(128) // HMAC-SHA256 for authenticity
+  qrCode String @map("qr_code") @db.Text // QR code data for mobile verification
+
   // Signature Metadata
-  signerId  String?  @map("signer_id") @db.Uuid
+  signerId    String? @map("signer_id") @db.Uuid
   signerEmail String? @map("signer_email") @db.VarChar(100)
-  location  String?  @map("location") @db.VarChar(100)
-  ipAddress String?  @map("ip_address") @db.VarChar(45)
-  
+  location    String? @map("location") @db.VarChar(100)
+  ipAddress   String? @map("ip_address") @db.VarChar(45)
+
   // Lifecycle
   signedAt  DateTime @default(now()) @map("signed_at")
   expiresAt DateTime @map("expires_at") // Signature validity period (90 days)
-  
+
   // Audit
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-  
+
   // Relations
   contract Contract @relation("ContractSignatures", fields: [contractId], references: [id], onDelete: Cascade)
-  
+
   @@index([contractId])
   @@index([hash])
   @@index([expiresAt])
@@ -784,7 +786,6 @@ model OperationalExpense {
   @@index([category])
   @@map("operational_expense")
 }
-
 
 model InvoiceLineItem {
   id          String   @id @default(uuid()) @db.Uuid
@@ -983,26 +984,26 @@ model Notification {
 // 4. On failure: increment retryCount, set nextRetryAt with backoff
 // 5. Max 5 retries, then status=FAILED_PERMANENT
 model NotificationOutbox {
-  id                String           @id @default(uuid()) @db.Uuid
-  notificationId    String?          @map("notification_id") @db.Uuid // Optional FK to notification
-  userId            String           @map("user_id") @db.Uuid
-  email             String           @db.VarChar(255)
-  subject           String           @db.VarChar(255)
-  bodyHtml          String           @db.Text
-  notificationType  NotificationType @map("notification_type")
-  
+  id               String           @id @default(uuid()) @db.Uuid
+  notificationId   String?          @map("notification_id") @db.Uuid // Optional FK to notification
+  userId           String           @map("user_id") @db.Uuid
+  email            String           @db.VarChar(255)
+  subject          String           @db.VarChar(255)
+  bodyHtml         String           @db.Text
+  notificationType NotificationType @map("notification_type")
+
   // Delivery tracking
-  status            OutboxStatus     @default(PENDING) // PENDING, SENT, FAILED_PERMANENT
-  sentAt            DateTime?        @map("sent_at")
-  failureReason     String?          @map("failure_reason") @db.Text
-  
+  status        OutboxStatus @default(PENDING) // PENDING, SENT, FAILED_PERMANENT
+  sentAt        DateTime?    @map("sent_at")
+  failureReason String?      @map("failure_reason") @db.Text
+
   // Retry logic
-  retryCount        Int              @default(0) @map("retry_count")
-  nextRetryAt       DateTime?        @map("next_retry_at")
-  maxRetries        Int              @default(5) @map("max_retries")
-  
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
+  retryCount  Int       @default(0) @map("retry_count")
+  nextRetryAt DateTime? @map("next_retry_at")
+  maxRetries  Int       @default(5) @map("max_retries")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([status, nextRetryAt]) // For polling pending/failed messages
   @@index([userId, status])
@@ -1882,7 +1883,7 @@ model PaymentTransaction {
   id            Int       @id @default(autoincrement())
   transactionId String    @unique @map("transaction_id") @db.VarChar(100)
   status        String    @db.VarChar(20) // PENDING | SUCCESS | FAILED
-  amount        Decimal @db.Decimal(16, 2) // Amount in VND (2dp)
+  amount        Decimal   @db.Decimal(16, 2) // Amount in VND (2dp)
   paymentMethod String?   @map("payment_method") @db.VarChar(50)
   referenceCode String    @unique @map("reference_code") @db.VarChar(100)
   responseData  Json?     @map("response_data")
@@ -1978,38 +1979,38 @@ model BadDebtInvoice {
 // Monitors and notifies about critical events requiring landlord/admin intervention
 // Email delivery via NotificationOutboxService for guaranteed delivery
 model Alert {
-  id                String        @id @default(uuid()) @db.Uuid
-  type              AlertType     @map("type")
-  severity          AlertSeverity @map("severity")
-  title             String        @map("title") @db.VarChar(200)
-  description       String        @map("description") @db.Text
-  
+  id          String        @id @default(uuid()) @db.Uuid
+  type        AlertType     @map("type")
+  severity    AlertSeverity @map("severity")
+  title       String        @map("title") @db.VarChar(200)
+  description String        @map("description") @db.Text
+
   // Resource tracking
-  resourceType      String        @map("resource_type") @db.VarChar(50) // CONTRACT | INVOICE | PAYMENT | DISPUTE | USER
-  resourceId        String        @map("resource_id") @db.Uuid
-  
+  resourceType String @map("resource_type") @db.VarChar(50) // CONTRACT | INVOICE | PAYMENT | DISPUTE | USER
+  resourceId   String @map("resource_id") @db.Uuid
+
   // Alert recipient
-  affectedUserId    String        @map("affected_user_id") @db.Uuid
-  
+  affectedUserId String @map("affected_user_id") @db.Uuid
+
   // Alert metadata (JSON: details specific to alert type)
-  metadata          Json?         @map("metadata")
-  
+  metadata Json? @map("metadata")
+
   // Acknowledgment tracking
-  acknowledged      Boolean       @default(false) @map("acknowledged")
-  acknowledgedAt    DateTime?     @map("acknowledged_at")
-  acknowledgedBy    String?       @map("acknowledged_by") @db.Uuid
-  
+  acknowledged   Boolean   @default(false) @map("acknowledged")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  acknowledgedBy String?   @map("acknowledged_by") @db.Uuid
+
   // Resolution
-  resolvedAt        DateTime?     @map("resolved_at")
-  
+  resolvedAt DateTime? @map("resolved_at")
+
   // Audit
-  createdAt         DateTime      @default(now()) @map("created_at")
-  updatedAt         DateTime      @updatedAt @map("updated_at")
-  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   // Relations
-  affectedUser      User          @relation("AlertRecipient", fields: [affectedUserId], references: [id], onDelete: Cascade)
-  acknowledgedByUser User?        @relation("AlertAcknowledgedBy", fields: [acknowledgedBy], references: [id], onDelete: SetNull)
-  
+  affectedUser       User  @relation("AlertRecipient", fields: [affectedUserId], references: [id], onDelete: Cascade)
+  acknowledgedByUser User? @relation("AlertAcknowledgedBy", fields: [acknowledgedBy], references: [id], onDelete: SetNull)
+
   @@index([affectedUserId])
   @@index([type])
   @@index([severity])
@@ -2026,31 +2027,31 @@ model Alert {
 // UC_LEGAL_01: Immutable Event Store (Single Source of Truth)
 // Append-only log with hash chain for tamper detection
 model DomainEvent {
-  id                String   @id @default(uuid()) @db.Uuid
-  eventId           String   @unique @map("event_id") @db.Uuid
-  eventType         String   @map("event_type") @db.VarChar(100)
-  
+  id        String @id @default(uuid()) @db.Uuid
+  eventId   String @unique @map("event_id") @db.Uuid
+  eventType String @map("event_type") @db.VarChar(100)
+
   // Causation & Correlation (Legal Traceability)
-  causationId       String?  @map("causation_id") @db.Uuid
-  correlationId     String   @map("correlation_id") @db.Uuid
-  
+  causationId   String? @map("causation_id") @db.Uuid
+  correlationId String  @map("correlation_id") @db.Uuid
+
   // Aggregate Identity
-  aggregateId       String   @map("aggregate_id") @db.Uuid
-  aggregateType     String   @map("aggregate_type") @db.VarChar(50)
-  aggregateVersion  Int      @map("aggregate_version")
-  
+  aggregateId      String @map("aggregate_id") @db.Uuid
+  aggregateType    String @map("aggregate_type") @db.VarChar(50)
+  aggregateVersion Int    @map("aggregate_version")
+
   // Event Data (Immutable)
-  payload           Json     @map("payload")
-  metadata          Json     @map("metadata")
-  
+  payload  Json @map("payload")
+  metadata Json @map("metadata")
+
   // Integrity (Hash Chain)
-  previousEventHash String?  @map("previous_event_hash") @db.VarChar(64)
-  eventHash         String   @map("event_hash") @db.VarChar(64)
-  
+  previousEventHash String? @map("previous_event_hash") @db.VarChar(64)
+  eventHash         String  @map("event_hash") @db.VarChar(64)
+
   // Timestamp (Authoritative)
-  occurredAt        DateTime @map("occurred_at")
-  createdAt         DateTime @default(now()) @map("created_at")
-  
+  occurredAt DateTime @map("occurred_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
   @@unique([aggregateId, aggregateType, aggregateVersion])
   @@index([aggregateId, aggregateType])
   @@index([correlationId])
@@ -2070,7 +2071,7 @@ model IdempotencyRecord {
   resultHash String   @map("result_hash") @db.VarChar(64)
   createdAt  DateTime @default(now()) @map("created_at")
   expiresAt  DateTime @map("expires_at")
-  
+
   @@index([userId])
   @@index([expiresAt])
   @@map("idempotency_record")
@@ -2078,28 +2079,28 @@ model IdempotencyRecord {
 
 // UC_LEGAL_09: Admin Audit Trail (God Mode Tracking)
 model AdminAuditLog {
-  id                String   @id @default(uuid()) @db.Uuid
-  adminId           String   @map("admin_id") @db.Uuid
-  action            String   @map("action") @db.VarChar(100)
-  entityType        String   @map("entity_type") @db.VarChar(50)
-  entityId          String   @map("entity_id") @db.Uuid
-  
+  id         String @id @default(uuid()) @db.Uuid
+  adminId    String @map("admin_id") @db.Uuid
+  action     String @map("action") @db.VarChar(100)
+  entityType String @map("entity_type") @db.VarChar(50)
+  entityId   String @map("entity_id") @db.Uuid
+
   // Before/After tracking
-  beforeValue       Json?    @map("before_value")
-  afterValue        Json?    @map("after_value")
-  
+  beforeValue Json? @map("before_value")
+  afterValue  Json? @map("after_value")
+
   // Context
-  reason            String?  @map("reason") @db.Text
-  ipAddress         String?  @map("ip_address") @db.VarChar(45)
-  userAgent         String?  @map("user_agent") @db.Text
-  
+  reason    String? @map("reason") @db.Text
+  ipAddress String? @map("ip_address") @db.VarChar(45)
+  userAgent String? @map("user_agent") @db.Text
+
   // Integrity (Hash Chain)
-  previousAuditHash String?  @map("previous_audit_hash") @db.VarChar(64)
-  auditHash         String   @map("audit_hash") @db.VarChar(64)
-  
+  previousAuditHash String? @map("previous_audit_hash") @db.VarChar(64)
+  auditHash         String  @map("audit_hash") @db.VarChar(64)
+
   // Timestamp
-  timestamp         DateTime @default(now()) @map("timestamp")
-  
+  timestamp DateTime @default(now()) @map("timestamp")
+
   @@index([adminId])
   @@index([action])
   @@index([entityType, entityId])
@@ -2117,10 +2118,65 @@ model AuditLog {
   details    Json     @map("details")
   ipAddress  String?  @map("ip_address") @db.VarChar(45)
   createdAt  DateTime @default(now()) @map("created_at")
-  
+
   @@index([userId])
   @@index([action])
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+// ============================================================================
+// USER DOCUMENT MANAGEMENT (GENERALIZED SYSTEM)
+// ============================================================================
+
+enum UserDocumentType {
+  PCCC_CERTIFICATE // Giấy chứng nhận PCCC
+  CONTRACT // Hợp đồng thuê
+  DEED // Sổ đỏ/Giấy tờ nhà
+  BUSINESS_LICENSE // Giấy phép kinh doanh
+  INVOICE // Hóa đơn
+  IDENTITY_CARD // CCCD/CMND
+  OTHER
+}
+
+enum DocumentStatus {
+  VALID
+  EXPIRED
+  PENDING_VERIFICATION
+  REJECTED
+}
+
+model UserDocument {
+  id         String           @id @default(uuid()) @db.Uuid
+  userId     String           @map("user_id") @db.Uuid
+  propertyId String?          @map("property_id") @db.Uuid
+  type       UserDocumentType
+  title      String           @db.VarChar(200)
+
+  // File Info
+  fileUrl  String  @map("file_url") @db.Text
+  fileHash String? @map("file_hash") @db.VarChar(64) // SHA-256 for integrity
+  fileType String? @map("file_type") @db.VarChar(50) // MIME type
+  fileSize Int?    @map("file_size") // Bytes
+
+  // Metadata
+  expiryDate  DateTime?      @map("expiry_date")
+  status      DocumentStatus @default(VALID)
+  description String?        @db.Text
+  metadata    Json? // Extra data (e.g. issuing authority)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property? @relation(fields: [propertyId], references: [id])
+
+  @@index([userId])
+  @@index([propertyId])
+  @@index([type])
+  @@index([status])
+  @@index([expiryDate])
+  @@map("user_document")
 }

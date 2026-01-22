@@ -28,6 +28,7 @@ import {
   RecommendationModule,
   UploadModule,
   FavoritesModule,
+  DocumentsModule,
 } from './modules';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AIModule } from './modules/ai/ai.module';
@@ -94,10 +95,11 @@ import { OperationalExpensesModule } from './modules/operational-expenses/operat
     PCCCModule, // PCCC compliance generator (PC17)
     DisputeModule, // UC_DISPUTE_01: Deposit dispute resolution
     AlertsModule, // UC_SEC_05: Critical event alerting system
-      LegalInfrastructureModule, // UC_LEGAL_*: Legal-grade infrastructure (event sourcing, state machine, audit)
+    LegalInfrastructureModule, // UC_LEGAL_*: Legal-grade infrastructure (event sourcing, state machine, audit)
     eKycModule, // UC_AUTH_01: Identity verification (FPT.AI/VNPT)
     UtilitiesModule, // Global utilities (ContractHashService, etc.)
     OperationalExpensesModule,
+    DocumentsModule,
   ],
   providers: [
     PrismaService,
@@ -113,4 +115,4 @@ import { OperationalExpensesModule } from './modules/operational-expenses/operat
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

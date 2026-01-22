@@ -36,6 +36,10 @@ import { CreateContractResidentDto } from '../dto/create-contract-resident.dto';
 import { UpdateContractResidentDto } from '../dto/update-contract-resident.dto';
 import { RoomStatus } from '../../rooms/entities/room.entity';
 import { User } from '../../users/entities';
+import { v4 as uuidv4 } from 'uuid';
+import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
+import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
+import { ImmutabilityGuard } from 'src/shared/guards/immutability.guard';
 
 @Injectable()
 export class ContractLifecycleService {
@@ -57,6 +61,9 @@ export class ContractLifecycleService {
     private readonly emailService: EmailService,
     private readonly paymentService: PaymentService,
     private readonly snapshotService: SnapshotService,
+    private readonly eventStore: EventStoreService,
+    private readonly stateMachine: StateMachineGuard,
+    private readonly immutability: ImmutabilityGuard,
   ) {}
 
   /**
@@ -491,19 +498,57 @@ export class ContractLifecycleService {
 
     this.ensureAllowedTransition(contract.status, 'tenantApprove');
 
+    // 🔒 STATE MACHINE: Validate transition PENDING_SIGNATURE → DEPOSIT_PENDING
+    this.stateMachine.validateTransition(
+      'CONTRACT',
+      contractId,
+      contract.status,
+      'DEPOSIT_PENDING',
+      tenantId,
+      'Tenant approved contract',
+    );
+
     const paymentRef = `HD${contract.contractNumber}`
       .replace(/[^a-zA-Z0-9]/g, '')
       .toUpperCase();
     const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const updated = await this.prisma.contract.update({
-      where: { id: contractId },
-      data: {
-        status: ContractStatus.DEPOSIT_PENDING,
-        paymentRef,
-        depositDeadline,
-      },
-      include: { tenant: { include: { user: true } } },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const correlationId = uuidv4();
+
+      const result = await tx.contract.update({
+        where: { id: contractId },
+        data: {
+          status: ContractStatus.DEPOSIT_PENDING,
+          paymentRef,
+          depositDeadline,
+        },
+        include: { tenant: { include: { user: true } } },
+      });
+
+      // EVENT STORE: Record contract approval
+      await this.eventStore.append({
+        eventId: uuidv4(),
+        eventType: 'CONTRACT_APPROVED',
+        correlationId,
+        aggregateId: contractId,
+        aggregateType: 'CONTRACT',
+        aggregateVersion: 1,
+        payload: {
+          contractId,
+          tenantId,
+          paymentRef,
+          depositDeadline,
+        },
+        metadata: {
+          userId: tenantId,
+          userRole: 'TENANT',
+          timestamp: new Date(),
+          source: 'API',
+        },
+      });
+
+      return result;
     });
 
     // Notify landlord
@@ -596,6 +641,39 @@ export class ContractLifecycleService {
       await tx.contract.update({
         where: { id },
         data: { status: ContractStatus.ACTIVE, depositDeadline: null },
+      });
+
+      // 🔒 STATE MACHINE: Validate transition DEPOSIT_PENDING → ACTIVE
+      this.stateMachine.validateTransition(
+        'CONTRACT',
+        id,
+        ContractStatus.DEPOSIT_PENDING,
+        ContractStatus.ACTIVE,
+        contract.tenantId,
+        'Deposit verified',
+      );
+
+      // EVENT STORE: Record contract activation
+      const correlationId = uuidv4();
+      await this.eventStore.append({
+        eventId: uuidv4(),
+        eventType: 'CONTRACT_ACTIVATED',
+        correlationId,
+        aggregateId: id,
+        aggregateType: 'CONTRACT',
+        aggregateVersion: 1,
+        payload: {
+          contractId: id,
+          depositAmount: contract.deposit,
+          paymentRecord: paymentRecord.id,
+          invoiceId: invoice.id,
+        },
+        metadata: {
+          userId: contract.tenantId,
+          userRole: UserRole.TENANT,
+          timestamp: new Date(),
+          source: 'API',
+        },
       });
 
       await tx.room.update({
@@ -799,6 +877,16 @@ export class ContractLifecycleService {
       const oldContract = await this.findOneTx(tx, id);
       this.ensureAllowedTransition(oldContract.status, 'renew');
 
+      // 🔒 STATE MACHINE: Validate renewal transition
+      this.stateMachine.validateTransition(
+        'CONTRACT',
+        id,
+        oldContract.status,
+        'DRAFT', // New contract created in DRAFT
+        userId,
+        'Contract renewal',
+      );
+
       const isLandlord = oldContract.landlord.userId === userId;
       if (!isLandlord) {
         throw new ForbiddenException('Only landlord can renew contract');
@@ -863,6 +951,30 @@ export class ContractLifecycleService {
         });
       }
 
+      // EVENT STORE: Record contract renewal
+      const correlationId = uuidv4();
+      await this.eventStore.append({
+        eventId: uuidv4(),
+        eventType: 'CONTRACT_RENEWED',
+        correlationId,
+        aggregateId: newContract.id,
+        aggregateType: 'CONTRACT',
+        aggregateVersion: 1,
+        payload: {
+          newContractId: newContract.id,
+          oldContractId: oldContract.id,
+          newRent,
+          oldRent: Number(oldContract.monthlyRent),
+          renewalCount: renewalCount + 1,
+        },
+        metadata: {
+          userId,
+          userRole: UserRole.LANDLORD,
+          timestamp: new Date(),
+          source: 'API',
+        },
+      });
+
       // 📸 CREATE SNAPSHOT: Contract Renewed (MANDATORY - fail-fast)
       await this.snapshotService.create(
         {
@@ -894,6 +1006,16 @@ export class ContractLifecycleService {
     const result = await this.prisma.$transaction(async (tx) => {
       const contract = await this.findOneTx(tx, id);
       this.ensureAllowedTransition(contract.status, 'terminate');
+
+      // 🛡️ STATE MACHINE: Validate transition ACTIVE → TERMINATED
+      this.stateMachine.validateTransition(
+        'CONTRACT',
+        id,
+        contract.status,
+        'TERMINATED',
+        userId,
+        `Termination: ${terminateDto.reason}`,
+      );
 
       const isTenant = contract.tenant.userId === userId;
       const isLandlord = contract.room.property.landlord.userId === userId;
@@ -1025,6 +1147,41 @@ export class ContractLifecycleService {
       await tx.room.update({
         where: { id: contract.roomId },
         data: { status: RoomStatus.AVAILABLE },
+      });
+
+      // 📊 EVENT STORE: Record CONTRACT_TERMINATED event with refund + deduction tracking
+      const eventCount = await tx.domainEvent.count({
+        where: { aggregateId: id },
+      });
+
+      await this.eventStore.append({
+        eventId: uuidv4(),
+        eventType: 'CONTRACT_TERMINATED',
+        correlationId: uuidv4(),
+        aggregateId: id,
+        aggregateType: 'CONTRACT',
+        aggregateVersion: eventCount + 1,
+        payload: {
+          contractId: id,
+          terminatedBy: userId,
+          terminatedByRole: isTenant ? 'TENANT' : 'LANDLORD',
+          reason: terminateDto.reason,
+          terminationDate: terminateDto.terminationDate,
+          deposit,
+          deductions: deductionItems,
+          totalDeductions,
+          refundAmount,
+          unpaidInvoices: unpaidAmount,
+          proratedRent: Math.round(proratedRent * 100) / 100,
+          isEarlyTermination,
+          noticeDays,
+        },
+        metadata: {
+          userId,
+          userRole: isTenant ? 'TENANT' : 'LANDLORD',
+          timestamp: new Date(),
+          source: 'API',
+        },
       });
 
       // 📸 CREATE SNAPSHOT: Contract Terminated (MANDATORY - fail-fast)

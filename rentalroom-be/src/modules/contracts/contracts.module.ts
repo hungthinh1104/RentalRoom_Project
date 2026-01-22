@@ -21,6 +21,11 @@ import { SnapshotsModule } from '../snapshots/snapshots.module';
 import { ContractApplicationService } from './applications/contract-application.service';
 import { ContractLifecycleService } from './lifecycle/contract-lifecycle.service';
 
+// Legal infrastructure
+import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
+import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
+import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
+
 @Module({
   imports: [
     ScheduleModule.forRoot(),
@@ -41,6 +46,11 @@ import { ContractLifecycleService } from './lifecycle/contract-lifecycle.service
     PrismaService,
     ContractApplicationService,
     ContractLifecycleService,
+    // Legal infrastructure
+    EventStoreService,
+    StateMachineGuard,
+    ImmutabilityGuard,
+    IdempotencyGuard,
   ],
   exports: [
     ContractsService,
