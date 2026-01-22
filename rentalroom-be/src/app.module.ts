@@ -11,6 +11,7 @@ import { getMailConfig } from './config/mail.config';
 import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { CacheService } from './common/services/cache.service';
 import { CleanupService } from './tasks/cleanup.service';
+import { LegalIntegrityCron } from './tasks/legal-integrity.cron';
 
 import {
   AuthModule,
@@ -105,6 +106,7 @@ import { OperationalExpensesModule } from './modules/operational-expenses/operat
     PrismaService,
     CacheService,
     CleanupService,
+    LegalIntegrityCron, // ☠️ LEGAL: Daily integrity verification cron
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpCacheInterceptor,
