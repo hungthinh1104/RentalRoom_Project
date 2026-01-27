@@ -1,10 +1,10 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import {
   CreateSystemFeedbackDto,
   UpdateFeedbackStatusDto,
 } from './dto/system-feedback.dto';
-import { Prisma, FeedbackStatus, UserRole } from '@prisma/client';
+import { Prisma, FeedbackStatus } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -89,7 +89,7 @@ export class SystemFeedbackService {
     });
   }
 
-  async addResponse(id: string, response: string, responderId: string) {
+  async addResponse(id: string, response: string, _responderId: string) {
     const feedback = await this.prisma.systemFeedback.findUnique({
       where: { id },
       include: {

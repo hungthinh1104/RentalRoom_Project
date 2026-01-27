@@ -7,19 +7,9 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/lib/api/client';
 import { TaxYearSummary } from '@/types/tax';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { Lock, Download, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { formatCurrency } from '@/utils/tax-helpers';
+import { useLegalConfirmation } from '@/components/security/legal-finality-dialog';
 
 interface TaxYearClosingProps {
     year: number;
@@ -29,6 +19,7 @@ export function TaxYearClosing({ year }: TaxYearClosingProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isExporting, setIsExporting] = useState(false);
+    const { confirm, Dialog } = useLegalConfirmation();
 
     // Fetch tax year status
     const { data: taxYearData, isLoading } = useQuery({
@@ -39,12 +30,14 @@ export function TaxYearClosing({ year }: TaxYearClosingProps) {
     // Close tax year mutation
     const closeMutation = useMutation({
         mutationFn: () => taxService.closeTaxYear(year),
-        onSuccess: () => {
+        onSuccess: (result: { snapshotId?: string }) => {
             queryClient.invalidateQueries({ queryKey: ['tax-year'] });
             queryClient.invalidateQueries({ queryKey: ['incomes'] });
             toast({
                 title: '🎉 Đã chốt sổ thành công',
-                description: `Dữ liệu thuế năm ${year} đã được đóng băng vĩnh viễn.`,
+                description: result?.snapshotId
+                    ? `Snapshot: ${result.snapshotId.substring(0, 8)}... - Dữ liệu đã được đóng băng vĩnh viễn.`
+                    : `Dữ liệu thuế năm ${year} đã được đóng băng vĩnh viễn.`,
             });
         },
         onError: (error: unknown) => {
@@ -155,48 +148,33 @@ export function TaxYearClosing({ year }: TaxYearClosingProps) {
                 </Button>
 
                 {!isClosed && (
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button
-                                disabled={!canClose || closeMutation.isPending}
-                                className="flex-1 bg-warning hover:bg-warning-hover text-warning-foreground"
-                            >
-                                {closeMutation.isPending ? (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                    <Lock className="h-4 w-4 mr-2" />
-                                )}
-                                Chốt sổ năm {year}
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>⚠️ Chốt sổ thuế năm {year}?</AlertDialogTitle>
-                                <AlertDialogDescription className="space-y-2">
-                                    <p>Hành động này sẽ:</p>
-                                    <ul className="list-disc pl-5 space-y-1 text-foreground">
-                                        <li>Đóng băng <strong>vĩnh viễn</strong> tất cả dữ liệu thu/chi năm {year}</li>
-                                        <li>Không thể thêm, sửa, xóa bất kỳ giao dịch nào</li>
-                                        <li>Tạo snapshot bảo toàn pháp lý</li>
-                                    </ul>
-                                    <p className="text-destructive font-medium pt-2">
-                                        ⚠️ Không thể hoàn tác sau khi chốt!
-                                    </p>
-                                </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Hủy</AlertDialogCancel>
-                                <AlertDialogAction
-                                    onClick={() => closeMutation.mutate()}
-                                    className="bg-warning hover:bg-warning-hover text-warning-foreground"
-                                >
-                                    Xác nhận chốt sổ
-                                </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
+                    <Button
+                        onClick={() => {
+                            confirm(
+                                {
+                                    title: `Chốt sổ thuế năm ${year}`,
+                                    description: `Hành động này sẽ đóng băng vĩnh viễn tất cả dữ liệu thu/chi năm ${year}. Không thể thêm, sửa, xóa bất kỳ giao dịch nào sau khi chốt. Snapshot pháp lý sẽ được tạo và lưu trữ.`,
+                                    severity: "critical",
+                                    consentText: "Tôi xác nhận chốt sổ thuế năm này",
+                                },
+                                async () => {
+                                    await closeMutation.mutateAsync();
+                                }
+                            );
+                        }}
+                        disabled={!canClose || closeMutation.isPending}
+                        className="flex-1 bg-warning hover:bg-warning-hover text-warning-foreground"
+                    >
+                        {closeMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <Lock className="h-4 w-4 mr-2" />
+                        )}
+                        Chốt sổ năm {year}
+                    </Button>
                 )}
             </div>
+            <Dialog />
 
             {!canClose && !isClosed && (
                 <p className="text-xs text-muted-foreground text-center pt-2">

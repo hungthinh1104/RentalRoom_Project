@@ -69,7 +69,7 @@ export class TaxController {
     @CurrentUser() user: User,
   ) {
     // SECURITY: IDOR protection - LANDLORD can only access their own data
-    if (user.role === UserRole.LANDLORD) {
+    if ((user.role as any) === UserRole.LANDLORD) {
       const landlord = await this.prisma.landlord.findUnique({
         where: { userId: user.id },
       });
@@ -129,7 +129,7 @@ export class TaxController {
     @CurrentUser() user: User,
   ) {
     // SECURITY: IDOR protection - LANDLORD can only access their own data
-    if (user.role === UserRole.LANDLORD) {
+    if ((user.role as any) === UserRole.LANDLORD) {
       const landlord = await this.prisma.landlord.findUnique({
         where: { userId: user.id },
       });

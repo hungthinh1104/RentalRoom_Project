@@ -96,7 +96,7 @@ export function AuditDetailModal({ snapshot, isOpen, onClose }: AuditDetailModal
 
                             {shouldVerify && !isVerifying && verifyResult && (
                                 verifyResult.isValid ? (
-                                    <Badge className="bg-green-600 hover:bg-green-700">
+                                    <Badge className="bg-success text-success-foreground">
                                         <ShieldCheck className="h-3 w-3 mr-1" /> Verified Valid
                                     </Badge>
                                 ) : (

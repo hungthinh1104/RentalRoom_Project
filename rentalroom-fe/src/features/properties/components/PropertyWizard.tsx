@@ -108,7 +108,7 @@ export function PropertyWizard({ open, onOpenChange }: PropertyWizardProps) {
                         {/* Progress Bar Line */}
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-0.5 bg-border/50 -z-10" />
                         <div
-                            className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-amber-500 transition-all duration-300 -z-10"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-primary transition-all duration-300 -z-10"
                             style={{ width: `${((step - 1) / (STEPS.length - 1)) * 100}%` }}
                         />
 
@@ -120,14 +120,14 @@ export function PropertyWizard({ open, onOpenChange }: PropertyWizardProps) {
                                 <div key={s.id} className="flex flex-col items-center gap-2 bg-background p-2 rounded-full">
                                     <div className={cn(
                                         "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300",
-                                        isActive ? "border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-500/20" :
-                                            isCompleted ? "border-amber-500 bg-background text-amber-500" : "border-muted-foreground/30 text-muted-foreground bg-background"
+                                        isActive ? "border-primary bg-primary text-white shadow-lg shadow-primary/20" :
+                                            isCompleted ? "border-primary bg-background text-primary" : "border-muted-foreground/30 text-muted-foreground bg-background"
                                     )}>
                                         {isCompleted ? <Check className="w-5 h-5" /> : <s.icon className="w-5 h-5" />}
                                     </div>
                                     <span className={cn(
                                         "text-xs font-medium absolute -bottom-6 w-32 text-center",
-                                        isActive ? "text-amber-500" : "text-muted-foreground"
+                                        isActive ? "text-primary" : "text-muted-foreground"
                                     )}>{s.title}</span>
                                 </div>
                             );
@@ -268,11 +268,11 @@ export function PropertyWizard({ open, onOpenChange }: PropertyWizardProps) {
                             </Button>
 
                             {step < 3 ? (
-                                <Button type="button" onClick={nextStep} className="w-24 bg-amber-500 hover:bg-amber-600">
+                                <Button type="button" onClick={nextStep} className="w-24 bg-primary hover:bg-primary/90">
                                     Tiếp tục <ArrowRight className="w-4 h-4 ml-1" />
                                 </Button>
                             ) : (
-                                <Button type="submit" disabled={isCreating} className="w-32 bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/20">
+                                <Button type="submit" disabled={isCreating} className="w-32 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
                                     {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : "Hoàn tất"}
                                 </Button>
                             )}

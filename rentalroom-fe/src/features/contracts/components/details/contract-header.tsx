@@ -63,9 +63,9 @@ export function ContractHeader({
             case ContractStatus.ACTIVE:
                 return {
                     label: "Đang hoạt động",
-                    bg: "bg-green-50 dark:bg-green-950",
-                    text: "text-green-700 dark:text-green-400",
-                    border: "border-green-200 dark:border-green-800",
+                    bg: "bg-success/10",
+                    text: "text-success",
+                    border: "border-success/20",
                     icon: CheckCircle2
                 };
             case ContractStatus.EXPIRED:
@@ -87,33 +87,33 @@ export function ContractHeader({
             case ContractStatus.CANCELLED:
                 return {
                     label: "Đã hủy",
-                    bg: "bg-gray-100",
-                    text: "text-gray-600",
-                    border: "border-gray-200",
+                    bg: "bg-muted",
+                    text: "text-muted-foreground",
+                    border: "border-border",
                     icon: Ban
                 };
             case ContractStatus.DRAFT:
                 return {
                     label: "Bản nháp",
-                    bg: "bg-yellow-50",
-                    text: "text-yellow-700",
-                    border: "border-yellow-200",
+                    bg: "bg-warning/10",
+                    text: "text-warning",
+                    border: "border-warning/20",
                     icon: FileText
                 };
             case ContractStatus.PENDING_SIGNATURE:
                 return {
                     label: "Chờ ký",
-                    bg: "bg-blue-50",
-                    text: "text-blue-700",
-                    border: "border-blue-200",
+                    bg: "bg-info/10",
+                    text: "text-info",
+                    border: "border-info/20",
                     icon: FileText
                 };
             case ContractStatus.DEPOSIT_PENDING:
                 return {
                     label: "Chờ cọc",
-                    bg: "bg-purple-50",
-                    text: "text-purple-700",
-                    border: "border-purple-200",
+                    bg: "bg-primary/10",
+                    text: "text-primary",
+                    border: "border-primary/20",
                     icon: FileText
                 };
             default:
@@ -136,9 +136,10 @@ export function ContractHeader({
                 {/* Negotiation Note Alert */}
                 {contract.lastNegotiationNote && contract.status === ContractStatus.DRAFT && (
                     <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-3 text-yellow-800"
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2 }}
+                        className="mb-6 p-4 bg-warning/10 border border-warning/20 rounded-lg flex gap-3 text-warning"
                     >
                         <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                         <div>
@@ -189,7 +190,7 @@ export function ContractHeader({
                                     variant="destructive"
                                     onClick={onTerminate}
                                     disabled={isActionLoading}
-                                    className="flex-1 sm:flex-none gap-2 bg-red-50 hover:bg-red-100 text-red-600 border-red-200 shadow-sm border"
+                                    className="flex-1 sm:flex-none gap-2 bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20 shadow-sm border"
                                 >
                                     <Ban className="w-4 h-4" />
                                     <span className="hidden sm:inline">Chấm dứt</span>
@@ -200,7 +201,7 @@ export function ContractHeader({
                                 contractId={contract.id}
                                 contractNumber={contract.contractNumber}
                                 trigger={
-                                    <Button variant="outline" className="flex-1 sm:flex-none gap-2 bg-white hover:bg-gray-50 text-blue-600 border-blue-200 shadow-sm">
+                                    <Button variant="outline" className="flex-1 sm:flex-none gap-2 bg-card hover:bg-muted text-info border-info/20 shadow-sm">
                                         <Download className="w-4 h-4" />
                                         <span className="hidden sm:inline">In / Xuất PDF</span>
                                     </Button>

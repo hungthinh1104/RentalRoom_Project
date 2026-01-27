@@ -16,7 +16,7 @@ interface AdminProfileClientProps {
 export function AdminProfileClient({ user }: AdminProfileClientProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: (user as any)?.fullName || user?.name || "",
+    fullName: (user as { fullName?: string }).fullName || user?.name || "",
     email: user?.email || "",
     phoneNumber: "",
   });

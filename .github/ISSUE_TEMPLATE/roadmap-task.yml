@@ -1,0 +1,86 @@
+name: 🚀 Roadmap Task
+description: Convert roadmap item into actionable backlog ticket
+title: "[EPIC] "
+labels: ["roadmap", "needs-triage"]
+body:
+  - type: dropdown
+    id: epic
+    attributes:
+      label: Epic
+      description: Which epic does this belong to?
+      options:
+        - Observability
+        - DB Optimization
+        - Cache Strategy
+        - Test Coverage
+        - Infrastructure Scaling
+        - Security Hardening
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: 📥 Input (Prerequisites)
+      description: What needs to exist before this can be done?
+      placeholder: |
+        **Required:**
+        - [ ] Item 1
+        - [ ] Item 2
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: 📤 Expected Output
+      description: What will exist after this is done?
+      placeholder: |
+        1. **Artifact 1**: Description
+        2. **Configuration**: Updated file `xyz.yml`
+    validations:
+      required: true
+
+  - type: textarea
+    id: metrics
+    attributes:
+      label: 📊 Success Metrics
+      description: How do we measure success?
+      placeholder: |
+        **Before:**
+        - p95 response time: 500ms
+        - Connection pool: 100
+
+        **After (Target):**
+        - p95 response time: <200ms
+        - Connection pool: 20
+    validations:
+      required: true
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: ⚠️ Risks & Mitigation
+      description: What could go wrong?
+      placeholder: |
+        **Risk**: Connection pool too small
+        **Mitigation**: Monitor connection queue depth, adjust if needed
+
+  - type: input
+    id: effort
+    attributes:
+      label: 📅 Estimated Effort
+      description: In developer-days
+      placeholder: "3 days"
+
+  - type: checkboxes
+    id: definition-of-done
+    attributes:
+      label: ✅ Definition of Done
+      options:
+        - label: Code merged to main
+        - label: Tests passing
+        - label: Metrics showing improvement
+        - label: Documentation updated
+        - label: Deployed to production

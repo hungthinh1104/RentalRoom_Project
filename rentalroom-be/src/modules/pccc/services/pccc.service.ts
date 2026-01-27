@@ -23,8 +23,7 @@ export class PCCCService {
     private readonly prisma: PrismaService,
     private readonly snapshotService: SnapshotService,
     private readonly documentsService: DocumentsService,
-  ) { }
-
+  ) {}
 
   /**
    * Generate PCCC Compliance Report (PC17 Template)
@@ -61,7 +60,6 @@ export class PCCCService {
 
     // 3️⃣ ATOMIC TRANSACTION: DB create + PDF generation + hash + snapshot
     const result = await this.prisma.$transaction(async (tx) => {
-
       // Create PCCC report record
       const report = await tx.pCCCReport.create({
         data: {
@@ -96,7 +94,7 @@ export class PCCCService {
       const qrData = {
         reportId: report.id,
         propertyId,
-        url: `https://diphungthinh.io.vn/verify/${report.id}`,
+        url: `http://localhost:3000/verify/${report.id}`,
         expires: report.expiryDate,
         pdfHash, // Include hash in QR for verification
       };
@@ -166,14 +164,17 @@ export class PCCCService {
     try {
       await this.documentsService.create(landlordId, {
         title: `Chứng nhận PCCC - ${property.name}`,
-        type: 'PCCC_CERTIFICATE' as any,
+        type: 'PCCC_CERTIFICATE',
         fileUrl: result.pdfUrl,
         propertyId: propertyId,
         expiryDate: result.expiryDate.toISOString(),
         description: `Tự động tạo từ báo cáo PCCC #${result.reportId.substring(0, 8)}`,
       });
     } catch (error) {
-      this.logger.error(`Failed to auto-create UserDocument for PCCC report ${result.reportId}`, error);
+      this.logger.error(
+        `Failed to auto-create UserDocument for PCCC report ${result.reportId}`,
+        error,
+      );
       // Don't fail the main request, just log error
     }
 
@@ -257,7 +258,7 @@ export class PCCCService {
   /**
    * Calculate compliance score
    */
-  private calculateComplianceScore(requirements: any): number {
+  private calculateComplianceScore(_requirements: any): number {
     const score = 100;
     // Simplified scoring logic
     return score;

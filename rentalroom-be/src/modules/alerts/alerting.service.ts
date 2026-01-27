@@ -4,6 +4,7 @@ import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationOutboxService } from 'src/modules/notifications/outbox.service';
 import { ConfigService } from '@nestjs/config';
 import { AlertType, AlertSeverity, NotificationType } from '@prisma/client';
+import { CronClusterGuard } from 'src/shared/guards/cron-cluster.guard';
 
 // Re-export for external use
 export { AlertType, AlertSeverity };
@@ -59,8 +60,10 @@ export class AlertingService {
     private readonly prisma: PrismaService,
     private readonly notificationOutbox: NotificationOutboxService,
     private readonly configService: ConfigService,
+    private readonly cronGuard: CronClusterGuard,
   ) {
-    this.adminEmail = this.configService.get('ADMIN_EMAIL') || 'admin@example.com';
+    this.adminEmail =
+      this.configService.get('ADMIN_EMAIL') || 'admin@example.com';
   }
 
   /**
@@ -88,6 +91,21 @@ export class AlertingService {
         },
       });
 
+      await (this.prisma as any).changeLog.create({
+        data: {
+          userId: alert.affectedUserId,
+          changeType: 'ALERT_CREATED',
+          entityType: 'ALERT',
+          entityId: storedAlert.id,
+          metadata: {
+            type: alert.type,
+            severity: alert.severity,
+            resourceType: alert.resourceType,
+            resourceId: alert.resourceId,
+          },
+        },
+      });
+
       // Get affected user for email notification
       const affectedUser = await this.prisma.user.findUnique({
         where: { id: alert.affectedUserId },
@@ -108,7 +126,10 @@ export class AlertingService {
       }
 
       // CRITICAL alerts also go to admin
-      if (alert.severity === AlertSeverity.CRITICAL && affectedUser?.email !== this.adminEmail) {
+      if (
+        alert.severity === AlertSeverity.CRITICAL &&
+        affectedUser?.email !== this.adminEmail
+      ) {
         const adminEmailSubject = `[CRITICAL] ${alert.title}`;
         const adminEmailBody = this.buildAdminEmailBody(alert, affectedUser);
 
@@ -144,8 +165,9 @@ export class AlertingService {
    * - Overdue invoices (>3 days past due)
    * - Auto-payment retry exhaustion
    */
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_10_MINUTES) // Reduced from EVERY_5_MINUTES for performance
   async checkPaymentAlerts() {
+    if (!this.cronGuard.shouldExecute('checkPaymentAlerts')) return;
     try {
       // Find invoices overdue by more than 3 days
       const threeDaysAgo = new Date();
@@ -195,7 +217,8 @@ export class AlertingService {
               invoiceNumber: invoice.invoiceNumber,
               amount: invoice.totalAmount.toString(),
               daysOverdue: Math.floor(
-                (Date.now() - invoice.dueDate.getTime()) / (1000 * 60 * 60 * 24),
+                (Date.now() - invoice.dueDate.getTime()) /
+                (1000 * 60 * 60 * 24),
               ),
               tenantName: invoice.contract.tenant?.userId,
             },
@@ -250,7 +273,9 @@ export class AlertingService {
         }
       }
 
-      this.logger.debug(`Payment alerts checked: ${overdueInvoices.length} overdue invoices found`);
+      this.logger.debug(
+        `Payment alerts checked: ${overdueInvoices.length} overdue invoices found`,
+      );
     } catch (error) {
       this.logger.error('Error checking payment alerts', error);
     }
@@ -267,6 +292,7 @@ export class AlertingService {
    */
   @Cron('0 2 * * *') // 2 AM daily
   async checkContractAlerts() {
+    if (!this.cronGuard.shouldExecute('checkContractAlerts')) return;
     try {
       // Find contracts expiring in next 30 days
       const thirtyDaysFromNow = new Date();
@@ -302,11 +328,16 @@ export class AlertingService {
         if (!existingAlert) {
           await this.createAlert({
             type: AlertType.CONTRACT_EXPIRING_SOON,
-            severity: daysUntilExpiry <= 7 ? AlertSeverity.CRITICAL : AlertSeverity.HIGH,
+            severity:
+              daysUntilExpiry <= 7
+                ? AlertSeverity.CRITICAL
+                : AlertSeverity.HIGH,
             title: `Contract Expiring: ${contract.contractNumber}`,
             description: `Contract ${contract.contractNumber} will expire in ${daysUntilExpiry} days (${new Date(
               contract.endDate,
-            ).toLocaleDateString('vi-VN')}). Renewal or termination action needed.`,
+            ).toLocaleDateString(
+              'vi-VN',
+            )}). Renewal or termination action needed.`,
             resourceType: 'CONTRACT',
             resourceId: contract.id,
             affectedUserId: contract.landlordId,
@@ -319,7 +350,9 @@ export class AlertingService {
         }
       }
 
-      this.logger.debug(`Contract alerts checked: ${expiringContracts.length} expiring contracts found`);
+      this.logger.debug(
+        `Contract alerts checked: ${expiringContracts.length} expiring contracts found`,
+      );
     } catch (error) {
       this.logger.error('Error checking contract alerts', error);
     }
@@ -335,6 +368,7 @@ export class AlertingService {
    */
   @Cron('*/30 * * * *') // Every 30 minutes
   async checkDisputeAlerts() {
+    if (!this.cronGuard.shouldExecute('checkDisputeAlerts')) return;
     try {
       // Find escalated disputes
       const escalatedDisputes = await this.prisma.dispute.findMany({
@@ -436,6 +470,7 @@ export class AlertingService {
    */
   @Cron('0 3 * * *') // 3 AM daily
   async checkRiskAlerts() {
+    if (!this.cronGuard.shouldExecute('checkRiskAlerts')) return;
     try {
       // Find bad debt invoices
       const badDebtInvoices = await this.prisma.badDebtInvoice.findMany({
@@ -496,16 +531,21 @@ export class AlertingService {
       });
 
       // Group by landlordId manually
-      const disputesByLandlord = disputes.reduce((acc, dispute) => {
-        const landlordId = dispute.contract.landlordId;
-        if (!acc[landlordId]) {
-          acc[landlordId] = [];
-        }
-        acc[landlordId].push(dispute);
-        return acc;
-      }, {} as Record<string, typeof disputes>);
+      const disputesByLandlord = disputes.reduce(
+        (acc, dispute) => {
+          const landlordId = dispute.contract.landlordId;
+          if (!acc[landlordId]) {
+            acc[landlordId] = [];
+          }
+          acc[landlordId].push(dispute);
+          return acc;
+        },
+        {} as Record<string, typeof disputes>,
+      );
 
-      for (const [landlordId, landlordDisputes] of Object.entries(disputesByLandlord)) {
+      for (const [landlordId, landlordDisputes] of Object.entries(
+        disputesByLandlord,
+      )) {
         if (landlordDisputes.length >= 3) {
           const existingAlert = await this.prisma.alert.findFirst({
             where: {

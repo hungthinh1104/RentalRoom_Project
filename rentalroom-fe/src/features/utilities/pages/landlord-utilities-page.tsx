@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useSession } from 'next-auth/react';
-import { useState } from 'react';
+
 import { contractsApi } from '@/features/contracts/api/contracts-api';
 import {
   UtilityInvoiceGenerator,

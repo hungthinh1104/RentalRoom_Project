@@ -25,6 +25,7 @@ import { UserRole } from '../users/entities';
 import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { AdminAuditService } from 'src/shared/audit/admin-audit.service';
+import { PrismaService } from 'src/database/prisma/prisma.service';
 
 @Controller('billing')
 export class BillingController {
@@ -32,6 +33,7 @@ export class BillingController {
     private readonly billingService: BillingService,
     private readonly pdfService: PdfService,
     private readonly adminAudit: AdminAuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post('invoices')
@@ -78,11 +80,28 @@ export class BillingController {
 
   @Patch('invoices/:id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  updateInvoice(
+  async updateInvoice(
     @Param('id') id: string,
     @Body() updateDto: UpdateInvoiceDto,
     @CurrentUser() user: any,
+    @Req() req: Request,
   ) {
+    // 📝 ADMIN AUDIT: Log invoice update if admin
+    if (user.role === UserRole.ADMIN) {
+      const invoice = await this.billingService.findOneInvoice(id, user);
+
+      await this.adminAudit.logAdminAction({
+        adminId: user.id,
+        action: 'UPDATE_INVOICE',
+        entityType: 'INVOICE',
+        entityId: id,
+        beforeValue: invoice,
+        reason: `Admin updated invoice ${invoice.invoiceNumber}, status: ${invoice.status}, fields: ${Object.keys(updateDto).join(', ')}`,
+        ipAddress: req.ip,
+        timestamp: new Date(),
+      });
+    }
+
     return this.billingService.updateInvoice(id, updateDto, user);
   }
 
@@ -91,7 +110,7 @@ export class BillingController {
   markAsPaid(
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Headers('idempotency-key') idempotencyKey?: string,
+    @Headers('idempotency-key') idempotencyKey: string,
   ) {
     return this.billingService.markAsPaid(id, user, idempotencyKey);
   }
@@ -105,7 +124,7 @@ export class BillingController {
   ) {
     // 📝 ADMIN AUDIT: Log invoice deletion before executing
     const invoice = await this.billingService.findOneInvoice(id, user);
-    
+
     await this.adminAudit.logAdminAction({
       adminId: user.id,
       action: 'DELETE_INVOICE',
@@ -156,11 +175,16 @@ export class BillingController {
       readings: Array<{ serviceId: string; currentReading: number }>;
     },
     @CurrentUser() user: any,
+    @Headers('idempotency-key') idempotencyKey: string,
   ) {
-    return this.billingService.submitMeterReadingsForLandlord(dto, {
-      id: user.id,
-      role: user.role,
-    });
+    return this.billingService.submitMeterReadingsForLandlord(
+      dto,
+      {
+        id: user.id,
+        role: user.role,
+      },
+      idempotencyKey,
+    );
   }
 
   /**
@@ -179,6 +203,19 @@ export class BillingController {
    * Generate utility invoice from meter readings
    * Creates invoice with line items for each service
    */
+
+  @Post('utilities/invoice/:contractId/:month')
+  @Auth(UserRole.LANDLORD)
+  async generateUtilityInvoice(
+    @Param('contractId') contractId: string,
+    @Param('month') month: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.billingService.generateUtilityInvoice(contractId, month, {
+      id: user.id,
+      role: user.role,
+    });
+  }
 
   @Get('utilities/invoices')
   @Auth(UserRole.TENANT, UserRole.LANDLORD)

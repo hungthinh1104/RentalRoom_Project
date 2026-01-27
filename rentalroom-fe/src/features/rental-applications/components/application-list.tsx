@@ -148,7 +148,7 @@ export function ApplicationsList({ view = "tenant", pageSize = 10 }: Application
                 <div key={app.id} onClick={() => openDrawer(app)} className="group cursor-pointer grid grid-cols-1 md:grid-cols-12 gap-4 p-5 rounded-xl border border-border bg-card shadow-sm hover:shadow-md transition-all">
                   <div className="md:col-span-4 space-y-1">
                     <div className="text-sm font-medium text-muted-foreground">Phòng</div>
-                    <div className="font-semibold text-lg text-indigo-600 group-hover:text-indigo-700">{app.room?.roomNumber ?? app.roomAddress ?? "—"}</div>
+                    <div className="font-semibold text-lg text-primary group-hover:text-primary/90">{app.room?.roomNumber ?? app.roomAddress ?? "—"}</div>
                     <div className="text-sm text-muted-foreground">{app.roomAddress}</div>
                   </div>
 
@@ -178,7 +178,7 @@ export function ApplicationsList({ view = "tenant", pageSize = 10 }: Application
 
                       {view === "landlord" && app.status === ApplicationStatus.APPROVED && !app.contractId && (
                         <Link href={`/dashboard/landlord/contracts/create?applicationId=${app.id}`} className="w-full sm:w-auto">
-                          <Button size="sm" variant="default" className="w-full bg-indigo-600 hover:bg-indigo-700">Tạo hợp đồng</Button>
+                          <Button size="sm" variant="default" className="w-full bg-primary hover:bg-primary/90">Tạo hợp đồng</Button>
                         </Link>
                       )}
 

@@ -26,37 +26,37 @@ export const NOTIFICATION_TYPE_CONFIG: Record<NotificationType, NotificationType
   [NotificationType.PAYMENT]: {
     label: 'Thanh toán',
     icon: AlertCircle,
-    bgColor: 'bg-yellow-50',
-    textColor: 'text-yellow-700',
-    borderColor: 'border-yellow-200',
+    bgColor: 'bg-warning/10',
+    textColor: 'text-warning',
+    borderColor: 'border-warning/20',
   },
   [NotificationType.CONTRACT]: {
     label: 'Hợp đồng',
     icon: FileText,
-    bgColor: 'bg-blue-50',
-    textColor: 'text-blue-700',
-    borderColor: 'border-blue-200',
+    bgColor: 'bg-info/10',
+    textColor: 'text-info',
+    borderColor: 'border-info/20',
   },
   [NotificationType.MAINTENANCE]: {
     label: 'Bảo trì',
     icon: Wrench,
-    bgColor: 'bg-orange-50',
-    textColor: 'text-orange-700',
-    borderColor: 'border-orange-200',
+    bgColor: 'bg-accent-purple/10',
+    textColor: 'text-accent-purple',
+    borderColor: 'border-accent-purple/20',
   },
   [NotificationType.APPLICATION]: {
     label: 'Đơn đăng ký',
     icon: FileText,
-    bgColor: 'bg-green-50',
-    textColor: 'text-green-700',
-    borderColor: 'border-green-200',
+    bgColor: 'bg-success/10',
+    textColor: 'text-success',
+    borderColor: 'border-success/20',
   },
   [NotificationType.SYSTEM]: {
     label: 'Hệ thống',
     icon: Info,
-    bgColor: 'bg-gray-50',
-    textColor: 'text-gray-700',
-    borderColor: 'border-gray-200',
+    bgColor: 'bg-muted',
+    textColor: 'text-muted-foreground',
+    borderColor: 'border-border',
   },
 };
 
@@ -71,9 +71,9 @@ export function getNotificationTypeConfig(
     config || {
       label: 'Thông báo',
       icon: Bell,
-      bgColor: 'bg-gray-50',
-      textColor: 'text-gray-700',
-      borderColor: 'border-gray-200',
+      bgColor: 'bg-muted',
+      textColor: 'text-muted-foreground',
+      borderColor: 'border-border',
     }
   );
 }

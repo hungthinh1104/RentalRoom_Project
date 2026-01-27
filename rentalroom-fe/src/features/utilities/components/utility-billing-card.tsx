@@ -23,10 +23,10 @@ const getServiceIcon = (serviceName: string) => {
 
 const getServiceBadgeColor = (serviceName: string) => {
   const name = serviceName.toLowerCase();
-  if (name.includes('điện')) return 'bg-yellow-100 text-yellow-800';
-  if (name.includes('nước')) return 'bg-blue-100 text-blue-800';
-  if (name.includes('internet')) return 'bg-purple-100 text-purple-800';
-  return 'bg-gray-100 text-gray-800';
+  if (name.includes('điện')) return 'bg-utility-electric/10 text-utility-electric';
+  if (name.includes('nước')) return 'bg-utility-water/10 text-utility-water';
+  if (name.includes('internet')) return 'bg-utility-internet/10 text-utility-internet';
+  return 'bg-muted text-muted-foreground';
 };
 
 export function UtilityBillingCard({
@@ -43,7 +43,7 @@ export function UtilityBillingCard({
         </CardHeader>
         <CardContent>
           <div className="flex justify-center py-8">
-            <div className="text-gray-500">Đang tải...</div>
+            <div className="text-muted-foreground">Đang tải...</div>
           </div>
         </CardContent>
       </Card>
@@ -62,7 +62,7 @@ export function UtilityBillingCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {meteredServices.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
+          <div className="text-center text-muted-foreground py-8">
             Không có dịch vụ theo chỉ số
           </div>
         ) : (
@@ -75,7 +75,7 @@ export function UtilityBillingCard({
               return (
                 <div
                   key={service.id}
-                  className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
+                  className="flex items-center justify-between rounded-lg border border-border p-4"
                 >
                   <div className="flex items-center gap-3 flex-1">
                     <div className={`p-2 rounded-lg ${getServiceBadgeColor(service.serviceName)}`}>
@@ -83,7 +83,7 @@ export function UtilityBillingCard({
                     </div>
                     <div className="flex-1">
                       <p className="font-medium">{service.serviceName}</p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted-foreground">
                         {service.unitPrice.toLocaleString('vi-VN')} ₫/{service.unit}
                       </p>
                     </div>
@@ -95,7 +95,7 @@ export function UtilityBillingCard({
                         <p className="text-2xl font-bold">
                           {reading.amount.toLocaleString('vi-VN')}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           Tiêu thụ: {reading.usage.toLocaleString('vi-VN')}{service.unit}
                         </p>
                       </div>
@@ -110,7 +110,7 @@ export function UtilityBillingCard({
             <div className="border-t pt-4 mt-4">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Tổng chi phí dịch vụ:</span>
-                <span className="text-2xl font-bold text-blue-600">
+                <span className="text-2xl font-bold text-info">
                   {totalAmount.toLocaleString('vi-VN')} ₫
                 </span>
               </div>

@@ -7,12 +7,13 @@ import {
   getDispute,
   type CreateDisputeDto,
   type DisputeResolution,
+  type DisputeStatus,
 } from "../api/disputes-api";
 
-export function useDisputes(params?: { status?: string }) {
+export function useDisputes(params?: { status?: DisputeStatus }) {
   return useQuery({
     queryKey: ["disputes", params?.status],
-    queryFn: () => listDisputes(params as any),
+    queryFn: () => listDisputes(params),
   });
 }
 

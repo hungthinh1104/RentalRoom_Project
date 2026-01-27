@@ -95,8 +95,8 @@ export default function LandlordReviewsPage() {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-yellow-500/10">
-                                    <Star className="w-5 h-5 text-yellow-500" />
+                                <div className="p-2 rounded-lg bg-warning/10">
+                                    <Star className="w-5 h-5 text-warning" />
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{stats.avgRating.toFixed(1)}</p>
@@ -108,8 +108,8 @@ export default function LandlordReviewsPage() {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-orange-500/10">
-                                    <MessageSquare className="w-5 h-5 text-orange-500" />
+                                <div className="p-2 rounded-lg bg-info/10">
+                                    <MessageSquare className="w-5 h-5 text-info" />
                                 </div>
                                 <div>
                                     <p className="text-2xl font-bold">{stats.pending}</p>

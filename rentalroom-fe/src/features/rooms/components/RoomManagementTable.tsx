@@ -31,9 +31,9 @@ export function RoomManagementTable({ propertyId }: RoomManagementTableProps) {
 
     const getStatusBadge = (status: RoomStatus) => {
         switch (status) {
-            case RoomStatus.AVAILABLE: return <Badge className="bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">Trống</Badge>;
-            case RoomStatus.OCCUPIED: return <Badge className="bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 border-blue-500/20">Đang thuê</Badge>;
-            case RoomStatus.DEPOSIT_PENDING: return <Badge className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20">Cọc giữ chỗ</Badge>;
+            case RoomStatus.AVAILABLE: return <Badge className="bg-success/10 text-success hover:bg-success/20 border-success/20">Trống</Badge>;
+            case RoomStatus.OCCUPIED: return <Badge className="bg-info/10 text-info hover:bg-info/20 border-info/20">Đang thuê</Badge>;
+            case RoomStatus.DEPOSIT_PENDING: return <Badge className="bg-warning/10 text-warning hover:bg-warning/20 border-warning/20">Cọc giữ chỗ</Badge>;
             default: return <Badge variant="outline">Khác</Badge>;
         }
     };
@@ -85,8 +85,8 @@ export function RoomManagementTable({ propertyId }: RoomManagementTableProps) {
                             <TableCell>{room.area} m²</TableCell>
                             <TableCell>
                                 <div className="flex gap-1">
-                                    {room.amenities?.includes(AmenityType.WIFI) && <Wifi className="w-4 h-4 text-blue-500" />}
-                                    {room.amenities?.includes(AmenityType.AC) && <Power className="w-4 h-4 text-orange-500" />}
+                                    {room.amenities?.includes(AmenityType.WIFI) && <Wifi className="w-4 h-4 text-utility-internet" />}
+                                    {room.amenities?.includes(AmenityType.AC) && <Power className="w-4 h-4 text-warning" />}
                                     <span className="text-xs text-muted-foreground self-center">
                                         {(room.amenities?.length ?? 0) > 2 ? `+${(room.amenities?.length ?? 0) - 2}` : ''}
                                     </span>

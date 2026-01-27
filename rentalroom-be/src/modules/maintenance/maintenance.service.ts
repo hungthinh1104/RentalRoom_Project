@@ -256,7 +256,7 @@ export class MaintenanceService {
       });
 
       // � LOG STATE TRANSITION: Maintenance PENDING/IN_PROGRESS → COMPLETED
-      await this.stateLogger.logTransitionSafe({
+      this.stateLogger.logTransitionSafe({
         entityType: 'maintenance',
         entityId: id,
         oldStatus: request.status,

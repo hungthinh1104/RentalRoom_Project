@@ -14,11 +14,17 @@ export async function GET(
 
   const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
   try {
+    const headers: Record<string, string> = {
+      'Cookie': request.headers.get('cookie') || '',
+    };
+    // Pass through Authorization header for authenticated requests
+    const authHeader = request.headers.get('authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
     const response = await fetch(targetUrl, {
       method: 'GET',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
+      headers,
       credentials: 'include',
     });
     const data = await response.json().catch(() => ({}));
@@ -41,12 +47,18 @@ export async function POST(
   const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
   try {
     const body = await request.json().catch(() => ({}));
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Cookie': request.headers.get('cookie') || '',
+    };
+    // Pass through Authorization header for authenticated requests
+    const authHeader = request.headers.get('authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': request.headers.get('cookie') || '',
-      },
+      headers,
       body: JSON.stringify(body),
       credentials: 'include',
     });
@@ -70,12 +82,18 @@ export async function PUT(
   const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
   try {
     const body = await request.json().catch(() => ({}));
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Cookie': request.headers.get('cookie') || '',
+    };
+    // Pass through Authorization header for authenticated requests
+    const authHeader = request.headers.get('authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
     const response = await fetch(targetUrl, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': request.headers.get('cookie') || '',
-      },
+      headers,
       body: JSON.stringify(body),
       credentials: 'include',
     });
@@ -98,11 +116,17 @@ export async function DELETE(
 
   const targetUrl = `${BACKEND_URL}/api/v1/${pathStr}${queryString}`;
   try {
+    const headers: Record<string, string> = {
+      'Cookie': request.headers.get('cookie') || '',
+    };
+    // Pass through Authorization header for authenticated requests
+    const authHeader = request.headers.get('authorization');
+    if (authHeader) {
+      headers['Authorization'] = authHeader;
+    }
     const response = await fetch(targetUrl, {
       method: 'DELETE',
-      headers: {
-        'Cookie': request.headers.get('cookie') || '',
-      },
+      headers,
       credentials: 'include',
     });
     const data = await response.json().catch(() => ({}));

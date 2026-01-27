@@ -9,6 +9,7 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { SanitizePipe } from './common/pipes/sanitize.pipe';
 import { PaymentIdempotencyMiddleware } from './common/middleware/payment-idempotency.middleware';
+import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
 import { PrismaService } from './database/prisma/prisma.service';
 
 // Initialize Sentry for error monitoring (production only)
@@ -102,11 +103,14 @@ async function bootstrap() {
 
   // Payment Idempotency Middleware (UC_PAY_01 - Replay Attack Prevention)
   const prismaService = app.get(PrismaService);
-  app.use(
-    new PaymentIdempotencyMiddleware(prismaService).use.bind(
-      new PaymentIdempotencyMiddleware(prismaService),
-    ),
+  const paymentIdempotencyMiddleware = new PaymentIdempotencyMiddleware(
+    prismaService,
   );
+  app.use((req, res, next) => paymentIdempotencyMiddleware.use(req, res, next));
+
+  // Rate Limiting Middleware (prevent abuse on sensitive endpoints)
+  const rateLimitMiddleware = new RateLimitMiddleware();
+  app.use((req, res, next) => rateLimitMiddleware.use(req, res, next));
 
   // CORS
   const corsOrigins = process.env.CORS_ORIGIN

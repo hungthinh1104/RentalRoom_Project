@@ -14,7 +14,7 @@ export default function TermsOfServicePage() {
         <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
             {/* Background Effects */}
             <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[120px] -z-10 animate-pulse-soft" />
-            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] -z-10" />
+            <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent-purple/10 rounded-full blur-[120px] -z-10" />
 
             {/* Header */}
             <header className="sticky top-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl">
@@ -131,21 +131,21 @@ export default function TermsOfServicePage() {
                         <div className="grid md:grid-cols-2 gap-6">
                             <Card className="bg-background/50 backdrop-blur-sm border-border/50 hover:shadow-lg transition-all duration-300">
                                 <CardContent className="p-6 space-y-4">
-                                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-xl bg-info/10 text-info flex items-center justify-center">
                                         <div className="font-bold text-xl">T</div>
                                     </div>
                                     <h3 className="text-xl font-bold">Người thuê (Tenant)</h3>
                                     <ul className="space-y-2 text-sm text-muted-foreground">
                                         <li className="flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
                                             Tìm kiếm, xem phòng và gửi yêu cầu thuê
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
                                             Ký hợp đồng điện tử và thanh toán online
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
                                             Yêu cầu bảo trì và hỗ trợ kỹ thuật
                                         </li>
                                     </ul>
@@ -154,21 +154,21 @@ export default function TermsOfServicePage() {
 
                             <Card className="bg-background/50 backdrop-blur-sm border-border/50 hover:shadow-lg transition-all duration-300">
                                 <CardContent className="p-6 space-y-4">
-                                    <div className="w-12 h-12 rounded-xl bg-orange-500/10 text-orange-500 flex items-center justify-center">
+                                    <div className="w-12 h-12 rounded-xl bg-warning/10 text-warning flex items-center justify-center">
                                         <div className="font-bold text-xl">L</div>
                                     </div>
                                     <h3 className="text-xl font-bold">Chủ nhà (Landlord)</h3>
                                     <ul className="space-y-2 text-sm text-muted-foreground">
                                         <li className="flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
                                             Đăng tin, quản lý phòng và duyệt yêu cầu
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
                                             Tạo hợp đồng, thu tiền và quản lý cư dân
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                                            <CheckCircle2 className="w-4 h-4 text-success mt-0.5 shrink-0" />
                                             Đảm bảo chất lượng cơ sở vật chất
                                         </li>
                                     </ul>

@@ -13,14 +13,16 @@ import {
 } from './dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
-import { PaymentStatus } from './entities';
 import { PaymentService } from './payment.service';
 import { PaymentVerificationResult } from './interfaces';
-import { User, UserRole } from '@prisma/client';
+import { User, UserRole, PaymentStatus } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
 import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
-import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
+import {
+  ImmutabilityGuard,
+  IdempotencyGuard,
+} from 'src/shared/guards/immutability.guard';
 
 @Injectable()
 export class PaymentsService {
@@ -266,7 +268,7 @@ export class PaymentsService {
 
     if (
       updatePaymentDto.status &&
-      updatePaymentDto.status !== payment.status
+      (updatePaymentDto.status as any) !== payment.status
     ) {
       this.stateMachine.validateTransition(
         'PAYMENT',
@@ -460,7 +462,10 @@ export class PaymentsService {
     return { message: 'Payment deleted successfully' };
   }
 
-  async checkPaymentStatus(id: string, user?: User): Promise<PaymentVerificationResult> {
+  async checkPaymentStatus(
+    id: string,
+    user?: User,
+  ): Promise<PaymentVerificationResult> {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
       include: {

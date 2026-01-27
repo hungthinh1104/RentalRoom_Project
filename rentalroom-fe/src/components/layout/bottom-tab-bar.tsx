@@ -68,12 +68,19 @@ export function BottomTabBar({ role, className }: BottomTabBarProps) {
     return (
         <nav
             className={cn(
-                'lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t',
-                'safe-area-inset-bottom', // For iPhone notch
+                'lg:hidden fixed bottom-0 left-0 right-0 z-50',
+                'bg-card/80 backdrop-blur-md border-t border-border',
+                'pb-safe', // Safe area padding for devices with notches
                 className
             )}
+            style={{
+                // Ensure it stays above everything and docks properly
+                position: 'fixed',
+                bottom: 0,
+                width: '100%',
+            }}
         >
-            <div className="grid grid-cols-5 h-16">
+            <div className="grid grid-cols-5 h-16 w-full">
                 {tabItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
@@ -81,14 +88,26 @@ export function BottomTabBar({ role, className }: BottomTabBarProps) {
                             key={item.href}
                             href={item.href}
                             className={cn(
-                                'flex flex-col items-center justify-center gap-1 transition-colors',
+                                'flex flex-col items-center justify-center gap-1',
+                                'transition-all duration-200 ease-in-out',
+                                'active:scale-95', // Touch feedback
                                 isActive
                                     ? 'text-primary'
                                     : 'text-muted-foreground hover:text-foreground'
                             )}
                         >
-                            <item.icon className={cn('h-5 w-5', isActive && 'stroke-[2.5]')} />
-                            <span className={cn('text-[10px] font-medium', isActive && 'font-semibold')}>
+                            <item.icon
+                                className={cn(
+                                    'h-5 w-5 transition-all duration-200',
+                                    isActive && 'stroke-[2.5] scale-110'
+                                )}
+                            />
+                            <span
+                                className={cn(
+                                    'text-[10px] font-medium transition-all duration-200',
+                                    isActive && 'font-semibold'
+                                )}
+                            >
                                 {item.title}
                             </span>
                         </Link>

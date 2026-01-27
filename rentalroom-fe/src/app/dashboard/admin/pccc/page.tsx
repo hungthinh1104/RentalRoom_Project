@@ -47,8 +47,8 @@ export default function AdminPCCCPage() {
     };
 
     const getScoreBadge = (score: number) => {
-        if (score >= 90) return <Badge className="bg-green-600">Đạt Chuẩn ({score})</Badge>;
-        if (score >= 60) return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Cảnh Báo ({score})</Badge>;
+        if (score >= 90) return <Badge className="bg-success text-success-foreground">Đạt Chuẩn ({score})</Badge>;
+        if (score >= 60) return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">Cảnh Báo ({score})</Badge>;
         return <Badge variant="destructive">Nguy Hiểm ({score})</Badge>;
     };
 
@@ -87,7 +87,7 @@ export default function AdminPCCCPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {reports?.map((report) => (
+                                {reports?.map((report: PCCCReport) => (
                                     <TableRow key={report.id}>
                                         <TableCell className="font-medium max-w-[300px] truncate" title={report.propertyId}>
                                             {/* Ideally fetch property address or name */}

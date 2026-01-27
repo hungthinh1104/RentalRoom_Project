@@ -127,7 +127,7 @@ Ví dụ: 'Phòng trọ 25m2, full nội thất, có máy lạnh, wifi, wc riên
       {/* Results */}
       {result && (
         <div className="space-y-4 animate-in fade-in-50 slide-in-from-top-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-green-600">
+          <div className="flex items-center gap-2 text-sm font-medium text-success">
             <CheckCircle2 className="h-4 w-4" />
             Phân tích thành công!
           </div>
@@ -200,15 +200,15 @@ Ví dụ: 'Phòng trọ 25m2, full nội thất, có máy lạnh, wifi, wc riên
                 result.sentiment === "positive"
                   ? "default"
                   : result.sentiment === "negative"
-                  ? "destructive"
-                  : "secondary"
+                    ? "destructive"
+                    : "secondary"
               }
             >
               {result.sentiment === "positive"
                 ? "Tích cực ✨"
                 : result.sentiment === "negative"
-                ? "Tiêu cực"
-                : "Trung lập"}
+                  ? "Tiêu cực"
+                  : "Trung lập"}
             </Badge>
           </div>
 

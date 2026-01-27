@@ -8,10 +8,10 @@ import {
 } from '@nestjs/common';
 import {
   Prisma,
-  InvoiceStatus,
-  UserRole,
   ContractStatus,
-  PrismaClient,
+  ApplicationStatus,
+  UserRole,
+  InvoiceStatus,
 } from '@prisma/client';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
@@ -26,7 +26,6 @@ import {
 } from '../dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
-import { ApplicationStatus } from '../entities';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { EmailService } from 'src/common/services/email.service';
 import { NotificationType } from '../../notifications/entities/notification.entity';
@@ -81,20 +80,22 @@ export class ContractLifecycleService {
   /**
    * Advisory lock to serialize per-key critical sections (Postgres only)
    */
-  private async acquireLock(
-    tx: any,
-    key: string,
-  ) {
+  private async acquireLock(tx: any, key: string) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+  }
+
+  /**
+   * Compute next aggregate version for event store entries
+   */
+  private async nextEventVersion(client: any, aggregateId: string) {
+    const count = await client.domainEvent.count({ where: { aggregateId } });
+    return count + 1;
   }
 
   /**
    * Transaction-scoped contract loader to avoid mixed connections
    */
-  private async findOneTx(
-    tx: any,
-    id: string,
-  ) {
+  private async findOneTx(tx: any, id: string) {
     const contract = await tx.contract.findUnique({
       where: { id },
       include: {
@@ -155,7 +156,9 @@ export class ContractLifecycleService {
           const count = await tx.contract.count({
             where: {
               landlordId,
-              contractNumber: { startsWith: `HD-${landlordPrefix}-${yearMonth}` },
+              contractNumber: {
+                startsWith: `HD-${landlordPrefix}-${yearMonth}`,
+              },
             },
           });
 
@@ -186,7 +189,7 @@ export class ContractLifecycleService {
     );
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, actor?: User) {
     const contract = await this.prisma.contract.findUnique({
       where: { id },
       include: {
@@ -200,6 +203,15 @@ export class ContractLifecycleService {
 
     if (!contract) {
       throw new NotFoundException(`Contract with ID ${id} not found`);
+    }
+
+    // Ownership/visibility enforcement if actor provided
+    if (actor && actor.role !== (UserRole.ADMIN as any)) {
+      const isLandlord = contract.landlord?.userId === actor.id;
+      const isTenant = contract.tenant?.userId === actor.id;
+      if (!isLandlord && !isTenant) {
+        throw new ForbiddenException('Not authorized to view this contract');
+      }
     }
 
     return contract;
@@ -222,14 +234,14 @@ export class ContractLifecycleService {
 
     // Ownership filter
     if (user) {
-      if (user.role === UserRole.LANDLORD) {
+      if (user.role === (UserRole.LANDLORD as any)) {
         const landlord = await this.prisma.landlord.findUnique({
           where: { userId: user.id },
         });
         if (!landlord)
           throw new BadRequestException('Landlord profile not found');
         where.landlordId = landlord.userId;
-      } else if (user.role === UserRole.TENANT) {
+      } else if (user.role === (UserRole.TENANT as any)) {
         const tenant = await this.prisma.tenant.findUnique({
           where: { userId: user.id },
         });
@@ -238,7 +250,7 @@ export class ContractLifecycleService {
       }
     }
 
-    if (landlordId && (!user || user.role === UserRole.ADMIN))
+    if (landlordId && (!user || user.role === (UserRole.ADMIN as any)))
       where.landlordId = landlordId;
     if (tenantId) where.tenantId = tenantId;
     if (roomId) where.roomId = roomId;
@@ -271,8 +283,8 @@ export class ContractLifecycleService {
     return new PaginatedResponse(transformed, total, page, limit);
   }
 
-  async getContractDetails(id: string) {
-    const contract = await this.findOne(id);
+  async getContractDetails(id: string, actor?: User) {
+    const contract = await this.findOne(id, actor);
     return this.transformToDto(contract);
   }
 
@@ -290,7 +302,15 @@ export class ContractLifecycleService {
 
   // --- Creation & Sending ---
 
-  async create(createContractDto: CreateContractDto) {
+  async create(createContractDto: CreateContractDto, actor: User) {
+    // 🔒 Ownership enforcement: only landlord can create own contracts
+    if (!actor || (actor.role as any) !== UserRole.LANDLORD) {
+      throw new ForbiddenException('Only landlord can create contracts');
+    }
+    if (actor.id !== createContractDto.landlordId) {
+      throw new ForbiddenException('Landlord mismatch');
+    }
+
     const paymentConfig = await this.prisma.paymentConfig.findUnique({
       where: { landlordId: createContractDto.landlordId },
     });
@@ -303,14 +323,23 @@ export class ContractLifecycleService {
 
     const { residents, ...contractData } = createContractDto;
 
+    // Verify room belongs to landlord
+    const roomOwnership = await this.prisma.room.findUnique({
+      where: { id: contractData.roomId },
+      include: { property: { include: { landlord: true } } },
+    });
+    if (!roomOwnership) throw new NotFoundException('Room not found');
+    if (roomOwnership.property.landlord.userId !== actor.id) {
+      throw new ForbiddenException(
+        'Cannot create contract for a room you do not own',
+      );
+    }
+
     const contractNumber =
       contractData.contractNumber ||
       (await this.generateContractNumber(createContractDto.landlordId));
 
-    const paymentRef = contractNumber
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .toUpperCase();
-    const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // Do NOT compute paymentRef/depositDeadline at creation; only after tenant approves
 
     const contract = await this.prisma.$transaction(async (tx) => {
       const room = await tx.room.findUnique({
@@ -325,9 +354,7 @@ export class ContractLifecycleService {
           ...contractData,
           applicationId: contractData.applicationId!,
           contractNumber,
-          status: ContractStatus.DEPOSIT_PENDING,
-          paymentRef,
-          depositDeadline,
+          status: ContractStatus.DRAFT,
           residents:
             residents && residents.length > 0
               ? { create: residents }
@@ -336,21 +363,12 @@ export class ContractLifecycleService {
         include: { residents: true },
       });
 
-      await tx.room.update({
-        where: { id: contractData.roomId },
-        data: { status: RoomStatus.DEPOSIT_PENDING },
-      });
+      // Do NOT lock room here; wait until tenant approves → avoid starvation
 
       return newContract;
     });
 
-    this.sendPaymentInstructionEmail(
-      contract,
-      createContractDto.tenantId,
-      contractNumber,
-      paymentRef,
-      depositDeadline,
-    );
+    // No payment email at creation; email will be sent after tenant approves
 
     return this.transformToDto(contract);
   }
@@ -402,20 +420,27 @@ export class ContractLifecycleService {
 
       this.ensureAllowedTransition(contract.status, 'send');
 
+      // 🔒 STATE MACHINE: Validate transition DRAFT → PENDING_SIGNATURE
+      this.stateMachine.validateTransition(
+        'CONTRACT',
+        contractId,
+        contract.status,
+        ContractStatus.PENDING_SIGNATURE,
+        landlordUserId,
+        'Landlord sent contract',
+      );
+
       const room = await tx.room.findUnique({ where: { id: contract.roomId } });
       if (!room) throw new NotFoundException('Room not found');
 
       if (
-        room.status !== RoomStatus.AVAILABLE &&
-        room.status !== RoomStatus.DEPOSIT_PENDING
+        (room.status as any) !== RoomStatus.AVAILABLE &&
+        (room.status as any) !== RoomStatus.DEPOSIT_PENDING
       ) {
         throw new BadRequestException('Room is not available for deposit');
       }
 
-      await tx.room.update({
-        where: { id: contract.roomId },
-        data: { status: RoomStatus.DEPOSIT_PENDING },
-      });
+      // Do NOT lock room yet; lock only after tenant approves (avoid starvation)
 
       return tx.contract.update({
         where: { id: contractId },
@@ -514,6 +539,15 @@ export class ContractLifecycleService {
     const depositDeadline = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Serialize approvals to prevent race/double-approve
+      await this.acquireLock(tx, `contract:${contractId}:tenant-approve`);
+
+      // Idempotency: if already pending deposit, return current
+      const fresh = await this.findOneTx(tx, contractId);
+      if (fresh.status === ContractStatus.DEPOSIT_PENDING) {
+        return fresh;
+      }
+
       const correlationId = uuidv4();
 
       const result = await tx.contract.update({
@@ -526,14 +560,21 @@ export class ContractLifecycleService {
         include: { tenant: { include: { user: true } } },
       });
 
+      // Lock room after tenant approves (safe point)
+      await tx.room.update({
+        where: { id: fresh.roomId },
+        data: { status: RoomStatus.DEPOSIT_PENDING },
+      });
+
       // EVENT STORE: Record contract approval
+      const nextVersion = await this.nextEventVersion(tx, contractId);
       await this.eventStore.append({
         eventId: uuidv4(),
         eventType: 'CONTRACT_APPROVED',
         correlationId,
         aggregateId: contractId,
         aggregateType: 'CONTRACT',
-        aggregateVersion: 1,
+        aggregateVersion: nextVersion,
         payload: {
           contractId,
           tenantId,
@@ -592,51 +633,35 @@ export class ContractLifecycleService {
       }
 
       const invoiceNumber = `INV-${contract.contractNumber}-DEP`;
-      const existingInvoice = await tx.invoice.findFirst({
+      const invoice = await tx.invoice.upsert({
         where: { invoiceNumber },
-      });
-
-      const invoice =
-        existingInvoice ||
-        (await tx.invoice.create({
-          data: {
-            contractId: contract.id,
-            tenantId: contract.tenantId,
-            invoiceNumber,
-            issueDate: new Date(),
-            dueDate: new Date(),
-            totalAmount: contract.deposit,
-            status: InvoiceStatus.PAID,
-            paidAt: new Date(),
-            lineItems: {
-              create: {
-                itemType: 'OTHER',
-                description: 'Tiền cọc hợp đồng',
-                quantity: 1,
-                unitPrice: contract.deposit,
-                amount: contract.deposit,
-              },
+        create: {
+          contractId: contract.id,
+          tenantId: contract.tenantId,
+          invoiceNumber,
+          issueDate: new Date(),
+          dueDate: new Date(),
+          totalAmount: contract.deposit,
+          status: InvoiceStatus.PENDING,
+          lineItems: {
+            create: {
+              itemType: 'OTHER',
+              description: 'Tiền cọc hợp đồng',
+              quantity: 1,
+              unitPrice: contract.deposit,
+              amount: contract.deposit,
             },
           },
-        }));
+        },
+        update: {},
+      });
 
       const existingPayment = await tx.payment.findFirst({
         where: { invoiceId: invoice.id, status: 'COMPLETED' },
       });
-
-      const paymentRecord =
-        existingPayment ||
-        (await tx.payment.create({
-          data: {
-            amount: contract.deposit,
-            paymentMethod: 'BANK_TRANSFER',
-            paymentDate: new Date(),
-            status: 'COMPLETED',
-            invoiceId: invoice.id,
-            tenantId: contract.tenantId,
-            paidAt: new Date(),
-          },
-        }));
+      if (!existingPayment) {
+        return { success: false, status: contract.status };
+      }
 
       await tx.contract.update({
         where: { id },
@@ -655,17 +680,18 @@ export class ContractLifecycleService {
 
       // EVENT STORE: Record contract activation
       const correlationId = uuidv4();
+      const nextVersion = await this.nextEventVersion(tx, id);
       await this.eventStore.append({
         eventId: uuidv4(),
         eventType: 'CONTRACT_ACTIVATED',
         correlationId,
         aggregateId: id,
         aggregateType: 'CONTRACT',
-        aggregateVersion: 1,
+        aggregateVersion: nextVersion,
         payload: {
           contractId: id,
           depositAmount: contract.deposit,
-          paymentRecord: paymentRecord.id,
+          paymentRecord: existingPayment.id,
           invoiceId: invoice.id,
         },
         metadata: {
@@ -728,13 +754,13 @@ export class ContractLifecycleService {
           actorRole: UserRole.TENANT,
           actionType: 'payment_succeeded',
           entityType: 'PAYMENT',
-          entityId: paymentRecord.id,
+          entityId: existingPayment.id,
           metadata: {},
         },
         tx,
       );
       await tx.payment.update({
-        where: { id: paymentRecord.id },
+        where: { id: existingPayment.id },
         data: { snapshotId: paymentSnapshotId },
       });
 
@@ -770,6 +796,14 @@ export class ContractLifecycleService {
         if (contract.residents.length >= (contract.room.maxOccupants || 99)) {
           throw new BadRequestException('Room capacity exceeded');
         }
+
+        await this.immutability.enforceImmutability(
+          'CONTRACT',
+          contract.id,
+          contract.status,
+          { residents: dto },
+          userId,
+        );
 
         // Prevent duplicate citizenId
         if (dto.citizenId) {
@@ -814,6 +848,15 @@ export class ContractLifecycleService {
       throw new ForbiddenException('Not authorized');
     }
 
+    // 🔒 Check immutability before removal
+    await this.immutability.enforceImmutability(
+      'CONTRACT',
+      resident.contractId,
+      resident.contract.status,
+      { residents: [] },
+      userId,
+    );
+
     return this.prisma.contractResident.delete({ where: { id: residentId } });
   }
 
@@ -848,6 +891,15 @@ export class ContractLifecycleService {
     ) {
       throw new ForbiddenException('Not authorized');
     }
+
+    // 🔒 Check immutability before update
+    await this.immutability.enforceImmutability(
+      'CONTRACT',
+      resident.contractId,
+      resident.contract.status,
+      { residents: dto },
+      userId,
+    );
 
     // Check duplicate citizenId if updating
     if (dto.citizenId && dto.citizenId !== resident.citizenId) {
@@ -953,13 +1005,14 @@ export class ContractLifecycleService {
 
       // EVENT STORE: Record contract renewal
       const correlationId = uuidv4();
+      const nextVersion = await this.nextEventVersion(tx, newContract.id);
       await this.eventStore.append({
         eventId: uuidv4(),
         eventType: 'CONTRACT_RENEWED',
         correlationId,
         aggregateId: newContract.id,
         aggregateType: 'CONTRACT',
-        aggregateVersion: 1,
+        aggregateVersion: nextVersion,
         payload: {
           newContractId: newContract.id,
           oldContractId: oldContract.id,
@@ -1270,43 +1323,107 @@ export class ContractLifecycleService {
     const isTenant = contract.tenant.userId === userId;
     const isLandlord = contract.landlord.userId === userId;
 
-    const currentChecklist = (contract as any).handoverChecklist || {
-      checkIn: null,
-      checkOut: null,
-    };
-
     if (dto.stage === HandoverStage.CHECK_IN) {
+      // Only ACTIVE contracts can perform CHECK_IN
+      if (contract.status !== ContractStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Check-in allowed only for ACTIVE contracts',
+        );
+      }
       if (!isLandlord) {
         throw new ForbiddenException('Only landlord can update check-in');
       }
-      if (
-        currentChecklist.checkIn?.signatureUrl &&
-        contract.tenant.userId === userId
-      ) {
-        throw new BadRequestException('Locked');
-      }
-      currentChecklist.checkIn = {
-        ...dto,
-        updatedAt: new Date(),
-        updatedBy: userId,
-      };
     } else {
+      // Only TERMINATED contracts can perform CHECK_OUT
+      if (contract.status !== ContractStatus.TERMINATED) {
+        throw new BadRequestException(
+          'Check-out allowed only for TERMINATED contracts',
+        );
+      }
       if (!isTenant) {
         throw new ForbiddenException('Only tenant can update check-out');
       }
-      currentChecklist.checkOut = {
-        ...dto,
-        updatedAt: new Date(),
-        updatedBy: userId,
-      };
     }
 
-    await this.prisma.contract.update({
-      where: { id },
-      data: { handoverChecklist: currentChecklist } as any,
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const client = tx as any;
 
-    return { message: 'Updated', checklist: currentChecklist };
+      const checklist = await client.handoverChecklist.upsert({
+        where: { contractId: id },
+        update: {
+          ...(dto.stage === HandoverStage.CHECK_IN
+            ? {
+                ...(dto.witness !== undefined
+                  ? { checkInWitness: dto.witness }
+                  : {}),
+                ...(dto.signatureUrl !== undefined
+                  ? { checkInSignatureUrl: dto.signatureUrl }
+                  : {}),
+                checkInUpdatedAt: new Date(),
+                checkInUpdatedBy: userId,
+              }
+            : {
+                ...(dto.witness !== undefined
+                  ? { checkOutWitness: dto.witness }
+                  : {}),
+                ...(dto.signatureUrl !== undefined
+                  ? { checkOutSignatureUrl: dto.signatureUrl }
+                  : {}),
+                checkOutUpdatedAt: new Date(),
+                checkOutUpdatedBy: userId,
+              }),
+        },
+        create: {
+          contractId: id,
+          ...(dto.stage === HandoverStage.CHECK_IN
+            ? {
+                ...(dto.witness !== undefined
+                  ? { checkInWitness: dto.witness }
+                  : {}),
+                ...(dto.signatureUrl !== undefined
+                  ? { checkInSignatureUrl: dto.signatureUrl }
+                  : {}),
+                checkInUpdatedAt: new Date(),
+                checkInUpdatedBy: userId,
+              }
+            : {
+                ...(dto.witness !== undefined
+                  ? { checkOutWitness: dto.witness }
+                  : {}),
+                ...(dto.signatureUrl !== undefined
+                  ? { checkOutSignatureUrl: dto.signatureUrl }
+                  : {}),
+                checkOutUpdatedAt: new Date(),
+                checkOutUpdatedBy: userId,
+              }),
+        },
+      });
+
+      await client.handoverItem.deleteMany({
+        where: { checklistId: checklist.id, stage: dto.stage },
+      });
+
+      if (dto.items?.length) {
+        await client.handoverItem.createMany({
+          data: dto.items.map((item) => ({
+            checklistId: checklist.id,
+            stage: dto.stage,
+            itemName: item.itemName,
+            condition: item.condition,
+            quantity: item.quantity,
+            note: item.note,
+            images: item.images ?? [],
+          })),
+        });
+      }
+
+      const updated = await client.handoverChecklist.findUnique({
+        where: { id: checklist.id },
+        include: { items: true },
+      });
+
+      return { message: 'Updated', checklist: updated };
+    });
   }
 
   async update(id: string, updateContractDto: UpdateContractDto, user: User) {
@@ -1319,7 +1436,10 @@ export class ContractLifecycleService {
       throw new NotFoundException(`Contract with ID ${id} not found`);
     }
 
-    if (user.role === UserRole.LANDLORD && existing.landlordId !== user.id) {
+    if (
+      (user.role as any) === UserRole.LANDLORD &&
+      existing.landlordId !== user.id
+    ) {
       throw new BadRequestException(
         'Landlords can only update their own contracts',
       );
@@ -1334,6 +1454,16 @@ export class ContractLifecycleService {
       ...updateData
     } = updateContractDto;
 
+    // 🔒 Legal invariant: only allow updates when contract is in DRAFT
+    const current = await this.prisma.contract.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!current) throw new NotFoundException('Contract not found');
+    if (current.status !== ContractStatus.DRAFT) {
+      throw new BadRequestException('Only DRAFT contracts can be updated');
+    }
+
     const contract = await this.prisma.contract.update({
       where: { id },
       data: updateData,
@@ -1343,8 +1473,45 @@ export class ContractLifecycleService {
   }
 
   async remove(id: string) {
-    await this.findOne(id);
-    await this.prisma.contract.delete({ where: { id } });
-    return { message: 'Contract deleted successfully' };
+    return this.prisma.$transaction(async (tx) => {
+      const contract = await this.findOneTx(tx, id);
+      // Replace physical delete with legal cancellation
+      await tx.contract.update({
+        where: { id },
+        data: { status: ContractStatus.CANCELLED },
+      });
+
+      const nextVersion = await this.nextEventVersion(tx, id);
+
+      await this.eventStore.append({
+        eventId: uuidv4(),
+        eventType: 'CONTRACT_CANCELLED',
+        correlationId: uuidv4(),
+        aggregateId: id,
+        aggregateType: 'CONTRACT',
+        aggregateVersion: nextVersion,
+        payload: { contractId: id },
+        metadata: {
+          userId: contract.landlordId,
+          userRole: UserRole.LANDLORD,
+          timestamp: new Date(),
+          source: 'API',
+        },
+      });
+
+      await this.snapshotService.create(
+        {
+          actorId: contract.landlordId,
+          actorRole: UserRole.LANDLORD,
+          actionType: 'contract_cancelled',
+          entityType: 'CONTRACT',
+          entityId: id,
+          metadata: {},
+        },
+        tx,
+      );
+
+      return { message: 'Contract cancelled (logical delete)' };
+    });
   }
 }

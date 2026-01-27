@@ -1,3 +1,5 @@
+"use client";
+
 import { Property } from '@/types';
 import { PropertyCard } from './property-card';
 import { AlertCircle, Inbox, Plus } from 'lucide-react';

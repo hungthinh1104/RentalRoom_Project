@@ -30,20 +30,20 @@ export class NotificationsController {
   }
 
   @Get()
-  @Auth()
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   findAll(@Query() filterDto: FilterNotificationsDto) {
     return this.notificationsService.findAll(filterDto);
   }
 
   @Get(':id')
-  @Auth()
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
     // 🔒 SECURITY: Pass userId for ownership validation
     return this.notificationsService.findOne(id, user?.id);
   }
 
   @Patch(':id')
-  @Auth()
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   update(
     @Param('id') id: string,
     @Body() updateDto: UpdateNotificationDto,
@@ -55,14 +55,14 @@ export class NotificationsController {
   }
 
   @Patch(':id/mark-as-read')
-  @Auth()
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   markAsRead(@Param('id') id: string, @CurrentUser() user: any) {
     // 🔒 SECURITY: Users can only mark their own notifications as read
     return this.notificationsService.markAsRead(id, user?.id);
   }
 
   @Patch('user/:userId/mark-all-as-read')
-  @Auth()
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   async markAllAsRead(
     @Param('userId') userId: string,
     @CurrentUser() user: any,
@@ -92,7 +92,7 @@ export class NotificationsController {
   }
 
   @Delete(':id')
-  @Auth()
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     // 🔒 SECURITY: Users can only delete their own notifications
     return this.notificationsService.remove(id, user?.id);

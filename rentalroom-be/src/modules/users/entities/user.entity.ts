@@ -30,6 +30,8 @@ export class User {
   ekycVerificationId: string | null;
   ekycRiskLevel: string | null;
   ekycDocumentNumber: string | null;
+  ekycStatus: string | null;
+  ekycData: any;
   createdAt: Date;
   updatedAt: Date;
 }

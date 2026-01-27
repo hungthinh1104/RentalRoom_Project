@@ -141,7 +141,7 @@ export function ContactLandlordModal({
               htmlFor="message"
               className="text-sm font-medium text-foreground"
             >
-              Tin nhắn <span className="text-red-500">*</span>
+              Tin nhắn <span className="text-destructive">*</span>
             </label>
             <Textarea
               id="message"

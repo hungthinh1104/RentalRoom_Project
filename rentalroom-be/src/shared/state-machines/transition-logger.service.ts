@@ -5,7 +5,7 @@ import { validateTransition } from './transitions';
 /**
  * State Transition Logger
  * Logs all entity status transitions for audit trail and debugging
- * 
+ *
  * Usage:
  * ```typescript
  * await this.stateLogger.logTransition({
@@ -29,7 +29,7 @@ export class StateTransitionLogger {
    * Log a state transition with full audit trail
    * Validates transition is legal before logging
    */
-  async logTransition(dto: {
+  logTransition(dto: {
     entityType: 'invoice' | 'maintenance' | 'dispute' | 'contract';
     entityId: string;
     oldStatus: string;
@@ -38,8 +38,17 @@ export class StateTransitionLogger {
     actorRole?: string;
     reason?: string;
     metadata?: Record<string, any>;
-  }): Promise<void> {
-    const { entityType, oldStatus, newStatus, entityId, actorId, actorRole, reason, metadata } = dto;
+  }): void {
+    const {
+      entityType,
+      oldStatus,
+      newStatus,
+      entityId,
+      actorId,
+      actorRole,
+      reason,
+      metadata: _metadata,
+    } = dto;
 
     try {
       // Validate transition is legal
@@ -51,7 +60,9 @@ export class StateTransitionLogger {
         entityType,
         entityId: entityId.substring(0, 8) + '...',
         transition: `${oldStatus} → ${newStatus}`,
-        actor: actorId ? `${actorRole}:${actorId.substring(0, 8)}...` : 'SYSTEM',
+        actor: actorId
+          ? `${actorRole}:${actorId.substring(0, 8)}...`
+          : 'SYSTEM',
         reason,
         timestamp: new Date().toISOString(),
       });
@@ -84,9 +95,9 @@ export class StateTransitionLogger {
    * Shorthand: Log transition without throwing (for soft failures)
    * Useful for background jobs that shouldn't crash
    */
-  async logTransitionSafe(dto: any): Promise<void> {
+  logTransitionSafe(dto: any): void {
     try {
-      await this.logTransition(dto);
+      this.logTransition(dto);
     } catch (error) {
       this.logger.warn(`Failed to log transition: ${error}`);
       // Don't re-throw—allow operation to continue

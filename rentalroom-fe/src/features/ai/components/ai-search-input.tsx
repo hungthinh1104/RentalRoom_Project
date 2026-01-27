@@ -62,7 +62,7 @@ export function AiSearchInput({
         ...popularSearches.map((search: string) => ({
           text: search,
           type: "popular" as const,
-          icon: <TrendingUp className="w-4 h-4 text-amber-500" />,
+          icon: <TrendingUp className="w-4 h-4 text-warning" />,
         }))
       );
     }
@@ -73,7 +73,7 @@ export function AiSearchInput({
         ...searchHistory.map((search: string) => ({
           text: search,
           type: "history" as const,
-          icon: <Clock className="w-4 h-4 text-blue-500" />,
+          icon: <Clock className="w-4 h-4 text-info" />,
         }))
       );
     }
@@ -192,7 +192,7 @@ export function AiSearchInput({
       {isOpen && showSuggestions && suggestions.length > 0 && (
         <div
           id="ai-search-suggestions"
-          className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-2xl shadow-lg z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200"
+          className="absolute top-full left-0 right-0 mt-2 bg-background border border-border rounded-2xl shadow-lg z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top"
         >
           <div className="max-h-96 overflow-y-auto">
             {suggestions.slice(0, maxSuggestions).map((suggestion, index) => (
@@ -210,8 +210,8 @@ export function AiSearchInput({
                     {suggestion.type === "popular"
                       ? "Tìm kiếm phổ biến"
                       : suggestion.type === "history"
-                      ? "Tìm kiếm gần đây"
-                      : "Gợi ý"}
+                        ? "Tìm kiếm gần đây"
+                        : "Gợi ý"}
                   </p>
                 </div>
               </button>

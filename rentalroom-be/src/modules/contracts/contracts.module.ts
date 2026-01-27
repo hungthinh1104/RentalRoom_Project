@@ -16,7 +16,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { CommonModule } from 'src/common/common.module';
 import { DocumentsModule } from '../documents/documents.module';
 
-
 import { PaymentsModule } from '../payments/payments.module';
 import { SnapshotsModule } from '../snapshots/snapshots.module';
 
@@ -26,7 +25,10 @@ import { ContractLifecycleService } from './lifecycle/contract-lifecycle.service
 // Legal infrastructure
 import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
 import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
-import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
+import {
+  ImmutabilityGuard,
+  IdempotencyGuard,
+} from 'src/shared/guards/immutability.guard';
 
 @Module({
   imports: [
@@ -65,4 +67,4 @@ import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutabil
     ContractHashService,
   ],
 })
-export class ContractsModule { }
+export class ContractsModule {}

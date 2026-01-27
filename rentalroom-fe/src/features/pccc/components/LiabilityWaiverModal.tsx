@@ -47,10 +47,10 @@ export function LiabilityWaiverModal({ open, onOpenChange, onAgree }: LiabilityW
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] border-amber-500/20 bg-background/95 backdrop-blur-xl">
+            <DialogContent className="sm:max-w-[600px] border-warning/20 bg-background/95 backdrop-blur-xl">
                 <DialogHeader>
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-full bg-amber-500/10 text-amber-500">
+                        <div className="p-2 rounded-full bg-warning/10 text-warning">
                             <AlertTriangle className="w-6 h-6" />
                         </div>
                         <DialogTitle className="text-xl">Khước từ trách nhiệm pháp lý</DialogTitle>
@@ -139,7 +139,7 @@ export function LiabilityWaiverModal({ open, onOpenChange, onAgree }: LiabilityW
                             Hủy bỏ
                         </Button>
                         <Button
-                            className="bg-amber-600 hover:bg-amber-700 text-white min-w-[140px]"
+                            className="bg-warning hover:bg-warning/90 text-white min-w-[140px]"
                             disabled={!agreed}
                             onClick={handleConfirm}
                         >

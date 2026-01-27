@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { PaymentDialog } from "@/features/payments/components/PaymentDialog";
 
-interface Invoice {
+export interface Invoice {
   id: string;
   invoiceNumber: string;
   amount: number;
@@ -57,13 +57,13 @@ interface FinanceViewProps {
   user: {
     id: string;
     role: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   initialInvoices: {
     items: Invoice[];
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  initialStats: any;
+  initialStats: unknown;
 }
 
 export default function FinanceView({ user, initialInvoices, initialStats }: FinanceViewProps) {

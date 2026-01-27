@@ -86,7 +86,7 @@ export default function LandlordOverviewPage() {
   }
 
   // Transform data for charts
-  const revenueData = summary?.revenueLast6Months.map((d, i) => ({
+  const revenueData = summary?.revenueLast6Months.map((d: { year: number; month: number; amount: number }, i: number) => ({
     name: `T${i + 1}`, // Simplified label
     amount: d.amount
   })) || [];
@@ -101,7 +101,7 @@ export default function LandlordOverviewPage() {
       {/* Hero Section */}
       <motion.div variants={item} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 glass-card p-10 rounded-[2.5rem] relative overflow-hidden group border-none shadow-2xl shadow-primary/5">
         <div className="absolute top-0 right-0 -mt-20 -mr-20 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-soft group-hover:bg-primary/20 transition-all duration-700"></div>
-        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-blue-500/5 rounded-full blur-[80px] group-hover:bg-blue-500/10 transition-all duration-700"></div>
+        <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-info/5 rounded-full blur-[80px] group-hover:bg-info/10 transition-all duration-700"></div>
 
         <div className="space-y-3 relative z-10 w-full max-w-2xl">
           <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="flex items-center gap-2">
@@ -154,15 +154,15 @@ export default function LandlordOverviewPage() {
               className={cn(
                 "border-l-4 shadow-sm",
                 alert.type === 'overdue' ? "border-l-destructive bg-destructive/5" :
-                  alert.type === 'forecast' ? "border-l-orange-500 bg-orange-500/5" :
-                    alert.type === 'upcoming' ? "border-l-blue-500 bg-blue-500/5" :
-                      "border-l-emerald-500 bg-emerald-500/5"
+                  alert.type === 'forecast' ? "border-l-warning bg-warning/5" :
+                    alert.type === 'upcoming' ? "border-l-info bg-info/5" :
+                      "border-l-success bg-success/5"
               )}
             >
               {alert.type === 'overdue' ? <AlertCircle className="h-4 w-4 text-destructive" /> :
-                alert.type === 'forecast' ? <TrendingDown className="h-4 w-4 text-orange-500" /> :
-                  alert.type === 'upcoming' ? <AlertTriangle className="h-4 w-4 text-blue-500" /> :
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                alert.type === 'forecast' ? <TrendingDown className="h-4 w-4 text-warning" /> :
+                  alert.type === 'upcoming' ? <AlertTriangle className="h-4 w-4 text-info" /> :
+                    <CheckCircle2 className="h-4 w-4 text-success" />}
               <AlertDescription className="flex items-center justify-between w-full">
                 <span className="font-medium text-sm">{alert.message}</span>
                 {alert.amount && (
@@ -184,7 +184,7 @@ export default function LandlordOverviewPage() {
           <div className="flex items-center justify-between mb-6 relative z-10">
             <div>
               <h3 className="text-xl font-bold flex items-center gap-2">
-                <Banknote className="w-5 h-5 text-emerald-500" />
+                <Banknote className="w-5 h-5 text-success" />
                 Doanh thu
               </h3>
               <p className="text-sm text-muted-foreground">6 tháng gần nhất</p>
@@ -194,14 +194,14 @@ export default function LandlordOverviewPage() {
                 <div className="text-3xl font-black text-foreground">
                   <Vnd value={summary?.summary.revenueThisMonth || 0} />
                 </div>
-                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-none">Tháng này</Badge>
+                <Badge variant="outline" className="bg-success/10 text-success border-none">Tháng này</Badge>
               </div>
             }
           </div>
 
           <div className="h-[300px] w-full mt-4">
             {loading ? <Skeleton className="w-full h-full rounded-xl" /> : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                 <AreaChart data={revenueData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -229,13 +229,13 @@ export default function LandlordOverviewPage() {
         {/* Occupancy Card */}
         <motion.div variants={item} className="md:col-span-1 rounded-[2rem] border bg-card/50 p-8 shadow-sm backdrop-blur-xl flex flex-col items-center justify-center relative overflow-hidden">
           <h3 className="text-xl font-bold mb-6 flex items-center gap-2 w-full">
-            <Activity className="w-5 h-5 text-blue-500" />
+            <Activity className="w-5 h-5 text-info" />
             Tỷ lệ lấp đầy
           </h3>
           <div className="w-full flex-1 flex flex-col items-center justify-center">
             {loading ? <Skeleton className="w-48 h-48 rounded-full" /> : (
               <div className="relative w-[200px] h-[200px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minHeight={200}>
                   <PieChart>
                     <Pie
                       data={[
@@ -275,17 +275,17 @@ export default function LandlordOverviewPage() {
         {/* Action Items */}
         <motion.div variants={item} className="md:col-span-1 rounded-[2rem] border bg-card/50 p-6 shadow-sm backdrop-blur-xl">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <FileWarning className="w-5 h-5 text-orange-500" />
+            <FileWarning className="w-5 h-5 text-warning" />
             Cần xử lý
           </h3>
           <div className="space-y-3">
-            <Link href="/dashboard/landlord/finance" className="flex items-center justify-between p-4 rounded-2xl bg-orange-500/5 text-orange-600 hover:bg-orange-500/10 transition-all border border-transparent hover:border-orange-500/20">
+            <Link href="/dashboard/landlord/finance" className="flex items-center justify-between p-4 rounded-2xl bg-warning/5 text-warning-foreground hover:bg-warning/10 transition-all border border-transparent hover:border-warning/20">
               <span className="font-semibold text-sm">Hóa đơn quá hạn</span>
-              <Badge className="bg-orange-500 text-white hover:bg-orange-600 border-none">{summary?.summary.overdueInvoices || 0}</Badge>
+              <Badge className="bg-warning text-warning-foreground hover:bg-warning/90 border-none">{summary?.summary.overdueInvoices || 0}</Badge>
             </Link>
-            <Link href="/dashboard/landlord/maintenance" className="flex items-center justify-between p-4 rounded-2xl bg-blue-500/5 text-blue-600 hover:bg-blue-500/10 transition-all border border-transparent hover:border-blue-500/20">
+            <Link href="/dashboard/landlord/maintenance" className="flex items-center justify-between p-4 rounded-2xl bg-info/5 text-info-foreground hover:bg-info/10 transition-all border border-transparent hover:border-info/20">
               <span className="font-semibold text-sm">Yêu cầu bảo trì</span>
-              <Badge className="bg-blue-500 text-white hover:bg-blue-600 border-none">{summary?.summary.openMaintenance || 0}</Badge>
+              <Badge className="bg-info text-info-foreground hover:bg-info/90 border-none">{summary?.summary.openMaintenance || 0}</Badge>
             </Link>
           </div>
         </motion.div>
@@ -293,15 +293,15 @@ export default function LandlordOverviewPage() {
         {/* Shortcuts */}
         <motion.div variants={item} className="md:col-span-2 rounded-[2rem] border bg-card/50 p-6 shadow-sm backdrop-blur-xl">
           <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <LayoutDashboard className="w-5 h-5 text-purple-500" />
+            <LayoutDashboard className="w-5 h-5 text-accent-purple" />
             Truy cập nhanh
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { href: "/dashboard/landlord/contracts", icon: FileWarning, label: "Hợp đồng", color: "text-primary" },
-              { href: "/dashboard/landlord/tenants", icon: Users, label: "Khách thuê", color: "text-blue-500" },
-              { href: "/dashboard/landlord/finance", icon: Banknote, label: "Thu chi", color: "text-emerald-500" },
-              { href: "/dashboard/landlord/maintenance", icon: Wrench, label: "Bảo trì", color: "text-amber-500" },
+              { href: "/dashboard/landlord/tenants", icon: Users, label: "Khách thuê", color: "text-info" },
+              { href: "/dashboard/landlord/finance", icon: Banknote, label: "Thu chi", color: "text-success" },
+              { href: "/dashboard/landlord/maintenance", icon: Wrench, label: "Bảo trì", color: "text-warning" },
             ].map((s, idx) => (
               <Link key={idx} href={s.href} className="flex flex-col items-center justify-center p-4 rounded-2xl bg-background/50 border hover:border-primary/50 hover:bg-primary/5 transition-all group">
                 <s.icon className={cn("w-6 h-6 mb-2 transition-transform group-hover:scale-110", s.color)} />

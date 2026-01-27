@@ -2,7 +2,7 @@ import { Injectable, Logger, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import * as crypto from 'crypto';
 import { Decimal } from 'decimal.js';
-import { UserRole, Prisma, PrismaClient } from '@prisma/client';
+import { UserRole, Prisma } from '@prisma/client';
 import { SnapshotService } from '../snapshots/snapshot.service';
 
 @Injectable()
@@ -13,7 +13,7 @@ export class TaxService {
   constructor(
     private prisma: PrismaService,
     private snapshotService: SnapshotService,
-  ) { }
+  ) {}
 
   /**
    * Generate monthly revenue snapshot for a landlord
@@ -28,6 +28,7 @@ export class TaxService {
     const endDate = new Date(year, month, 1);
 
     return this.prisma.$transaction(async (tx) => {
+      const client = tx as any;
       // Query all invoices paid in this month
       const invoices = await tx.invoice.findMany({
         where: {
@@ -93,7 +94,6 @@ export class TaxService {
         update: {
           totalRevenue: new Decimal(totalRevenue),
           invoiceCount: invoices.length,
-          breakdown: breakdown as any,
           snapshotHash: hash,
         },
         create: {
@@ -102,10 +102,27 @@ export class TaxService {
           month,
           totalRevenue: new Decimal(totalRevenue),
           invoiceCount: invoices.length,
-          breakdown: breakdown as any,
           snapshotHash: hash,
         },
       });
+
+      await client.taxYearBreakdown.deleteMany({
+        where: { landlordId, year, month },
+      });
+
+      if (breakdown.length) {
+        await client.taxYearBreakdown.createMany({
+          data: breakdown.map((item) => ({
+            landlordId,
+            year,
+            month,
+            roomId: item.roomId,
+            roomNumber: item.roomNumber,
+            revenue: new Decimal(item.revenue),
+            invoiceCount: 1,
+          })),
+        });
+      }
 
       // Create legal snapshot (immutable)
       const { threshold } = await this.getEffectiveRegulation(year, tx);
@@ -233,13 +250,9 @@ export class TaxService {
   /**
    * Get effective regulation for a given year
    */
-  async getEffectiveRegulation(
-    year: number,
-    tx?: Prisma.TransactionClient,
-  ) {
+  async getEffectiveRegulation(year: number, tx?: Prisma.TransactionClient) {
     // Find the latest active regulation for the given year
-    const prisma =
-      (tx as Prisma.TransactionClient) || this.prisma;
+    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
     const regulation = await prisma.regulationVersion.findFirst({
       where: {
         type: 'RENTAL_TAX',
@@ -268,7 +281,9 @@ export class TaxService {
     }
 
     // Parse configuration from JSON
-    const config = (regulation as any).configuration;
+    const config = regulation?.configuration as
+      | { threshold?: number; taxRate?: number }
+      | null;
     return {
       threshold: Number(config?.threshold) || 100_000_000,
       taxRate: Number(config?.taxRate) || 0.1,
@@ -282,8 +297,7 @@ export class TaxService {
     year: number,
     tx?: Prisma.TransactionClient,
   ): Promise<{ type: string; version: string; hash: string } | null> {
-    const prisma =
-      (tx as Prisma.TransactionClient) || this.prisma;
+    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
     const regulation = await prisma.regulationVersion.findFirst({
       where: {
         type: 'RENTAL_TAX',

@@ -15,7 +15,6 @@ import * as path from 'path';
 import * as os from 'os';
 import { DocumentsService } from 'src/modules/documents/documents.service';
 
-
 /**
  * ContractSigningService
  * - Quản lý quy trình ký hợp đồng (Tạo PDF → Hash → Sign → Embed → Lưu)
@@ -36,7 +35,6 @@ export class ContractSigningService {
   ) {
     this.ensureStorageDirectory();
   }
-
 
   private ensureStorageDirectory() {
     const tryEnsure = (dir: string): boolean => {
@@ -181,7 +179,7 @@ export class ContractSigningService {
         try {
           await fsPromises.unlink(originalFilePath);
           this.logger.warn(`Rolled back file: ${originalFilePath}`);
-        } catch (unlinkError) {
+        } catch (_unlinkError) {
           this.logger.error(`Failed to rollback file: ${originalFilePath}`);
         }
         throw dbError;
@@ -326,6 +324,7 @@ export class ContractSigningService {
           action: 'SIGN',
           signer: signerInfo.name,
           signerEmail: signerInfo.email,
+          userId: signerInfo.userId,
           timestamp: new Date(),
           metadata,
         });
@@ -334,7 +333,7 @@ export class ContractSigningService {
         try {
           await fsPromises.unlink(signedFilePath);
           this.logger.warn(`Rolled back signed file: ${signedFilePath}`);
-        } catch (unlinkError) {
+        } catch (_unlinkError) {
           this.logger.error(`Failed to rollback file: ${signedFilePath}`);
         }
         throw dbError;
@@ -345,42 +344,30 @@ export class ContractSigningService {
       // Auto-create UserDocument if fully signed (optional: check if both parties signed if that's the flow, but here we just stash the signed version)
       // Assuming 'SIGNED' means fully signed or at least a significant step.
       try {
-        await this.documentsService.create({
+        const tenantId = contract.application.tenant.user.id;
+        await this.documentsService.create(tenantId, {
           title: `Hợp đồng thuê - ${contract.contractNumber}`,
-          type: 'CONTRACT' as any,
-          fileUrl: contract.signedUrl ? contract.signedUrl : '', // Note: This might be a local path, need to ensure it's accessible or uploaded. 
-          // In this system, it seems likely pdfUrl/signedUrl are local paths. 
-          // The DocumentService might need to handle file uploads or we store the path?
-          // "fileUrl" in UserDocument suggests a web-accessible URL.
-          // If the system serves static files from storage, we might need to convert path to URL.
-          // For now, let's assume we store what we have or a placeholder.
-          // Wait, PCCC logic used `result.pdfUrl` which was `storage/pccc/...`.
-          // DocumentsService API (`create`) expects `fileUrl`.
+          type: 'CONTRACT',
+          fileUrl: contract.signedUrl ? contract.signedUrl : '',
           propertyId: contract.application.room.property.id,
           expiryDate: contract.endDate.toISOString(),
           description: `Hợp đồng được ký bởi ${signerInfo.name}`,
-          userId: contract.application.tenant.user.id // Assign to Tenant? Or Landlord? Or both?
-          // Maybe duplicate for landlord? For now, let's assign to Tenant as they just signed?
-          // But Landlord needs it too. The UserDocument model has `userId`. 
-          // We might need to create two documents or shared ownership? 
-          // Let's creating for the Signer for now.
         });
 
-        // Also create for Landlord if the signer is Tenant, and vice versa?
-        // Actually, usually we want the document available to the user who triggers the action or both.
-        // Let's create for the Landlord as well since they are the owner.
-        await this.documentsService.create({
+        const landlordId = contract.application.room.property.landlord.user.id;
+        await this.documentsService.create(landlordId, {
           title: `Hợp đồng thuê - ${contract.contractNumber}`,
-          type: 'CONTRACT' as any,
-          fileUrl: signedFilePath, // Consistency with PCCC
+          type: 'CONTRACT',
+          fileUrl: signedFilePath,
           propertyId: contract.application.room.property.id,
           expiryDate: contract.endDate.toISOString(),
           description: `Hợp đồng được ký bởi ${signerInfo.name}`,
-          userId: contract.application.room.property.landlord.user.id
         });
-
       } catch (error) {
-        this.logger.warn(`Failed to auto-create UserDocument for contract ${contractId}`, error);
+        this.logger.warn(
+          `Failed to auto-create UserDocument for contract ${contractId}`,
+          error,
+        );
       }
 
       return {
@@ -519,11 +506,38 @@ export class ContractSigningService {
       action: string;
       signer: string;
       signerEmail?: string;
+      userId?: string;
       timestamp: Date;
       metadata?: any;
     },
   ) {
     try {
+      if (logData.userId) {
+        (this.prisma as any).changeLog
+          .create({
+            data: {
+              userId: logData.userId,
+              changeType:
+                logData.action === 'SIGN'
+                  ? 'CONTRACT_SIGNED'
+                  : 'OTHER',
+              entityType: 'CONTRACT',
+              entityId: contractId,
+              metadata: {
+                action: logData.action,
+                signer: logData.signer,
+                email: logData.signerEmail || '',
+                ...logData.metadata,
+              },
+              timestamp: logData.timestamp,
+            },
+          })
+          .catch((error: unknown) => {
+            const msg = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Failed to create ChangeLog: ${msg}`);
+          });
+      }
+
       this.logger.log(
         JSON.stringify({
           contractId,

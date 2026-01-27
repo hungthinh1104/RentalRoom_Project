@@ -1,4 +1,4 @@
-import { eKycResult, eKycProvider } from './ekyc.types';
+import { eKycResult } from './ekyc.types';
 
 /**
  * eKYC Service Interface

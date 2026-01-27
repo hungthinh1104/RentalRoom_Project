@@ -15,25 +15,25 @@ const getStatusConfig = (status: ContractStatus) => {
         case ContractStatus.DRAFT:
             return {
                 label: "Chờ phê duyệt",
-                className: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-800",
+                className: "bg-warning/10 text-warning border-warning/20",
                 icon: FileText,
             };
         case ContractStatus.PENDING_SIGNATURE:
             return {
                 label: "Chờ thanh toán",
-                className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800",
+                className: "bg-info/10 text-info border-info/20",
                 icon: Wallet,
             };
         case ContractStatus.DEPOSIT_PENDING:
             return {
                 label: "Đang xử lý thanh toán",
-                className: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-400 dark:border-purple-800",
+                className: "bg-accent-purple/10 text-accent-purple border-accent-purple/20",
                 icon: Clock,
             };
         case ContractStatus.ACTIVE:
             return {
                 label: "Đang hiệu lực",
-                className: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800",
+                className: "bg-success/10 text-success border-success/20",
                 icon: CheckCircle,
             };
         case ContractStatus.TERMINATED:
@@ -45,13 +45,13 @@ const getStatusConfig = (status: ContractStatus) => {
         case ContractStatus.EXPIRED:
             return {
                 label: "Hết hạn",
-                className: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-800",
+                className: "bg-warning/10 text-warning border-warning/20",
                 icon: CalendarX,
             };
         case ContractStatus.CANCELLED:
             return {
                 label: "Đã hủy",
-                className: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700",
+                className: "bg-muted text-muted-foreground border-border",
                 icon: XCircle,
             };
         default:
@@ -68,7 +68,7 @@ export function ContractStatusBadge({ status, className }: ContractStatusBadgePr
     const Icon = config.icon;
 
     return (
-        <Badge className={`${config.className} ${className || ""}`} variant="outline">
+        <Badge className={cn(config.className, className)} variant="outline">
             <Icon className="w-3 h-3 mr-1" />
             {config.label}
         </Badge>

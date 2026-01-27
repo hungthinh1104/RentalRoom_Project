@@ -55,9 +55,9 @@ export function ContractPrintDialog({ contractId, contractNumber, trigger }: Con
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="flex-1 overflow-auto bg-gray-100/50 p-4 md:p-8 relative w-full h-full">
+                <div className="flex-1 overflow-auto bg-muted/50 p-4 md:p-8 relative w-full h-full">
                     {isLoading ? (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 z-10">
+                        <div className="absolute inset-0 flex items-center justify-center bg-muted/80 z-10">
                             <div className="flex flex-col items-center gap-2">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                 <p className="text-sm font-medium text-muted-foreground">Đang tải dữ liệu hợp đồng đầy đủ...</p>
@@ -83,7 +83,7 @@ export function ContractPrintDialog({ contractId, contractNumber, trigger }: Con
                     <Button
                         onClick={() => handlePrint()}
                         disabled={isLoading || isError || !contract}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md relative group overflow-hidden"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md relative group overflow-hidden"
                     >
                         <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
                         <Printer className="mr-2 h-4 w-4 relative z-10" />

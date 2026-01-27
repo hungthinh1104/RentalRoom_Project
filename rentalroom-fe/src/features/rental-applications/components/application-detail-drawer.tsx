@@ -11,6 +11,9 @@ import { ApplicationStatusBadge } from "./application-status-badge";
 import { useApproveApplication, useRejectApplication, useWithdrawApplication } from "../hooks/use-rental-applications";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
+import { useSecureAction } from "@/hooks/use-secure-action";
+import { useLegalConfirmation } from "@/components/security/legal-finality-dialog";
+import { SnapshotReferenceInline } from "@/components/security/snapshot-reference";
 
 type Props = {
     application: RentalApplication | null;
@@ -32,27 +35,57 @@ export function ApplicationDetailDrawer({ application, isOpen, onClose }: Props)
     const [rejectReason, setRejectReason] = React.useState("");
     const [showRejectInput, setShowRejectInput] = React.useState(false);
 
-    const onApprove = async () => {
+    // 🔒 SECURITY: Use secure action hooks
+    const { confirm: confirmApprove, Dialog: ApproveDialog } = useLegalConfirmation();
+    const { confirm: confirmReject, Dialog: RejectDialog } = useLegalConfirmation();
+
+    const onApprove = () => {
         if (!application) return;
-        try {
-            await approveMutation.mutateAsync(application.id);
-            toast({ title: "Đã duyệt đơn", description: "Đơn đăng ký đã được chấp thuận." });
-            onClose();
-        } catch (e) {
-            toast({ title: "Lỗi", description: "Không thể duyệt đơn.", variant: "destructive" });
-        }
+
+        confirmApprove({
+            title: "Duyệt đơn đăng ký",
+            description: "Hành động này sẽ tạo snapshot pháp lý và không thể hoàn tác. Đơn sẽ được chuyển sang trạng thái APPROVED.",
+            severity: "legal",
+            consentText: "Tôi xác nhận duyệt đơn đăng ký này",
+        }, async () => {
+            try {
+                const result = await approveMutation.mutateAsync(application.id);
+                toast({
+                    title: "Đã duyệt đơn",
+                    description: result?.snapshotId
+                        ? `Đơn đăng ký đã được chấp thuận. (Snapshot ID: ${result.snapshotId})`
+                        : "Đơn đăng ký đã được chấp thuận."
+                });
+                onClose();
+            } catch (e) {
+                toast({ title: "Lỗi", description: "Không thể duyệt đơn.", variant: "destructive" });
+            }
+        });
     };
 
-    const onReject = async () => {
-        if (!application) return;
-        try {
-            await rejectMutation.mutateAsync({ id: application.id, reason: rejectReason });
-            toast({ title: "Đã từ chối", description: "Đơn đăng ký đã bị từ chối." });
-            setShowRejectInput(false);
-            onClose();
-        } catch (e) {
-            toast({ title: "Lỗi", description: "Không thể từ chối.", variant: "destructive" });
-        }
+    const onReject = () => {
+        if (!application || !rejectReason) return;
+
+        confirmReject({
+            title: "Từ chối đơn đăng ký",
+            description: `Bạn sắp từ chối đơn với lý do: "${rejectReason}". Hành động này sẽ được ghi nhận và không thể hoàn tác.`,
+            severity: "warning",
+            consentText: "Tôi xác nhận từ chối đơn đăng ký này",
+        }, async () => {
+            try {
+                const result = await rejectMutation.mutateAsync({ id: application.id, reason: rejectReason });
+                toast({
+                    title: "Đã từ chối",
+                    description: result?.snapshotId
+                        ? `Đơn đăng ký đã bị từ chối. (Snapshot ID: ${result.snapshotId})`
+                        : "Đơn đăng ký đã bị từ chối."
+                });
+                setShowRejectInput(false);
+                onClose();
+            } catch (e) {
+                toast({ title: "Lỗi", description: "Không thể từ chối.", variant: "destructive" });
+            }
+        });
     };
 
     const onWithdraw = async () => {
@@ -98,7 +131,7 @@ export function ApplicationDetailDrawer({ application, isOpen, onClose }: Props)
                             <span className="col-span-2 font-medium">{application.room?.property?.address ?? application.roomAddress ?? "—"}</span>
 
                             <span className="text-muted-foreground">Giá thuê</span>
-                            <span className="col-span-2 font-medium text-indigo-600">
+                            <span className="col-span-2 font-medium text-info">
                                 {application.room?.pricePerMonth
                                     ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(application.room.pricePerMonth)
                                     : "—"}/tháng
@@ -166,7 +199,7 @@ export function ApplicationDetailDrawer({ application, isOpen, onClose }: Props)
 
                     {application.status === ApplicationStatus.APPROVED && (isLandlord || !isTenant) && !application.contractId && (
                         <Link href={`/dashboard/landlord/contracts/create?applicationId=${application.id}`} className="block mt-6">
-                            <Button className="w-full h-12 text-base shadow-lg bg-indigo-600 hover:bg-indigo-700">
+                            <Button className="w-full h-12 text-base shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground border-none">
                                 Tạo hợp đồng ngay
                             </Button>
                         </Link>
@@ -174,14 +207,18 @@ export function ApplicationDetailDrawer({ application, isOpen, onClose }: Props)
 
                     {/* If Contract Exists */}
                     {application.contractId && (
-                        <div className="mt-6 p-4 bg-blue-50 text-blue-800 rounded-lg flex flex-col items-center gap-2">
+                        <div className="mt-6 p-4 bg-info/10 text-info border border-info/20 rounded-lg flex flex-col items-center gap-2">
                             <span className="font-medium">Hợp đồng đã được tạo</span>
                             <Link href={`/contracts/${application.contractId}`}>
-                                <Button variant="link" className="text-blue-700 underline h-auto p-0">Xem hợp đồng</Button>
+                                <Button variant="link" className="text-info hover:text-info/80 underline h-auto p-0">Xem hợp đồng</Button>
                             </Link>
                         </div>
                     )}
                 </div>
+
+                {/* 🔒 SECURITY: Legal finality dialogs */}
+                <ApproveDialog />
+                <RejectDialog />
             </SheetContent>
         </Sheet>
     );

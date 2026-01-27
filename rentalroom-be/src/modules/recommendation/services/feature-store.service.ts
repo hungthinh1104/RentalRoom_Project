@@ -156,10 +156,10 @@ export class FeatureStoreService {
    * Dispute Count: Number of disputes for this room
    * Note: Assumes you have a Dispute model. If not, return 0.
    */
-  private async calcDisputeCount(roomId: string): Promise<number> {
+  private calcDisputeCount(_roomId: string): Promise<number> {
     // TODO: Implement when Dispute model exists
     // For now, return 0 (no disputes tracked yet)
-    return 0;
+    return Promise.resolve(0);
   }
 
   /**

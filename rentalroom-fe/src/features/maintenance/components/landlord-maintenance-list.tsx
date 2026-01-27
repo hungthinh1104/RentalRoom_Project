@@ -25,12 +25,14 @@ import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import api from "@/lib/api/client";
 import { toast } from "sonner";
+import { useLegalConfirmation } from "@/components/security/legal-finality-dialog";
 
 export function LandlordMaintenanceList() {
 	const { data: session } = useSession();
 	const queryClient = useQueryClient();
 	const [searchQuery, setSearchQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | "ALL">("ALL");
+	const { confirm, Dialog: LegalDialog } = useLegalConfirmation();
 
 	const { data: requests, isLoading } = useQuery({
 		queryKey: ["landlord-maintenance", session?.user?.id],
@@ -232,6 +234,7 @@ export function LandlordMaintenanceList() {
 					))}
 				</div>
 			)}
+			<LegalDialog />
 		</div>
 	);
 }

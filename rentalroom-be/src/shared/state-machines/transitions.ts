@@ -96,15 +96,13 @@ export function validateTransition(
   const allowedStates = (transitions as any)[oldStatus];
 
   if (!allowedStates) {
-    throw new Error(
-      `Unknown status for ${entityType}: ${oldStatus}`,
-    );
+    throw new Error(`Unknown status for ${entityType}: ${oldStatus}`);
   }
 
   if (!allowedStates.includes(newStatus)) {
     throw new Error(
       `Invalid transition: ${entityType}.${oldStatus} → ${newStatus}. ` +
-      `Allowed: ${allowedStates.join(', ') || 'none (terminal state)'}`,
+        `Allowed: ${allowedStates.join(', ') || 'none (terminal state)'}`,
     );
   }
 }

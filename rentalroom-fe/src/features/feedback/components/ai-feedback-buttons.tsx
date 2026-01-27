@@ -51,7 +51,7 @@ export function AiFeedbackButtons({
                 disabled={isSubmitting || feedback !== null}
                 className={cn(
                     "h-8 px-2",
-                    feedback === UserAiFeedback.HELPFUL && "bg-green-100 text-green-700"
+                    feedback === UserAiFeedback.HELPFUL && "bg-success/10 text-success border-success/20 border"
                 )}
             >
                 <ThumbsUp className="size-4" />
@@ -63,7 +63,7 @@ export function AiFeedbackButtons({
                 disabled={isSubmitting || feedback !== null}
                 className={cn(
                     "h-8 px-2",
-                    feedback === UserAiFeedback.NOT_HELPFUL && "bg-red-100 text-red-700"
+                    feedback === UserAiFeedback.NOT_HELPFUL && "bg-destructive/10 text-destructive border-destructive/20 border"
                 )}
             >
                 <ThumbsDown className="size-4" />

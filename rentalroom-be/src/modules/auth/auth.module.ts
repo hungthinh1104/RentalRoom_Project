@@ -8,12 +8,14 @@ import { PrismaService } from 'src/database/prisma/prisma.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { EmailService } from 'src/common/services/email.service';
+import { eKycModule } from 'src/shared/integration/ekyc/ekyc.module';
 
 @Module({
   imports: [
     ConfigModule,
     PassportModule,
     JwtModule.register({}), // Config will be in strategy
+    eKycModule,
   ],
   controllers: [AuthController],
   providers: [

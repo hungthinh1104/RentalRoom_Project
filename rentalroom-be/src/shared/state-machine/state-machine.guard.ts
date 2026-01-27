@@ -2,17 +2,17 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 
 /**
  * ☠️ STATE MACHINE GUARD - PREVENT ILLEGAL TRANSITIONS
- * 
+ *
  * CRITICAL PROBLEM:
  * - Hiện tại: Cho phép PAID → UPDATE, TERMINATED → UPDATE
  * - Hậu quả: Tạo ra trạng thái KHÔNG TỒN TẠI trong đời thực
  * - Pháp lý: "Unreliable System of Record"
- * 
+ *
  * SOLUTION:
  * - Define EXPLICIT transitions cho mỗi entity type
  * - REJECT any transition không được phép
  * - AUDIT mọi transition attempt (kể cả fail)
- * 
+ *
  * UC_LEGAL_03: State Machine Integrity
  * UC_LEGAL_04: Illegal Transition Prevention
  */
@@ -52,15 +52,19 @@ export enum MaintenanceState {
 
 /**
  * STATE MACHINE DEFINITIONS
- * 
+ *
  * Format: { fromState: [allowedToStates] }
- * 
+ *
  * CRITICAL RULE:
  * If a transition is NOT in this map → IT IS FORBIDDEN
  */
 const INVOICE_TRANSITIONS: Record<InvoiceState, InvoiceState[]> = {
   [InvoiceState.DRAFT]: [InvoiceState.PENDING, InvoiceState.CANCELLED],
-  [InvoiceState.PENDING]: [InvoiceState.PAID, InvoiceState.OVERDUE, InvoiceState.CANCELLED],
+  [InvoiceState.PENDING]: [
+    InvoiceState.PAID,
+    InvoiceState.OVERDUE,
+    InvoiceState.CANCELLED,
+  ],
   [InvoiceState.OVERDUE]: [InvoiceState.PAID, InvoiceState.BAD_DEBT],
   [InvoiceState.PAID]: [], // ☠️ TERMINAL STATE - CANNOT CHANGE
   [InvoiceState.CANCELLED]: [], // ☠️ TERMINAL STATE
@@ -68,9 +72,18 @@ const INVOICE_TRANSITIONS: Record<InvoiceState, InvoiceState[]> = {
 };
 
 const CONTRACT_TRANSITIONS: Record<ContractState, ContractState[]> = {
-  [ContractState.DRAFT]: [ContractState.PENDING_SIGNATURE, ContractState.CANCELLED],
-  [ContractState.PENDING_SIGNATURE]: [ContractState.DEPOSIT_PENDING, ContractState.CANCELLED],
-  [ContractState.DEPOSIT_PENDING]: [ContractState.ACTIVE, ContractState.CANCELLED],
+  [ContractState.DRAFT]: [
+    ContractState.PENDING_SIGNATURE,
+    ContractState.CANCELLED,
+  ],
+  [ContractState.PENDING_SIGNATURE]: [
+    ContractState.DEPOSIT_PENDING,
+    ContractState.CANCELLED,
+  ],
+  [ContractState.DEPOSIT_PENDING]: [
+    ContractState.ACTIVE,
+    ContractState.CANCELLED,
+  ],
   [ContractState.ACTIVE]: [ContractState.TERMINATED, ContractState.EXPIRED],
   [ContractState.TERMINATED]: [], // ☠️ TERMINAL STATE
   [ContractState.EXPIRED]: [], // ☠️ TERMINAL STATE
@@ -85,15 +98,21 @@ const PAYMENT_TRANSITIONS: Record<PaymentState, PaymentState[]> = {
 };
 
 const MAINTENANCE_TRANSITIONS: Record<MaintenanceState, MaintenanceState[]> = {
-  [MaintenanceState.PENDING]: [MaintenanceState.IN_PROGRESS, MaintenanceState.CANCELLED],
-  [MaintenanceState.IN_PROGRESS]: [MaintenanceState.COMPLETED, MaintenanceState.CANCELLED],
+  [MaintenanceState.PENDING]: [
+    MaintenanceState.IN_PROGRESS,
+    MaintenanceState.CANCELLED,
+  ],
+  [MaintenanceState.IN_PROGRESS]: [
+    MaintenanceState.COMPLETED,
+    MaintenanceState.CANCELLED,
+  ],
   [MaintenanceState.COMPLETED]: [], // ☠️ TERMINAL STATE
   [MaintenanceState.CANCELLED]: [], // ☠️ TERMINAL STATE
 };
 
 /**
  * STATE MACHINE GUARD SERVICE
- * 
+ *
  * USAGE:
  * ```ts
  * // Before any state change:
@@ -104,7 +123,7 @@ const MAINTENANCE_TRANSITIONS: Record<MaintenanceState, MaintenanceState[]> = {
  *   'PAID',
  *   userId
  * );
- * 
+ *
  * // If invalid → throws BadRequestException
  * // If valid → returns true, logs audit
  * ```
@@ -122,12 +141,12 @@ export class StateMachineGuard {
 
   /**
    * VALIDATE TRANSITION - CRITICAL OPERATION
-   * 
+   *
    * GUARANTEES:
    * - Rejects illegal transitions
    * - Logs all attempts (for audit)
    * - Throws exception with clear error message
-   * 
+   *
    * @param entityType Type of entity (INVOICE, CONTRACT, etc)
    * @param entityId Entity UUID
    * @param fromState Current state
@@ -169,7 +188,7 @@ export class StateMachineGuard {
       );
       throw new BadRequestException(
         `Entity ${entityType}:${entityId} is in invalid state: ${fromState}. ` +
-        `This is a data integrity issue. Contact support.`,
+          `This is a data integrity issue. Contact support.`,
       );
     }
 
@@ -180,13 +199,13 @@ export class StateMachineGuard {
       // ☠️ ILLEGAL TRANSITION DETECTED
       this.logger.warn(
         `❌ ILLEGAL TRANSITION BLOCKED: ${entityType}:${entityId} ` +
-        `${fromState} → ${toState} by user ${userId}. ` +
-        `Reason: ${reason || 'Not provided'}`,
+          `${fromState} → ${toState} by user ${userId}. ` +
+          `Reason: ${reason || 'Not provided'}`,
       );
 
       throw new BadRequestException(
         `Cannot transition ${entityType} from ${fromState} to ${toState}. ` +
-        `Allowed transitions from ${fromState}: ${allowedTransitions.join(', ')}`,
+          `Allowed transitions from ${fromState}: ${allowedTransitions.join(', ')}`,
       );
     }
 
@@ -200,7 +219,7 @@ export class StateMachineGuard {
 
   /**
    * CHECK IF STATE IS TERMINAL (cannot be changed)
-   * 
+   *
    * Use this before allowing ANY update:
    * ```ts
    * if (this.stateMachine.isTerminalState('INVOICE', invoice.status)) {
@@ -221,7 +240,7 @@ export class StateMachineGuard {
 
   /**
    * GET ALLOWED TRANSITIONS - For UI
-   * 
+   *
    * Example: Show user only the valid next states
    */
   getAllowedTransitions(

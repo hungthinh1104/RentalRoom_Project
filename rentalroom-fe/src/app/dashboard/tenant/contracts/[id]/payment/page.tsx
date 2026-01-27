@@ -89,8 +89,8 @@ export default function ContractPaymentPage() {
             </div>
 
             {/* Success Message */}
-            <Alert className="border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <Alert className="bg-success/10 border-success/20 text-success">
+                <CheckCircle className="h-4 w-4 text-success" />
                 <AlertDescription>
                     ✅ Hợp đồng đã được phê duyệt thành công! Vui lòng thanh toán tiền cọc để kích hoạt hợp đồng.
                 </AlertDescription>
@@ -133,9 +133,9 @@ export default function ContractPaymentPage() {
                         </div>
 
                         {contract.depositDeadline && (
-                            <div className="flex items-center justify-between p-4 rounded-lg border border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+                            <div className="flex items-center justify-between p-4 rounded-lg border border-warning/20 bg-warning/10">
                                 <div className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                                    <Clock className="h-5 w-5 text-warning" />
                                     <div>
                                         <p className="text-sm text-muted-foreground">Hạn thanh toán</p>
                                         <p className="font-medium">
@@ -143,7 +143,7 @@ export default function ContractPaymentPage() {
                                         </p>
                                     </div>
                                 </div>
-                                <Badge variant="outline" className="text-orange-700 border-orange-300 dark:text-orange-400 dark:border-orange-600">
+                                <Badge variant="outline" className="text-warning border-warning/40">
                                     {timeLeft}
                                 </Badge>
                             </div>

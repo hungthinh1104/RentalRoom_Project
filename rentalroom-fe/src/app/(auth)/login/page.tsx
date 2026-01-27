@@ -1,6 +1,5 @@
 import { Metadata } from "next";
-import { Suspense } from "react";
-import { LoginForm } from "@/features/auth/components/login-form";
+import { LoginContent } from "./login-content";
 
 export const metadata: Metadata = {
   title: "Login | Rental Room",
@@ -8,9 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="container py-6">Đang tải…</div>}>
-      <LoginForm />
-    </Suspense>
-  );
+  return <LoginContent />;
 }

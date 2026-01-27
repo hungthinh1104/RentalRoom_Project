@@ -17,11 +17,11 @@ import { Badge } from "@/components/ui/badge";
 const getServiceTypeBadge = (type: ServiceType) => {
     switch (type) {
         case ServiceType.ELECTRICITY:
-            return <Badge variant="default" className="bg-yellow-600">Điện</Badge>;
+            return <Badge variant="default" className="bg-utility-electric text-black">Điện</Badge>;
         case ServiceType.WATER:
-            return <Badge variant="default" className="bg-blue-600">Nước</Badge>;
+            return <Badge variant="default" className="bg-utility-water text-white">Nước</Badge>;
         case ServiceType.INTERNET:
-            return <Badge variant="default" className="bg-indigo-600">Internet</Badge>;
+            return <Badge variant="default" className="bg-utility-internet text-white">Internet</Badge>;
         case ServiceType.PARKING:
             return <Badge variant="secondary">Gửi xe</Badge>;
         case ServiceType.CLEANING:
@@ -34,9 +34,9 @@ const getServiceTypeBadge = (type: ServiceType) => {
 const getBillingMethodBadge = (method: BillingMethod) => {
     switch (method) {
         case BillingMethod.METERED:
-            return <Badge variant="outline" className="border-blue-500 text-blue-600">Theo chỉ số</Badge>;
+            return <Badge variant="outline" className="border-info text-info">Theo chỉ số</Badge>;
         case BillingMethod.FIXED:
-            return <Badge variant="outline" className="border-green-500 text-green-600">Cố định</Badge>;
+            return <Badge variant="outline" className="border-success text-success">Cố định</Badge>;
         default:
             return <Badge variant="outline">{method}</Badge>;
     }
@@ -95,7 +95,7 @@ export const getServicesColumns = ({ onEdit, onDelete }: ServicesColumnsProps): 
                             <Pencil className="mr-2 h-4 w-4" />
                             Chỉnh sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDelete(service)} className="text-red-600 focus:text-red-600">
+                        <DropdownMenuItem onClick={() => onDelete(service)} className="text-destructive focus:text-destructive">
                             <Trash className="mr-2 h-4 w-4" />
                             Xóa dịch vụ
                         </DropdownMenuItem>

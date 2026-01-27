@@ -187,12 +187,10 @@ export class PaymentService {
    * Future: Can be overridden to use different gateways per landlord
    * @private
    */
-  private async getGatewayForContract(
-    _contract: any,
-  ): Promise<IPaymentGateway> {
+  private getGatewayForContract(_contract: any): Promise<IPaymentGateway> {
     // Future: Read from PaymentConfig.gatewayType if multi-gateway support added
     // For now, always use default (Sepay)
-    return this.gatewayFactory.getDefault();
+    return Promise.resolve(this.gatewayFactory.getDefault());
   }
 
   /**

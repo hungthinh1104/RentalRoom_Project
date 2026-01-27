@@ -27,6 +27,7 @@ interface RequestOptions {
 	body?: unknown;
 	params?: Record<string, unknown>;
 	responseType?: 'json' | 'blob' | 'text';
+	idempotencyKey?: string; // For idempotent operations
 }
 
 async function request<T>(
@@ -65,6 +66,21 @@ async function request<T>(
 			}
 		} catch (error) {
 			console.error('[API Client] Failed to get client session:', error);
+		}
+
+		// 🛡️ SECURITY FIX: Add CSRF token for state-changing requests
+		if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+			const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content;
+			if (csrfToken) {
+				headers['X-CSRF-Token'] = csrfToken;
+			} else if (process.env.NODE_ENV === 'development') {
+				console.warn('[Security] CSRF token not found in meta tag. Add <meta name="csrf-token" content="..."> to layout.');
+			}
+
+			// Add idempotency key for idempotent operations
+			if (options?.idempotencyKey) {
+				headers['Idempotency-Key'] = options.idempotencyKey;
+			}
 		}
 	} else {
 		// Server-side: use auth from @/auth (dynamically imported to avoid client bundle issues)

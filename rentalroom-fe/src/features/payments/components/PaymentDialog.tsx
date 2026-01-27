@@ -148,9 +148,9 @@ export function PaymentDialog({ invoice, open, onClose }: PaymentDialogProps) {
                     </div>
 
                     {/* Note */}
-                    <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-3">
-                        <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">Lưu ý:</p>
-                        <p className="text-blue-800 dark:text-blue-200">
+                    <div className="text-sm text-muted-foreground bg-info/5 dark:bg-info/10 border border-info/20 dark:border-info/40 rounded-lg p-3">
+                        <p className="font-medium text-info mb-1">Lưu ý:</p>
+                        <p className="text-muted-foreground">
                             Sau khi xác nhận, hóa đơn sẽ được đánh dấu là đã thanh toán.
                             Vui lòng đảm bảo bạn đã thực hiện thanh toán trước khi xác nhận.
                         </p>

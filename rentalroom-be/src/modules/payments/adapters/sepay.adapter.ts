@@ -184,7 +184,7 @@ export class SepayAdapter implements IPaymentGateway {
   /**
    * Validate Sepay config
    */
-  async validateConfig(config: any): Promise<void> {
+  validateConfig(config: any): Promise<void> {
     if (!config.accountNumber) {
       throw new BadRequestException('Sepay account number is required');
     }
@@ -195,6 +195,7 @@ export class SepayAdapter implements IPaymentGateway {
 
     // Token is from environment, just validate config fields
     this.logger.debug('✓ Sepay config validated successfully');
+    return Promise.resolve();
   }
 
   /**

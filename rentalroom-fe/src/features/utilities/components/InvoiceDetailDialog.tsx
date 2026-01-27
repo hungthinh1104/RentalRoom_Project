@@ -12,10 +12,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, Receipt, Calendar, User, Home, CreditCard, QrCode } from 'lucide-react';
 import { formatCurrency } from '@/utils/tax-helpers';
+import { cn } from '@/lib/utils';
 import { utilitiesApi, InvoiceLineItem, Payment } from '../api/utilities-api';
 import { UtilityPaymentDialog } from './utility-payment-dialog';
 import api from '@/lib/api/client';
 import { toast } from 'sonner';
+import { useLegalConfirmation } from '@/components/security/legal-finality-dialog';
+import { isActionAllowed } from '@/lib/security/action-matrix';
 
 interface InvoiceDetailDialogProps {
   invoiceId: string | null;
@@ -34,6 +37,7 @@ export function InvoiceDetailDialog({
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const queryClient = useQueryClient();
+  const { confirm, Dialog: LegalDialog } = useLegalConfirmation();
 
   const { data: invoice, isLoading, refetch } = useQuery({
     queryKey: ['invoice-detail', invoiceId],
@@ -108,7 +112,19 @@ export function InvoiceDetailDialog({
   if (!open) return null;
 
   const handlePayment = () => {
-    setPaymentDialogOpen(true);
+    if (!invoice) return;
+
+    confirm(
+      {
+        title: "Ghi nhận thanh toán",
+        description: `Bạn đang ghi nhận thanh toán cho hóa đơn ${invoice.invoiceNumber} với số tiền ${formatCurrency(Number(invoice.totalAmount))}. Hành động này sẽ tạo snapshot pháp lý và không thể hoàn tác.`,
+        severity: "critical",
+        consentText: "Tôi xác nhận ghi nhận thanh toán này",
+      },
+      () => {
+        setPaymentDialogOpen(true);
+      }
+    );
   };
 
   return (
@@ -173,12 +189,14 @@ export function InvoiceDetailDialog({
               {/* Status Badge and Actions */}
               <div className="flex items-center justify-between">
                 <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${invoice.status === 'PAID'
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : invoice.status === 'OVERDUE'
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                    }`}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-sm font-medium",
+                    invoice.status === 'PAID'
+                      ? 'bg-success/10 text-success'
+                      : invoice.status === 'OVERDUE'
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-warning/10 text-warning'
+                  )}
                 >
                   {invoice.status === 'PAID'
                     ? 'Đã thanh toán'
@@ -186,7 +204,8 @@ export function InvoiceDetailDialog({
                       ? 'Quá hạn'
                       : 'Chưa thanh toán'}
                 </span>
-                {invoice.status !== 'PAID' && (
+                {/* Only show payment actions if invoice is not PAID */}
+                {isActionAllowed('INVOICE', invoice.status, 'MARK_PAID') && (
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -229,7 +248,7 @@ export function InvoiceDetailDialog({
 
               {/* QR Code Section */}
               {showQR && invoice.status !== 'PAID' && (
-                <div className="p-6 border rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
+                <div className="p-6 border rounded-lg bg-gradient-to-br from-info/5 to-primary/5">
                   <div className="text-center space-y-4">
                     <h3 className="font-semibold text-lg">Quét mã QR để thanh toán</h3>
                     <div className="bg-white p-4 rounded-lg inline-block shadow-lg">
@@ -242,7 +261,7 @@ export function InvoiceDetailDialog({
                           className="w-64 h-64"
                         />
                       ) : (
-                        <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-gray-300">
+                        <div className="w-64 h-64 flex items-center justify-center border-2 border-dashed border-border">
                           {qrLoading ? (
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                           ) : (
@@ -259,7 +278,7 @@ export function InvoiceDetailDialog({
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="font-medium">Thông tin chuyển khoản:</p>
-                      <div className="bg-white/80 dark:bg-gray-900/80 p-3 rounded-lg space-y-1 text-left">
+                      <div className="bg-background/80 p-3 rounded-lg space-y-1 text-left">
                         <p><span className="text-muted-foreground">Ngân hàng:</span> <span className="font-medium">Vietcombank</span></p>
                         <p><span className="text-muted-foreground">Số TK:</span> <span className="font-medium">1234567890</span></p>
                         <p><span className="text-muted-foreground">Chủ TK:</span> <span className="font-medium">Rental Room Management</span></p>
@@ -322,7 +341,7 @@ export function InvoiceDetailDialog({
                   <>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Đã thanh toán</span>
-                      <span className="text-green-600 font-medium">
+                      <span className="text-success font-medium">
                         {formatCurrency(Number(invoice.paidAmount))}
                       </span>
                     </div>
@@ -357,7 +376,7 @@ export function InvoiceDetailDialog({
                             {payment.paymentMethod}
                           </p>
                         </div>
-                        <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <span className="text-xs px-2 py-1 rounded-full bg-success/10 text-success border border-success/20">
                           Thành công
                         </span>
                       </div>
@@ -381,10 +400,11 @@ export function InvoiceDetailDialog({
           onOpenChange={setPaymentDialogOpen}
           onSuccess={() => {
             setPaymentDialogOpen(false);
-            // Refetch invoice detail to update status
+            refetch();
           }}
         />
       )}
+      <LegalDialog />
     </>
   );
 }

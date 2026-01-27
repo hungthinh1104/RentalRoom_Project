@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, FileText, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { DocumentList } from '@/features/documents/components/document-list';
+import { UserDocument } from '@/features/documents/api/documents-api';
 import { DocumentUploadModal } from '@/features/documents/components/document-upload-modal';
 import { useDocuments } from '@/features/documents/hooks/use-documents';
 
@@ -16,7 +17,7 @@ export default function DocumentsPage() {
     // TODO: Add filters for type and property
     const { data: documents, isLoading } = useDocuments();
 
-    const filteredDocuments = documents?.filter(doc =>
+    const filteredDocuments = documents?.filter((doc: UserDocument) =>
         doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.description?.toLowerCase().includes(searchTerm.toLowerCase())
     );

@@ -89,7 +89,7 @@ export default function CookiePolicyPage() {
                                     Cookie này giúp cải thiện trải nghiệm của bạn bằng cách ghi nhớ sở thích.
                                 </p>
 
-                                <div className="border-l-4 border-blue-500 pl-4">
+                                <div className="border-l-4 border-info pl-4">
                                     <p className="font-semibold">Language Preference</p>
                                     <p className="text-sm text-muted-foreground">
                                         <strong>Mục đích:</strong> Ghi nhớ ngôn ngữ bạn chọn
@@ -99,7 +99,7 @@ export default function CookiePolicyPage() {
                                     </p>
                                 </div>
 
-                                <div className="border-l-4 border-blue-500 pl-4">
+                                <div className="border-l-4 border-info pl-4">
                                     <p className="font-semibold">Theme Preference</p>
                                     <p className="text-sm text-muted-foreground">
                                         <strong>Mục đích:</strong> Ghi nhớ chế độ sáng/tối
@@ -123,7 +123,7 @@ export default function CookiePolicyPage() {
                                     Cookie này giúp chúng tôi hiểu cách người dùng sử dụng website để cải thiện dịch vụ.
                                 </p>
 
-                                <div className="border-l-4 border-amber-500 pl-4">
+                                <div className="border-l-4 border-warning pl-4">
                                     <p className="font-semibold">Analytics Cookie</p>
                                     <p className="text-sm text-muted-foreground">
                                         <strong>Mục đích:</strong> Theo dõi lượt truy cập, trang được xem nhiều nhất

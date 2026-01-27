@@ -466,7 +466,7 @@ export class RoomsService {
 
   async remove(id: string, user: User) {
     // Check if room exists
-    const room = await this.findOne(id);
+    const _room = await this.findOne(id);
 
     // Get room's property for landlord check
     const fullRoom = await this.prisma.room.findUnique({

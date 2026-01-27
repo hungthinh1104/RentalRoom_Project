@@ -47,7 +47,7 @@ export function ContractStepper({ status }: ContractStepperProps) {
     return (
         <div className="w-full py-4">
             <div className="relative flex items-center justify-between w-full">
-                <div className="absolute left-0 top-1/2 w-full h-1 bg-gray-200 -z-10 rounded-full" />
+                <div className="absolute left-0 top-1/2 w-full h-1 bg-muted -z-10 rounded-full" />
 
                 {steps.map((step, index) => {
                     const active = step.isActive(status);
@@ -77,10 +77,10 @@ export function ContractStepper({ status }: ContractStepperProps) {
                                 className={cn(
                                     "flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-300",
                                     isFinished
-                                        ? "bg-green-600 border-green-600 text-white"
+                                        ? "bg-success border-success text-success-foreground"
                                         : isCurrentStep
-                                            ? "bg-blue-600 border-blue-600 text-white ring-4 ring-blue-100"
-                                            : "bg-white border-gray-300 text-gray-400"
+                                            ? "bg-info border-info text-info-foreground ring-4 ring-info/10"
+                                            : "bg-background border-border text-muted-foreground"
                                 )}
                             >
                                 {isFinished ? (
@@ -92,7 +92,7 @@ export function ContractStepper({ status }: ContractStepperProps) {
                             <span
                                 className={cn(
                                     "mt-2 text-xs font-medium uppercase tracking-wider",
-                                    isFinished ? "text-green-600" : isCurrentStep ? "text-blue-600" : "text-gray-400"
+                                    isFinished ? "text-success" : isCurrentStep ? "text-info" : "text-muted-foreground"
                                 )}
                             >
                                 {step.label}

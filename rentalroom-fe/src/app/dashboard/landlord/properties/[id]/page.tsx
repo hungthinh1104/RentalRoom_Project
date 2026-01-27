@@ -164,25 +164,25 @@ export default function PropertyDetailPage({ params }: { params: Promise<{ id: s
 					icon={<Home className="h-6 w-6" />}
 					label="Loại hình"
 					value={property.propertyType || "N/A"}
-					gradient="from-blue-500 to-cyan-500"
+					gradient="from-info to-primary"
 				/>
 				<StatCard
 					icon={<Bed className="h-6 w-6" />}
 					label="Tổng số phòng"
 					value={rooms.length.toString()}
-					gradient="from-purple-500 to-pink-500"
+					gradient="from-accent-purple to-primary"
 				/>
 				<StatCard
 					icon={<Users className="h-6 w-6" />}
 					label="Phòng trống"
 					value={availableRooms.toString()}
-					gradient="from-green-500 to-emerald-500"
+					gradient="from-success to-primary"
 				/>
 				<StatCard
 					icon={<DollarSign className="h-6 w-6" />}
 					label="Đã cho thuê"
 					value={occupiedRooms.toString()}
-					gradient="from-amber-500 to-orange-500"
+					gradient="from-warning to-primary"
 				/>
 			</div>
 
@@ -251,9 +251,9 @@ function StatCard({
 
 function RoomCard({ room, propertyId }: { room: Room; propertyId: string }) {
 	const statusColors = {
-		AVAILABLE: "bg-green-500/10 text-green-600 border-green-500/20",
-		OCCUPIED: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-		MAINTENANCE: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+		AVAILABLE: "bg-success/10 text-success border-success/20",
+		OCCUPIED: "bg-info/10 text-info border-info/20",
+		MAINTENANCE: "bg-warning/10 text-warning border-warning/20",
 	};
 
 	const statusLabels = {

@@ -70,7 +70,7 @@ export class PaymentGatewayFactory {
    * @param landlordId Landlord ID
    * @returns Gateway instance for landlord
    */
-  async getForLandlord(_landlordId: string): Promise<IPaymentGateway> {
+  getForLandlord(_landlordId: string): Promise<IPaymentGateway> {
     // TODO: Query PaymentConfig.gatewayType from DB when multi-gateway support added
     // const config = await this.prisma.paymentConfig.findUnique({
     //   where: { landlordId },
@@ -78,7 +78,7 @@ export class PaymentGatewayFactory {
     // return this.create(config?.gatewayType || PaymentGatewayType.SEPAY);
 
     // For now, always use Sepay
-    return this.getDefault();
+    return Promise.resolve(this.getDefault());
   }
 
   /**

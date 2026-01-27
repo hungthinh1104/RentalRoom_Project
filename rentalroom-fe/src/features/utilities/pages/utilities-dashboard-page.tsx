@@ -111,7 +111,7 @@ export function UtilitiesDashboardPage({ contractId }: UtilitiesDashboardPagePro
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Quản lý Điện Nước</h1>
-          <p className="text-gray-600 mt-1">Nhập và quản lý chỉ số dịch vụ</p>
+          <p className="text-muted-foreground mt-1">Nhập và quản lý chỉ số dịch vụ</p>
         </div>
 
         <Button onClick={() => setShowForm(true)} className="gap-2">
@@ -163,7 +163,7 @@ export function UtilitiesDashboardPage({ contractId }: UtilitiesDashboardPagePro
             <div className="text-3xl font-bold">
               {totalAmount.toLocaleString('vi-VN')} ₫
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {readings.length} dịch vụ đã nhập
             </p>
           </CardContent>
@@ -177,7 +177,7 @@ export function UtilitiesDashboardPage({ contractId }: UtilitiesDashboardPagePro
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{meteredServices.length}</div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {readings.length}/{meteredServices.length} đã nhập
             </p>
           </CardContent>
@@ -231,7 +231,7 @@ export function UtilitiesDashboardPage({ contractId }: UtilitiesDashboardPagePro
               <CardTitle>Xu hướng sử dụng</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center text-gray-500 py-8">
+              <div className="text-center text-muted-foreground py-8">
                 Chức năng phân tích sẽ có sớm
               </div>
             </CardContent>

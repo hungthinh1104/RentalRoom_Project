@@ -1,7 +1,6 @@
-
 import { auth } from "@/auth";
 import api from "@/lib/api/client";
-import FinanceView from "./finance-view";
+import FinanceView, { type Invoice } from "./finance-view";
 import { redirect } from "next/navigation";
 
 export default async function TenantFinancePage() {
@@ -13,24 +12,26 @@ export default async function TenantFinancePage() {
 
     // Fetch data in parallel on the server
     // We use try/catch to handle errors gracefully, although the nearest error.tsx would catch them
-    let initialInvoices = { items: [] };
+    let initialInvoices: { items: Invoice[] } = { items: [] };
     let initialStats = null;
 
     try {
         const [invoicesRes, statsRes] = await Promise.all([
-            api.get("/invoices/my-invoices"),
+            api.get<{ items: Invoice[] }>("/invoices/my-invoices"),
             api.get("/invoices/stats"),
         ]);
-        initialInvoices = invoicesRes.data as any;
+        initialInvoices = invoicesRes.data;
         initialStats = statsRes.data;
     } catch (error) {
         console.error("Failed to fetch finance data:", error);
-        // You could redirect to error page or let it render with empty data
     }
 
     return (
         <FinanceView
-            user={session.user}
+            user={{
+                ...session.user,
+                fullName: (session.user as { fullName?: string }).fullName || session.user?.name || "",
+            }}
             initialInvoices={initialInvoices}
             initialStats={initialStats}
         />

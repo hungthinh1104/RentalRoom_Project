@@ -8,12 +8,12 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies with caching
+# Install dependencies with optimized caching
 RUN --mount=type=cache,target=/root/.npm \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
-    npm ci --legacy-peer-deps
+    npm ci --omit=dev --legacy-peer-deps
 
 # ============================================
 # Stage 2: Builder
@@ -22,8 +22,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+# Copy package files for dev dependencies
+COPY package*.json ./
+
+# Install ALL dependencies (including dev) for build
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --legacy-peer-deps
 
 # Copy source code
 COPY . .
@@ -35,22 +39,6 @@ RUN npx prisma generate
 # Build application
 RUN npm run build
 
-# Prune devDependencies
-RUN npm prune --production --legacy-peer-deps
-
-# Clean up node_modules aggressively
-RUN find node_modules -name "*.md" -delete && \
-    find node_modules -name "*.ts" -not -path "*/node_modules/.prisma/*" -delete && \
-    find node_modules -name "*.map" -delete && \
-    find node_modules -name "LICENSE*" -delete && \
-    find node_modules -name "CHANGELOG*" -delete && \
-    find node_modules -name "README*" -delete && \
-    find node_modules -name ".github" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    find node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    find node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    find node_modules -name "docs" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    find node_modules -name "examples" -type d -exec rm -rf {} + 2>/dev/null || true
-
 # ============================================
 # Stage 3: Production
 # ============================================
@@ -58,7 +46,7 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install runtime dependencies + PM2
+# Install runtime dependencies only
 RUN apk add --no-cache \
     openssl \
     chromium \
@@ -67,7 +55,7 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
-    && npm install -g pm2 \
+    && npm install -g pm2@latest \
     && rm -rf /var/cache/apk/*
 
 ENV NODE_ENV=production \
@@ -76,24 +64,34 @@ ENV NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=512"
 
 # Copy package files
-COPY --from=builder /app/package*.json ./
+COPY package*.json ./
 
-# Copy production node_modules
-COPY --from=builder /app/node_modules ./node_modules
+# Copy production dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
 
-# Copy Prisma files
+# Copy Prisma files and generated client
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
-# Copy email templates
+# Copy necessary runtime files
 COPY --from=builder /app/src/templates ./dist/src/templates
-
-# Copy PM2 config
+COPY --from=builder /app/fonts ./fonts
+COPY --from=builder /app/certs ./certs
 COPY ecosystem.config.json ./
 
-# Create non-root user
+# Clean up unnecessary files to reduce image size
+RUN find node_modules -name "*.md" -delete && \
+    find node_modules -name "*.ts" -not -path "*/node_modules/.prisma/*" -delete && \
+    find node_modules -name "*.map" -delete && \
+    find node_modules -name "LICENSE*" -delete && \
+    find node_modules -name "CHANGELOG*" -delete && \
+    find node_modules -name "README*" -delete && \
+    rm -rf node_modules/*/{test,tests,docs,examples,.github} 2>/dev/null || true
+
+# Create non-root user for security
 RUN addgroup -g 1001 -S app && \
     adduser -S -u 1001 app -G app && \
     chown -R app:app /app

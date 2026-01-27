@@ -5,9 +5,9 @@ import React from "react";
 
 export function AiBackground() {
     return (
-        <div className="fixed inset-0 overflow-hidden -z-10 bg-black">
+        <div className="fixed inset-0 overflow-hidden -z-10 bg-background">
             {/* Base Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-black opacity-80" />
+            <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background to-background opacity-80" />
 
             {/* Animated Orbs */}
             <motion.div
@@ -22,7 +22,7 @@ export function AiBackground() {
                     repeat: Infinity,
                     ease: "easeInOut",
                 }}
-                className="absolute -top-32 -left-32 w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-40"
+                className="absolute -top-32 -left-32 w-96 h-96 bg-primary rounded-full mix-blend-multiply filter blur-[128px] opacity-40"
             />
             <motion.div
                 animate={{
@@ -37,7 +37,7 @@ export function AiBackground() {
                     ease: "easeInOut",
                     delay: 2,
                 }}
-                className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-40"
+                className="absolute top-1/4 right-0 w-[500px] h-[500px] bg-info rounded-full mix-blend-multiply filter blur-[128px] opacity-40"
             />
             <motion.div
                 animate={{
@@ -52,7 +52,7 @@ export function AiBackground() {
                     ease: "easeInOut",
                     delay: 5,
                 }}
-                className="absolute -bottom-32 left-1/3 w-[600px] h-[600px] bg-indigo-800 rounded-full mix-blend-multiply filter blur-[128px] opacity-40"
+                className="absolute -bottom-32 left-1/3 w-[600px] h-[600px] bg-secondary rounded-full mix-blend-multiply filter blur-[128px] opacity-40"
             />
 
             {/* Grid Overlay for "Tech" feel */}

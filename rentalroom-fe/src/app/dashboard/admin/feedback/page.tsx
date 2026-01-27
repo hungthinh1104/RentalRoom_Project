@@ -100,13 +100,13 @@ export default function AdminFeedbackPage() {
     const getStatusBadge = (status: FeedbackStatus) => {
         switch (status) {
             case FeedbackStatus.PENDING:
-                return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending</Badge>;
+                return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">Pending</Badge>;
             case FeedbackStatus.IN_PROGRESS:
-                return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">In Progress</Badge>;
+                return <Badge variant="outline" className="bg-info/10 text-info border-info/20">In Progress</Badge>;
             case FeedbackStatus.RESOLVED:
-                return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Resolved</Badge>;
+                return <Badge variant="outline" className="bg-success/10 text-success border-success/20">Resolved</Badge>;
             case FeedbackStatus.REJECTED:
-                return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rejected</Badge>;
+                return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Rejected</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }

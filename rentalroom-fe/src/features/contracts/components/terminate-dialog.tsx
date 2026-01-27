@@ -7,6 +7,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { TerminationType } from '@/types/enums';
+import { useLegalConfirmation } from '@/components/security/legal-finality-dialog';
+import { toast } from 'sonner';
 
 interface TerminateDialogProps {
   open: boolean;
@@ -34,18 +36,37 @@ export function TerminateDialog({
   const [terminationType, setTerminationType] = useState<TerminationType>(
     isTenant ? TerminationType.EARLY_BY_TENANT : TerminationType.EARLY_BY_LANDLORD
   );
+  const { confirm, Dialog: LegalDialog } = useLegalConfirmation();
 
   const finalDeposit = depositAmount ?? deposit;
   const [refundAmount, setRefundAmount] = useState<number>(0);
 
   const handleConfirm = () => {
     if (!reason.trim()) {
-      alert('Vui lòng nhập lý do chấm dứt hợp đồng');
+      toast.error('Vui lòng nhập lý do chấm dứt hợp đồng');
       return;
     }
-    onConfirm({ reason: reason.trim(), noticeDays, terminationType, refundAmount });
-    setReason('');
-    setNoticeDays(30);
+
+    const terminationData = {
+      reason: reason.trim(),
+      noticeDays,
+      terminationType,
+      refundAmount
+    };
+
+    confirm(
+      {
+        title: "Chấm dứt hợp đồng",
+        description: `Bạn đang chấm dứt hợp đồng với lý do: "${reason.trim()}". Loại: ${terminationType}. Số tiền hoàn lại: ${refundAmount.toLocaleString('vi-VN')} đ. Hành động này sẽ tạo snapshot pháp lý và không thể hoàn tác.`,
+        severity: "critical",
+        consentText: "Tôi xác nhận chấm dứt hợp đồng",
+      },
+      () => {
+        onConfirm(terminationData);
+        setReason('');
+        setNoticeDays(30);
+      }
+    );
   };
 
   // Logic to auto-calculate refund/penalty based on Type
@@ -81,8 +102,8 @@ export function TerminateDialog({
         <div className="space-y-5 mt-2">
           {/* Logic Warning */}
           {(daysRemaining > 0 && terminationType !== TerminationType.EXPIRY) && (
-            <Alert variant="destructive" className="border-2 bg-red-50">
-              <AlertDescription className="text-sm font-medium text-red-800">
+            <Alert variant="destructive" className="border-2 bg-destructive/10">
+              <AlertDescription className="text-sm font-medium text-destructive">
                 ⚠️ Hợp đồng còn {daysRemaining} ngày. Chấm dứt sớm có thể phát sinh phạt cọc.
               </AlertDescription>
             </Alert>
@@ -137,7 +158,7 @@ export function TerminateDialog({
                 <Label className="text-xs text-muted-foreground">Số tiền hoàn lại cho khách</Label>
                 <Input
                   type="number"
-                  className="mt-1 font-bold text-green-700"
+                  className="mt-1 font-bold text-success"
                   value={refundAmount}
                   onChange={(e) => setRefundAmount(Number(e.target.value))}
                 />
@@ -164,6 +185,7 @@ export function TerminateDialog({
           </div>
         </div>
       </DialogContent>
+      <LegalDialog />
     </Dialog>
   );
 }

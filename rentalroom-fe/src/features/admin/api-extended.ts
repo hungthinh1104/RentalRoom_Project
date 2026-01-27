@@ -11,6 +11,9 @@ import {
 import { config } from "@/lib/config";
 
 const API_URL = config.api.url;
+const SERVER_API_BASE = API_URL.endsWith('/api/v1')
+  ? API_URL
+  : `${API_URL}/api/v1`;
 
 async function serverGet<T>(path: string, params?: Record<string, unknown>): Promise<T> {
   const session = await auth();
@@ -21,7 +24,7 @@ async function serverGet<T>(path: string, params?: Record<string, unknown>): Pro
     headers["Authorization"] = `Bearer ${session.accessToken}`;
   }
 
-  const url = new URL(`${API_URL}${path}`);
+  const url = new URL(`${SERVER_API_BASE}${path}`);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) url.searchParams.append(key, String(value));
@@ -41,6 +44,51 @@ async function serverGet<T>(path: string, params?: Record<string, unknown>): Pro
   }
   return res.json() as Promise<T>;
 }
+
+type PaginatedResponse<T> = {
+  data: T[];
+  meta: { total: number; page: number; limit: number; totalPages?: number };
+};
+
+const mapRoomStatus = (status?: string) => {
+  switch (status) {
+    case "OCCUPIED":
+      return "Đã cho thuê";
+    case "AVAILABLE":
+      return "Trống";
+    case "UNAVAILABLE":
+    case "DEPOSIT_PENDING":
+      return "Bảo trì";
+    default:
+      return "Trống";
+  }
+};
+
+const mapContractStatus = (status?: string) => {
+  switch (status) {
+    case "ACTIVE":
+      return "Hoạt động";
+    case "EXPIRED":
+    case "TERMINATED":
+    case "CANCELLED":
+      return "Hết hạn";
+    default:
+      return "Sắp hết hạn";
+  }
+};
+
+const mapPaymentStatus = (status?: string) => {
+  switch (status) {
+    case "COMPLETED":
+      return "Đã thanh toán";
+    case "PENDING":
+      return "Chưa thanh toán";
+    case "FAILED":
+      return "Quá hạn";
+    default:
+      return "Chưa thanh toán";
+  }
+};
 
 // Zod schemas for server responses
 const trendSchema = z.object({ date: z.string(), revenue: z.number() });
@@ -92,22 +140,47 @@ export async function fetchAdminTopPerformers(): Promise<TopPerformers> {
 }
 
 export async function fetchAdminRooms(page = 1, limit = 10) {
-  const raw = await serverGet<unknown>("/admin/rooms", { page, limit });
-  return z.array(adminRoomSchema).parse(raw);
+  const raw = await serverGet<PaginatedResponse<any>>("/rooms", { page, limit });
+  const mapped = (raw?.data || []).map((room) => ({
+    id: room.id,
+    number: room.roomNumber,
+    property: room.property?.name || room.propertyId,
+    status: mapRoomStatus(room.status),
+    price: Number(room.pricePerMonth || 0),
+    occupant: undefined,
+  }));
+  return z.array(adminRoomSchema).parse(mapped);
 }
 
 export async function fetchAdminContracts(page = 1, limit = 10) {
-  const raw = await serverGet<unknown>("/admin/contracts", { page, limit });
-  return z.array(adminContractSchema).parse(raw);
+  const raw = await serverGet<PaginatedResponse<any>>("/contracts", { page, limit });
+  const mapped = (raw?.data || []).map((contract) => ({
+    id: contract.id,
+    tenant: contract.tenant?.fullName || contract.tenantId,
+    property: contract.room?.property?.name || contract.roomId,
+    startDate: new Date(contract.startDate).toLocaleDateString("vi-VN"),
+    endDate: new Date(contract.endDate).toLocaleDateString("vi-VN"),
+    status: mapContractStatus(contract.status),
+  }));
+  return z.array(adminContractSchema).parse(mapped);
 }
 
 export async function fetchAdminPayments(page = 1, limit = 10) {
-  const raw = await serverGet<unknown>("/admin/payments", { page, limit });
-  return z.array(adminPaymentSchema).parse(raw);
+  const raw = await serverGet<PaginatedResponse<any>>("/payments", { page, limit });
+  const mapped = (raw?.data || []).map((payment) => ({
+    id: payment.id,
+    tenant: payment.tenantId,
+    amount: Number(payment.amount || 0),
+    dueDate: payment.paidAt
+      ? new Date(payment.paidAt).toLocaleDateString("vi-VN")
+      : new Date(payment.paymentDate || payment.createdAt || Date.now()).toLocaleDateString("vi-VN"),
+    status: mapPaymentStatus(payment.status),
+  }));
+  return z.array(adminPaymentSchema).parse(mapped);
 }
 
 export async function fetchAdminUsers(page = 1, limit = 10) {
-  const raw = await serverGet<unknown>("/admin/users", { page, limit });
+  const raw = await serverGet<unknown>("/users", { page, limit });
   return z.array(adminUserSchema).parse(raw);
 }
 
@@ -135,8 +208,22 @@ export type PaginatedProperties = z.infer<typeof paginatedPropertiesSchema>;
 export async function fetchAdminProperties(page = 1, limit = 50, search?: string): Promise<PaginatedProperties> {
   const params: Record<string, unknown> = { page, limit };
   if (search) params.search = search;
-  const raw = await serverGet<unknown>("/admin/properties", params);
-  return paginatedPropertiesSchema.parse(raw);
+  const raw = await serverGet<PaginatedResponse<any>>("/properties", params);
+  const mapped = {
+    items: (raw?.data || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      address: p.address,
+      landlordId: p.landlordId,
+      landlordName: p.landlord?.user?.fullName || p.landlordId,
+      roomCount: Number(p.totalRooms || p._count?.rooms || 0),
+      createdAt: p.createdAt,
+    })),
+    total: raw?.meta?.total ?? 0,
+    page: raw?.meta?.page ?? page,
+    limit: raw?.meta?.limit ?? limit,
+  };
+  return paginatedPropertiesSchema.parse(mapped);
 }
 
 // Audit logs schema and fetcher
@@ -163,9 +250,9 @@ const auditLogSchema = z.object({
   ipAddress: z.string().optional(),
   userAgent: z.string().optional(),
   dataHash: z.string(),
-  metadata: z.record(z.string(), z.unknown()),
-  regulations: z.array(snapshotRegulationSchema),
-  documentVersions: z.array(snapshotDocumentSchema),
+  metadata: z.record(z.string(), z.unknown()).optional().default({}),
+  regulations: z.array(snapshotRegulationSchema).optional().default([]),
+  documentVersions: z.array(snapshotDocumentSchema).optional().default([]),
 });
 
 const paginatedAuditLogsSchema = z.object({

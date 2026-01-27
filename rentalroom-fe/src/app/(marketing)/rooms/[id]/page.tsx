@@ -275,7 +275,7 @@ export default function RoomDetailPage({ params }: RoomDetailPageProps) {
                                 key={i}
                                 className={`size-4 ${i < review.rating
                                   ? "fill-yellow-400 text-yellow-400"
-                                  : "text-muted-foreground"
+                                  : "text-muted-foreground/30"
                                   }`}
                               />
                             ))}

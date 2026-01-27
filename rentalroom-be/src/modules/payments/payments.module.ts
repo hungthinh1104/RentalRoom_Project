@@ -16,7 +16,10 @@ import { PaymentService } from './payment.service';
 // Legal infrastructure
 import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
 import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
-import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
+import {
+  ImmutabilityGuard,
+  IdempotencyGuard,
+} from 'src/shared/guards/immutability.guard';
 
 @Module({
   imports: [HttpModule],

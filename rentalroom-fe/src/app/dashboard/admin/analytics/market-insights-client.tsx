@@ -78,7 +78,7 @@ export function MarketInsightsClient({ insights }: MarketInsightsClientProps) {
                     </CardHeader>
                     <CardContent className="flex-1 min-h-[300px]">
                         <div className="h-full w-full min-h-[300px]">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                                 <BarChart data={insights.priceAnalysis}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                     <XAxis
@@ -124,15 +124,15 @@ export function MarketInsightsClient({ insights }: MarketInsightsClientProps) {
                     </Card>
 
                     {insights.recommendations.length > 0 && (
-                        <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-900">
+                        <Card className="border-warning/20 bg-warning/10">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2" style={{ color: 'var(--warning)' }}>
+                                <CardTitle className="flex items-center gap-2 text-warning">
                                     <AlertTriangle className="h-5 w-5" />
                                     Khuyến nghị hệ thống
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <ul className="list-disc pl-5 space-y-1 text-sm" style={{ color: 'var(--warning)' }}>
+                                <ul className="list-disc pl-5 space-y-1 text-sm text-warning/90">
                                     {insights.recommendations.map((rec, i) => (
                                         <li key={i}>{rec}</li>
                                     ))}

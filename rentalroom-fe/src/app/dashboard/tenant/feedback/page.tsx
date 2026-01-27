@@ -17,13 +17,13 @@ export default function TenantFeedbackPage() {
     const getStatusBadge = (status: FeedbackStatus) => {
         switch (status) {
             case FeedbackStatus.PENDING:
-                return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Đang chờ</Badge>;
+                return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">Đang chờ</Badge>;
             case FeedbackStatus.IN_PROGRESS:
-                return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Đang xử lý</Badge>;
+                return <Badge variant="outline" className="bg-info/10 text-info border-info/20">Đang xử lý</Badge>;
             case FeedbackStatus.RESOLVED:
-                return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Đã giải quyết</Badge>;
+                return <Badge variant="outline" className="bg-success/10 text-success border-success/20">Đã giải quyết</Badge>;
             case FeedbackStatus.REJECTED:
-                return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Từ chối</Badge>;
+                return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Từ chối</Badge>;
             default:
                 return <Badge variant="outline">Mới</Badge>;
         }
@@ -34,7 +34,7 @@ export default function TenantFeedbackPage() {
             case FeedbackPriority.CRITICAL:
                 return <Badge variant="destructive">Khẩn cấp</Badge>;
             case FeedbackPriority.HIGH:
-                return <Badge className="bg-orange-500 hover:bg-orange-600">Cao</Badge>;
+                return <Badge className="bg-warning text-warning-foreground hover:bg-warning/90">Cao</Badge>;
             case FeedbackPriority.MEDIUM:
                 return <Badge variant="secondary">Trung bình</Badge>;
             case FeedbackPriority.LOW:
@@ -120,21 +120,21 @@ export default function TenantFeedbackPage() {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="pt-4 space-y-4">
-                                    <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
+                                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                                         {feedback.description}
                                     </p>
 
                                     {feedback.adminResponse && (
-                                        <div className="mt-4 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                                        <div className="mt-4 bg-info/5 p-4 rounded-lg border border-info/10">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">
+                                                <Badge variant="secondary" className="bg-info/10 text-info hover:bg-info/20 border-none">
                                                     Phản hồi từ Admin
                                                 </Badge>
                                                 <span className="text-xs text-muted-foreground">
                                                     {feedback.respondedAt && new Date(feedback.respondedAt).toLocaleDateString('vi-VN')}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-gray-700">
+                                            <p className="text-sm text-foreground">
                                                 {feedback.adminResponse}
                                             </p>
                                         </div>

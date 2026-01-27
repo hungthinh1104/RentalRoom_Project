@@ -174,7 +174,7 @@ export interface Contract {
 		id?: string;
 		fullName: string;
 		citizenId?: string;
-		relationship: 'SPOUSE' | 'CHILD' | 'PARENT' | 'FRIEND' | 'OTHER';
+		relationship: 'SPOUSE' | 'CHILD' | 'PARENT' | 'FRIEND' | 'RELATIVE' | 'OTHER';
 		phoneNumber?: string;
 	}>;
 	maxOccupants?: number;

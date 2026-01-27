@@ -7,9 +7,9 @@ import Link from "next/link"
 import { AuthBackground } from "./auth-background";
 import { useRouter, useSearchParams } from "next/navigation"
 import { signIn, getSession } from "next-auth/react"
-import { motion, AnimatePresence } from "framer-motion"
-import { Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight, Loader2 } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowRight, Loader2, Shield } from "lucide-react"
 import { formatAuthError } from "../utils/format-auth-error"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 
 import { loginSchema, type LoginInput } from "../schemas"
 import { getCallbackUrl, normalizeRedirectTarget } from "@/lib/redirect-after-login";
+import { authRateLimiter } from "@/lib/security/rate-limiter";
+import { sanitizeRedirect, validateAndLogRedirect } from "@/lib/security/redirect-validator";
 
 export function LoginForm() {
   const router = useRouter()
@@ -27,6 +29,10 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = React.useState(false)
   const [signInErrorState, setSignInErrorState] = React.useState<string | null>(null);
 
+  // 🛡️ SECURITY: Rate limiting state
+  const [isRateLimited, setIsRateLimited] = React.useState(false);
+  const [backoffSeconds, setBackoffSeconds] = React.useState(0);
+
   const {
     register,
     handleSubmit,
@@ -35,10 +41,35 @@ export function LoginForm() {
     resolver: zodResolver(loginSchema),
   })
 
-  const isPending = isSubmitting;
+  const isPending = isSubmitting || isRateLimited;
+
+  // 🛡️ SECURITY: Update backoff timer
+  React.useEffect(() => {
+    if (!isRateLimited) return;
+
+    const interval = setInterval(() => {
+      const remaining = authRateLimiter.getBackoffSeconds('login');
+      setBackoffSeconds(remaining);
+
+      if (remaining === 0) {
+        setIsRateLimited(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRateLimited]);
 
   const onSubmit = async (data: LoginInput) => {
     console.debug('[LoginForm] submitting', data?.email);
+
+    // 🛡️ SECURITY: Check rate limit
+    if (!authRateLimiter.isAllowed('login')) {
+      const backoff = authRateLimiter.getBackoffSeconds('login');
+      setIsRateLimited(true);
+      setBackoffSeconds(backoff);
+      toast.error(`Quá nhiều lần thử. Vui lòng đợi ${backoff} giây`);
+      return;
+    }
 
     // Determine callback URL
     const callbackUrlGuess = getCallbackUrl(searchParams, undefined);
@@ -55,6 +86,9 @@ export function LoginForm() {
     });
 
     if (signInResult?.ok) {
+      // 🛡️ SECURITY: Reset rate limiter on success
+      authRateLimiter.reset('login');
+
       let target = signInResult.url;
       const isDefaultGuess = !searchParams.get('callbackUrl') && !sessionStorage.getItem('loginCallbackUrl');
 
@@ -67,10 +101,27 @@ export function LoginForm() {
         target = normalizeRedirectTarget(signInResult.url ?? callbackUrlGuess, undefined);
       }
 
+      // 🛡️ SECURITY: Validate redirect URL
+      if (!validateAndLogRedirect(target, 'post-login')) {
+        console.warn('[Security] Invalid redirect detected, using safe default');
+        target = '/dashboard';
+      }
+
+      // Additional sanitization
+      target = sanitizeRedirect(target, '/dashboard');
+
       console.debug('[Login] signIn success -> redirect to', target);
       await router.push(target);
       router.refresh();
       return;
+    }
+
+    // 🛡️ SECURITY: Record failed attempt
+    authRateLimiter.recordAttempt('login');
+    const attemptCount = authRateLimiter.getAttemptCount('login');
+
+    if (attemptCount >= 3) {
+      toast.warning(`Lần thử ${attemptCount}/5. Hãy cẩn thận!`);
     }
 
     if (signInResult?.error) {
@@ -84,57 +135,60 @@ export function LoginForm() {
   return (
     <>
       <AuthBackground />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      <div
         className="w-full max-w-lg glass-card rounded-[32px] p-8 md:p-12 shadow-2xl relative overflow-hidden ring-1 ring-white/20 backdrop-blur-xl"
       >
         {/* Decorative Glows */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[100px] -z-10 animate-pulse-soft" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-[80px] -z-10" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-info/10 rounded-full blur-[80px] -z-10" />
 
         {/* Header */}
         <div className="space-y-4 text-center mb-10">
 
 
           <div className="space-y-2">
-            <motion.h1
+            <h1
               className="text-3xl md:text-4xl font-bold text-foreground tracking-tight"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
             >
               Chào mừng trở lại
-            </motion.h1>
-            <motion.p
+            </h1>
+            <p
               className="text-muted-foreground text-base max-w-xs mx-auto leading-relaxed"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
             >
               Nhập thông tin của bạn để truy cập hệ thống quản lý
-            </motion.p>
+            </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Global Error */}
-          <AnimatePresence mode="wait">
-            {(signInErrorState) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: "auto", marginBottom: 24 }}
-                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                className="p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 overflow-hidden backdrop-blur-md"
-              >
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-destructive leading-relaxed font-medium">
-                  {formatAuthError(signInErrorState)}
+          {/* Rate Limit Warning */}
+          {isRateLimited && (
+            <div
+              className="p-4 rounded-2xl bg-warning/10 border border-warning/20 flex items-start gap-3 overflow-hidden backdrop-blur-md"
+            >
+              <Shield className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-warning leading-relaxed font-medium">
+                  Quá nhiều lần thử đăng nhập. Vui lòng đợi {backoffSeconds} giây.
                 </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <p className="text-xs text-warning/70 mt-1">
+                  Đây là biện pháp bảo mật để bảo vệ tài khoản của bạn.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Global Error */}
+          {(signInErrorState && !isRateLimited) && (
+            <div
+              className="p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 overflow-hidden backdrop-blur-md"
+            >
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-destructive leading-relaxed font-medium">
+                {formatAuthError(signInErrorState)}
+              </p>
+            </div>
+          )}
 
           {/* Email */}
           <div className="space-y-2">
@@ -159,19 +213,14 @@ export function LoginForm() {
                 {...register("email")}
               />
             </div>
-            <AnimatePresence>
-              {errors.email && (
-                <motion.p
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="text-xs text-destructive ml-1 flex items-center gap-1.5 font-medium mt-1.5"
-                >
-                  <AlertCircle className="w-3 h-3" />
-                  {errors.email.message}
-                </motion.p>
-              )}
-            </AnimatePresence>
+            {errors.email && (
+              <p
+                className="text-xs text-destructive ml-1 flex items-center gap-1.5 font-medium mt-1.5"
+              >
+                <AlertCircle className="w-3 h-3" />
+                {errors.email.message}
+              </p>
+            )}
           </div>
 
           {/* Password */}
@@ -206,19 +255,14 @@ export function LoginForm() {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <AnimatePresence>
-              {errors.password && (
-                <motion.p
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="text-xs text-destructive ml-1 flex items-center gap-1.5 font-medium mt-1.5"
-                >
-                  <AlertCircle className="w-3 h-3" />
-                  {errors.password.message}
-                </motion.p>
-              )}
-            </AnimatePresence>
+            {errors.password && (
+              <p
+                className="text-xs text-destructive ml-1 flex items-center gap-1.5 font-medium mt-1.5"
+              >
+                <AlertCircle className="w-3 h-3" />
+                {errors.password.message}
+              </p>
+            )}
           </div>
 
           {/* Remember */}
@@ -269,7 +313,7 @@ export function LoginForm() {
             </Link>
           </p>
         </div>
-      </motion.div>
+      </div>
     </>
   );
 }

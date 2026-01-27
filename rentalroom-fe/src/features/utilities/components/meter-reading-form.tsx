@@ -25,6 +25,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { utilitiesApi, Service, MeterReading } from '../api/utilities-api';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface MeterReadingFormProps {
   contractId: string;
@@ -154,13 +155,13 @@ export function MeterReadingForm({
                       <label className="text-sm font-medium">
                         {service.serviceName}
                       </label>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-muted-foreground">
                         {service.unit}
                       </span>
                     </div>
 
                     {lastReading && (
-                      <div className="rounded-sm bg-gray-50 p-2 text-xs text-gray-600">
+                      <div className="rounded-sm bg-muted/30 p-2 text-xs text-muted-foreground border border-border/50">
                         Lần trước: {lastReading.previousReading.toLocaleString()}
                         {service.unit} → {lastReading.currentReading.toLocaleString()}
                         {service.unit}
@@ -181,12 +182,15 @@ export function MeterReadingForm({
                               placeholder="Nhập chỉ số hiện tại"
                               {...field}
                               value={field.value as number}
-                              className={error ? 'border-red-500' : ''}
+                              className={cn(
+                                "bg-background/50 border-input/40 text-foreground transition-all duration-300 backdrop-blur-sm",
+                                error && "border-destructive focus-visible:border-destructive focus-visible:ring-destructive/20"
+                              )}
                               disabled={isSubmitting}
                             />
                           </FormControl>
                           {error && (
-                            <FormMessage className="text-red-500">
+                            <FormMessage className="text-destructive">
                               {error}
                             </FormMessage>
                           )}

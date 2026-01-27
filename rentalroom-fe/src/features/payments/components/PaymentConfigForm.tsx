@@ -219,12 +219,12 @@ export function PaymentConfigForm({ onSuccess }: PaymentConfigFormProps) {
               )}
             />
 
-            <Alert className="bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-              <AlertTitle className="text-emerald-900 dark:text-emerald-100">
+            <Alert className="bg-success/5 dark:bg-success/10 border-success/20 dark:border-success/40">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              <AlertTitle className="text-success font-bold">
                 Bảo mật & Đơn giản
               </AlertTitle>
-              <AlertDescription className="text-emerald-800 dark:text-emerald-200 text-sm space-y-1">
+              <AlertDescription className="text-muted-foreground text-sm space-y-1">
                 <p>✓ Hệ thống dùng 1 API token bảo mật chung</p>
                 <p>✓ Không lưu token cá nhân trên database</p>
                 <p>✓ Chỉ cần tài khoản ngân hàng của bạn</p>

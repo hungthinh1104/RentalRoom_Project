@@ -81,7 +81,7 @@ export default function TenantMaintenancePage() {
 				<Card className="border border-border bg-card/80 backdrop-blur-xl rounded-[28px] shadow-xl shadow-muted/30">
 					<CardHeader className="pb-0">
 						<CardTitle className="flex items-center gap-2 text-lg font-semibold">
-							<AlertTriangle className="h-5 w-5 text-amber-500" />
+							<AlertTriangle className="h-5 w-5 text-warning" />
 							Hướng dẫn nhanh
 						</CardTitle>
 					</CardHeader>

@@ -104,6 +104,14 @@ export class LandlordRevenueResponseDto {
     averageMonthlyRevenue: number;
   };
   monthlyBreakdown: MonthlyRevenueDto[];
+  roomBreakdown?: Array<{
+    roomId: string;
+    roomNumber: string;
+    year: number;
+    month: number;
+    totalRevenue: number;
+    invoiceCount: number;
+  }>;
 }
 
 export class PropertyMetricsDto {

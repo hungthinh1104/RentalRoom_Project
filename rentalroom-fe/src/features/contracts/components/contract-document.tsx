@@ -47,7 +47,7 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
 
                 {/* Party A (Landlord) */}
                 <div className="mb-8">
-                    <h2 className="font-bold text-base mb-3 uppercase border-b border-gray-400 inline-block pr-10">BÊN CHO THUÊ (BÊN A):</h2>
+                    <h2 className="font-bold text-base mb-3 uppercase border-b border-border inline-block pr-10">BÊN CHO THUÊ (BÊN A):</h2>
                     <table className="w-full text-left border-collapse ml-2">
                         <tbody>
                             <tr>
@@ -72,7 +72,7 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
 
                 {/* Party B (Tenant) */}
                 <div className="mb-8">
-                    <h2 className="font-bold text-base mb-3 uppercase border-b border-gray-400 inline-block pr-10">BÊN THUÊ (BÊN B):</h2>
+                    <h2 className="font-bold text-base mb-3 uppercase border-b border-border inline-block pr-10">BÊN THUÊ (BÊN B):</h2>
                     <table className="w-full text-left border-collapse ml-2">
                         <tbody>
                             <tr>
@@ -124,7 +124,7 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
                             <p>2.1. Thời hạn thuê: Từ ngày <strong>{formatDate(contract.startDate)}</strong> đến ngày <strong>{formatDate(contract.endDate)}</strong>.</p>
                             <p>2.2. Giá thuê phòng: <strong>{formatCurrency(contract.monthlyRent)}</strong> / tháng.</p>
                             <p>2.3. Tiền đặt cọc: <strong>{formatCurrency(contract.deposit)}</strong>.</p>
-                            <p className="italic text-sm pl-4 mt-1 mb-2 text-gray-700">
+                            <p className="italic text-sm pl-4 mt-1 mb-2 text-muted-foreground font-medium">
                                 (Khoản tiền này dùng để đảm bảo thực hiện hợp đồng và sẽ được hoàn trả cho Bên B khi kết thúc hợp đồng, sau khi đã trừ các khoản phí chưa thanh toán hoặc chi phí khắc phục hư hỏng nếu có).
                             </p>
                             <p>2.4. Phương thức thanh toán: Tiền mặt hoặc Chuyển khoản.</p>
@@ -137,21 +137,21 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
                         <h2 className="font-bold text-base uppercase mb-2">Điều 3: Danh sách cư dân (Người ở chung)</h2>
                         <div className="pl-6">
                             {contract.residents && contract.residents.length > 0 ? (
-                                <table className="w-full border-collapse border border-gray-300 mt-2 text-sm">
+                                <table className="w-full border-collapse border border-border mt-2 text-sm">
                                     <thead>
-                                        <tr className="bg-gray-100">
-                                            <th className="border border-gray-300 px-3 py-2 text-left w-10">STT</th>
-                                            <th className="border border-gray-300 px-3 py-2 text-left">Họ và tên</th>
-                                            <th className="border border-gray-300 px-3 py-2 text-left">Quan hệ</th>
-                                            <th className="border border-gray-300 px-3 py-2 text-left">CCCD/SĐT</th>
+                                        <tr className="bg-muted">
+                                            <th className="border border-border px-3 py-2 text-left w-10">STT</th>
+                                            <th className="border border-border px-3 py-2 text-left">Họ và tên</th>
+                                            <th className="border border-border px-3 py-2 text-left">Quan hệ</th>
+                                            <th className="border border-border px-3 py-2 text-left">CCCD/SĐT</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {contract.residents.map((res, idx) => (
                                             <tr key={idx}>
-                                                <td className="border border-gray-300 px-3 py-2 text-center">{idx + 1}</td>
-                                                <td className="border border-gray-300 px-3 py-2 font-medium">{res.fullName}</td>
-                                                <td className="border border-gray-300 px-3 py-2">
+                                                <td className="border border-border px-3 py-2 text-center">{idx + 1}</td>
+                                                <td className="border border-border px-3 py-2 font-medium">{res.fullName}</td>
+                                                <td className="border border-border px-3 py-2">
                                                     {res.relationship === 'SPOUSE' && 'Vợ/chồng'}
                                                     {res.relationship === 'CHILD' && 'Con'}
                                                     {res.relationship === 'PARENT' && 'Cha/mẹ'}
@@ -159,7 +159,7 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
                                                     {res.relationship === 'OTHER' && 'Khác'}
                                                     {!res.relationship && '...'}
                                                 </td>
-                                                <td className="border border-gray-300 px-3 py-2">{res.citizenId || res.phoneNumber || "---"}</td>
+                                                <td className="border border-border px-3 py-2">{res.citizenId || res.phoneNumber || "---"}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -177,11 +177,11 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
                             {contract.room?.amenities && contract.room.amenities.length > 0 ? (
                                 <div className="flex flex-wrap gap-2 mt-2">
                                     {contract.room.amenities.map((item, i) => (
-                                        <span key={i} className="inline-block px-3 py-1 bg-gray-100 border border-gray-300 rounded text-sm">
+                                        <span key={i} className="inline-block px-3 py-1 bg-muted border border-border rounded text-sm">
                                             ☑ {item}
                                         </span>
                                     ))}
-                                    <p className="w-full text-sm italic mt-2 text-gray-600">(Bên B cam kết bảo quản và sử dụng đúng mục đích các trang thiết bị trên).</p>
+                                    <p className="w-full text-sm italic mt-2 text-muted-foreground"> (Bên B cam kết bảo quản và sử dụng đúng mục đích các trang thiết bị trên).</p>
                                 </div>
                             ) : (
                                 <p>Phòng trống, không bao gồm nội thất.</p>
@@ -212,7 +212,7 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
                     {contract.terms && (
                         <div>
                             <h2 className="font-bold text-base uppercase mb-2">Điều 6: Thỏa thuận khác</h2>
-                            <div className="pl-6 whitespace-pre-wrap font-medium bg-gray-50 p-4 rounded border border-gray-200 text-sm">
+                            <div className="pl-6 whitespace-pre-wrap font-medium bg-muted/50 p-4 rounded border border-border text-sm">
                                 {contract.terms}
                             </div>
                         </div>
@@ -233,20 +233,20 @@ export const ContractDocument = React.forwardRef<HTMLDivElement, ContractDocumen
                 <div className="grid grid-cols-2 gap-10 mt-16 mb-10 overflow-avoid break-inside-avoid">
                     <div className="text-center">
                         <h3 className="font-bold text-base uppercase">ĐẠI DIỆN BÊN A</h3>
-                        <p className="italic text-sm text-gray-600">(Ký, ghi rõ họ tên)</p>
+                        <p className="italic text-sm text-muted-foreground"> (Ký, ghi rõ họ tên)</p>
                         <div className="h-40 flex items-center justify-center relative">
                             {/* Visual placeholder for physical signature */}
-                            <div className="text-gray-200 font-bold text-6xl opacity-20 rotate-12 select-none">BÊN A</div>
+                            <div className="text-muted/20 font-bold text-6xl opacity-20 rotate-12 select-none">BÊN A</div>
                         </div>
                         <p className="font-bold uppercase text-lg">{contract.landlord?.user?.fullName}</p>
                     </div>
                     <div className="text-center relative">
                         <h3 className="font-bold text-base uppercase">ĐẠI DIỆN BÊN B</h3>
-                        <p className="italic text-sm text-gray-600">(Ký, ghi rõ họ tên)</p>
+                        <p className="italic text-sm text-muted-foreground">(Ký, ghi rõ họ tên)</p>
                         <div className="h-40 flex items-center justify-center relative">
                             {(contract.status === 'ACTIVE' || contract.status === 'DEPOSIT_PENDING') && (
-                                <div className="border-4 border-red-600 rounded-lg px-4 py-2 text-red-600 font-bold uppercase rotate-[-12deg] opacity-80 shadow-sm bg-white/50 backdrop-blur-sm z-10">
-                                    <p className="text-xs tracking-widest border-b border-red-600 pb-1 mb-1">ĐÃ KÝ ĐIỆN TỬ</p>
+                                <div className="border-4 border-destructive rounded-lg px-4 py-2 text-destructive font-bold uppercase rotate-[-12deg] opacity-80 shadow-sm bg-white/50 backdrop-blur-sm z-10">
+                                    <p className="text-xs tracking-widest border-b border-destructive pb-1 mb-1">ĐÃ KÝ ĐIỆN TỬ</p>
                                     <p className="text-lg">{contract.tenant?.user?.fullName}</p>
                                     <p className="text-[10px] mt-1 font-normal overflow-hidden text-ellipsis whitespace-nowrap max-w-[150px]">
                                         {format(new Date(), "HH:mm dd/MM/yyyy")}

@@ -223,7 +223,7 @@ function SectionCard({ section, isCompleted, isOptional, children }: SectionCard
             {/* Completion Indicator */}
             {isCompleted && (
                 <div className="absolute top-4 right-4">
-                    <div className="flex items-center gap-2 px-3 py-1 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400 rounded-full text-xs font-medium">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-success/10 text-success rounded-full text-xs font-medium">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Hoàn thành
                     </div>

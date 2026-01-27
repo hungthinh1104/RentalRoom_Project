@@ -16,7 +16,7 @@ export default async function TenantDashboardPage() {
   }
 
   const tenantId = session.user.id;
-  const name = (session.user as any).fullName || session.user.name || "bạn";
+  const name = (session.user as { fullName?: string }).fullName || session.user.name || "bạn";
 
   // 2. Parallel Data Fetching
   const [

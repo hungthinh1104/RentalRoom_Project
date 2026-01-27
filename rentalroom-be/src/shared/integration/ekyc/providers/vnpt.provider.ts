@@ -62,7 +62,7 @@ export class VnpteKycProvider implements IeKycService {
       const sessionId = sessionResponse.data.session_id;
 
       // Submit document images
-      const documentResponse = await axios.post(
+      const _documentResponse = await axios.post(
         `${this.endpoint}/kyc/verify/${sessionId}/document`,
         {
           front_image: documentImage,
@@ -109,22 +109,22 @@ export class VnpteKycProvider implements IeKycService {
         throw new BadRequestException(resultResponse.data.error_message);
       }
 
-      const data = resultResponse.data;
+      const _data = resultResponse.data;
 
       return {
-        verified: data.verified,
+        verified: _data.verified,
         providerId: 'VNPT',
         verificationId: sessionId,
-        documentType: this.mapDocumentType(data.document_type),
-        documentNumber: data.document_number,
-        fullName: data.full_name,
-        dateOfBirth: new Date(data.date_of_birth),
-        issuedDate: new Date(data.issued_date),
-        expiryDate: new Date(data.expiry_date),
-        livenessCheckPassed: data.liveness_verified || false,
-        faceMatchScore: data.face_match_score || 0,
+        documentType: this.mapDocumentType(_data.document_type),
+        documentNumber: _data.document_number,
+        fullName: _data.full_name,
+        dateOfBirth: new Date(_data.date_of_birth),
+        issuedDate: new Date(_data.issued_date),
+        expiryDate: new Date(_data.expiry_date),
+        livenessCheckPassed: _data.liveness_verified || false,
+        faceMatchScore: _data.face_match_score || 0,
         timestamp: new Date(),
-        riskLevel: this.calculateRiskLevel(data),
+        riskLevel: this.calculateRiskLevel(_data),
       };
     } catch (error) {
       throw new BadRequestException(
@@ -136,24 +136,24 @@ export class VnpteKycProvider implements IeKycService {
   /**
    * Get verification status
    */
-  async getVerificationStatus(userId: string): Promise<eKycResult | null> {
+  getVerificationStatus(_userId: string): Promise<eKycResult | null> {
     try {
       // Stub: would query VNPT verification history
       // In production, cache result in database
-      return null;
-    } catch (error) {
-      console.error('Failed to get verification status:', error);
-      return null;
+      return Promise.resolve(null);
+    } catch (_error) {
+      return Promise.resolve(null);
     }
   }
 
   /**
    * Revoke KYC verification
    */
-  async revokeVerification(userId: string, reason: string): Promise<void> {
+  revokeVerification(_userId: string, reason: string): Promise<void> {
     try {
       // Stub: would call VNPT revocation endpoint
-      console.log(`Revoking VNPT KYC for user ${userId}: ${reason}`);
+      console.log(`Revoking VNPT KYC for user ${_userId}: ${reason}`);
+      return Promise.resolve();
     } catch (error) {
       console.error('Failed to revoke verification:', error);
       throw error;
@@ -163,9 +163,9 @@ export class VnpteKycProvider implements IeKycService {
   /**
    * Check if verification is valid
    */
-  async isVerificationValid(userId: string): Promise<boolean> {
+  isVerificationValid(_userId: string): Promise<boolean> {
     // Stub: would check database ekyc_verified_at
-    return false;
+    return Promise.resolve(false);
   }
 
   /**

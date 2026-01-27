@@ -15,21 +15,21 @@ export interface ContractSignature {
 
 /**
  * CONTRACT SIGNATURE & INTEGRITY SERVICE
- * 
+ *
  * Implements cryptographic verification for rental contracts:
  * 1. SHA-256 hash of contract content for tamper detection
  * 2. HMAC signature for authenticity verification (requires signing key)
  * 3. QR code generation for mobile verification & audit trail
  * 4. Signature expiration (90 days by default) for freshness
  * 5. Secure storage of signature metadata in database
- * 
+ *
  * SECURITY GUARANTEES:
  * - Detects any modification to signed contract content
  * - Prevents unauthorized signature creation (HMAC key required)
  * - Enables offline verification via QR code
  * - Audit trail of all signature operations
  * - Time-based expiration prevents indefinite signature reuse
- * 
+ *
  * UC_SEC_04: PDF/Contract Signature Verification
  */
 @Injectable()
@@ -47,10 +47,10 @@ export class ContractHashService {
 
   /**
    * Generate cryptographic signature for contract
-   * 
+   *
    * IMPORTANT: Must be called INSIDE transaction to ensure atomicity
    * Returns both hash and HMAC for maximum verification assurance
-   * 
+   *
    * @param contractId Contract UUID
    * @param contractContent Raw contract text/PDF content
    * @param signatureMetadata Additional metadata (signer ID, location, etc.)
@@ -68,9 +68,7 @@ export class ContractHashService {
   ): Promise<ContractSignature> {
     try {
       // Generate SHA-256 hash of contract content
-      const hash = createHash('sha256')
-        .update(contractContent)
-        .digest('hex');
+      const hash = createHash('sha256').update(contractContent).digest('hex');
 
       // Generate HMAC-SHA256 for authenticity (prevents signature forgery)
       const hmac = createHmac('sha256', this.hashingSecret)
@@ -128,10 +126,10 @@ export class ContractHashService {
 
   /**
    * Verify contract signature integrity
-   * 
+   *
    * CRITICAL: Used on contract updates to prevent tampering
    * Validates that contract hasn't been modified since signing
-   * 
+   *
    * @param contractId Contract UUID
    * @param contractContent Current contract content
    * @param storedHash Previously stored SHA-256 hash
@@ -201,10 +199,10 @@ export class ContractHashService {
 
   /**
    * Validate signature and log tamper attempt if invalid
-   * 
+   *
    * Creates audit record if signature fails verification
    * Essential for detecting contract fraud attempts
-   * 
+   *
    * @param contractId Contract UUID
    * @param contractContent Current content
    * @param storedHash Previous hash
@@ -240,7 +238,7 @@ export class ContractHashService {
 
   /**
    * Get signature history for contract (audit trail)
-   * 
+   *
    * @param contractId Contract UUID
    * @returns Array of all signatures with timestamps
    */
@@ -261,16 +259,20 @@ export class ContractHashService {
 
   /**
    * Generate QR code content for contract verification
-   * 
+   *
    * QR code includes contract ID and partial hash for mobile scanning
    * Enables offline verification via QR code reader
-   * 
+   *
    * @param contractId Contract UUID
    * @param hash SHA-256 hash of contract content
    * @param hmac HMAC signature
    * @returns QR code data string
    */
-  private generateQRData(contractId: string, hash: string, hmac: string): string {
+  private generateQRData(
+    contractId: string,
+    hash: string,
+    hmac: string,
+  ): string {
     // Format: contract:id|hash:shortHash|signature:shortSig|time:timestamp
     const timestamp = Date.now();
     const shortHash = hash.substring(0, 16).toUpperCase();
@@ -281,7 +283,7 @@ export class ContractHashService {
 
   /**
    * Verify QR code matches contract (for mobile verification)
-   * 
+   *
    * @param qrCode QR code data string
    * @param contractId Expected contract ID
    * @param hash Expected hash
@@ -309,10 +311,10 @@ export class ContractHashService {
 
   /**
    * Generate random contract access token
-   * 
+   *
    * Used for secure contract sharing/verification links
    * Prevents unauthorized access via URL guessing
-   * 
+   *
    * @returns Random 32-byte hex token
    */
   generateAccessToken(): string {
@@ -321,7 +323,7 @@ export class ContractHashService {
 
   /**
    * Hash access token for storage (never store plain tokens)
-   * 
+   *
    * @param token Plain access token
    * @returns SHA-256 hash of token
    */

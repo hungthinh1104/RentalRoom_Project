@@ -26,6 +26,7 @@ import { MaintenanceStatus, MaintenancePriority } from '@/types/enums';
 import api from '@/lib/api/client';
 import { toast } from 'sonner';
 import { MaintenanceRequest } from '@/types';
+import { cn } from '@/lib/utils';
 
 export default function LandlordMaintenanceDetailPage() {
     const params = useParams();
@@ -60,17 +61,17 @@ export default function LandlordMaintenanceDetailPage() {
 
     const getStatusBadge = (status: MaintenanceStatus) => {
         const variants = {
-            PENDING: { variant: 'secondary' as const, icon: Clock, label: 'Chờ xử lý', color: 'text-yellow-600' },
-            IN_PROGRESS: { variant: 'default' as const, icon: AlertCircle, label: 'Đang xử lý', color: 'text-blue-600' },
-            COMPLETED: { variant: 'default' as const, icon: CheckCircle2, label: 'Hoàn thành', color: 'text-green-600' },
-            CANCELLED: { variant: 'destructive' as const, icon: XCircle, label: 'Đã hủy', color: 'text-red-600' },
+            PENDING: { variant: 'secondary' as const, icon: Clock, label: 'Chờ xử lý', color: 'bg-warning/10 text-warning border-warning/20' },
+            IN_PROGRESS: { variant: 'default' as const, icon: AlertCircle, label: 'Đang xử lý', color: 'bg-info/10 text-info border-info/20 font-bold' },
+            COMPLETED: { variant: 'default' as const, icon: CheckCircle2, label: 'Hoàn thành', color: 'bg-success/10 text-success border-success/20 font-bold' },
+            CANCELLED: { variant: 'destructive' as const, icon: XCircle, label: 'Đã hủy', color: 'bg-destructive/10 text-destructive border-destructive/20 font-bold' },
         };
         const config = variants[status];
         const Icon = config.icon;
         return (
-            <Badge variant={config.variant} className={`gap-1 ${config.color}`}>
-                <Icon className="w-3 h-3" />
-                {config.label}
+            <Badge variant="outline" className={cn("gap-1 py-1 px-3 shadow-none border-none", config.color)}>
+                <Icon className="w-3.5 h-3.5" />
+                <span className="capitalize">{config.label}</span>
             </Badge>
         );
     };

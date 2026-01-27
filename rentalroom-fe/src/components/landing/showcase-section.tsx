@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star } from "lucide-react";
 
@@ -33,11 +34,14 @@ export default function ShowcaseSection() {
                         transition={{ duration: 1.5, ease: [0.4, 0, 0.2, 1] }}
                         className="absolute inset-0 w-full h-full will-change-transform"
                     >
-                        <img
+                        <Image
                             src={images[currentImage]}
                             alt="Background"
-                            className="w-full h-full object-cover"
-                            loading="lazy"
+                            fill
+                            className="object-cover"
+                            priority
+                            sizes="100vw"
+                            quality={90}
                         />
                     </motion.div>
                 </AnimatePresence>

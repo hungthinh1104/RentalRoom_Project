@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
-import { EmailService } from 'src/common/services/email.service';
 import {
   CreateNotificationDto,
   UpdateNotificationDto,
@@ -19,12 +18,43 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     @Inject('NOTIFICATIONS_GATEWAY')
     private readonly notificationsGateway: NotificationsGateway,
-    private readonly emailService: EmailService,
   ) {}
 
   async create(createDto: CreateNotificationDto) {
+    const shouldEmail =
+      createDto.notificationType === 'PAYMENT' ||
+      createDto.notificationType === 'CONTRACT';
+
+    let emailFields = {};
+    if (shouldEmail) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: createDto.userId },
+      });
+
+      if (user?.email) {
+        emailFields = {
+          emailTo: user.email,
+          emailSubject: `[Smart Room] ${createDto.title}`,
+          emailBodyHtml: `
+              <h2>${createDto.title}</h2>
+              <p>${createDto.content}</p>
+              <br/>
+              <a href="${process.env.FRONTEND_URL}/dashboard/tenant/payments" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                Xem chi tiết / Thanh toán
+              </a>
+              <p style="font-size: 12px; color: grey; margin-top: 20px;">
+                Bạn nhận được email này vì bạn là thành viên của hệ thống Smart Room.
+              </p>
+            `,
+        };
+      }
+    }
+
     const notification = await this.prisma.notification.create({
-      data: createDto,
+      data: {
+        ...createDto,
+        ...emailFields,
+      },
     });
 
     const result = plainToClass(NotificationResponseDto, notification, {
@@ -41,44 +71,6 @@ export class NotificationsService {
       this.logger.debug(
         `WebSocket notification failed: ${error instanceof Error ? error.message : String(error)}`,
       );
-    }
-
-    // 2. Send Email Notification (Critical for Debt/Payment)
-    if (
-      createDto.notificationType === 'PAYMENT' ||
-      createDto.notificationType === 'CONTRACT'
-    ) {
-      try {
-        const user = await this.prisma.user.findUnique({
-          where: { id: createDto.userId },
-        });
-
-        if (user && user.email) {
-          await this.emailService.sendEmail(
-            user.email,
-            `[Smart Room] ${createDto.title}`, // Subject
-            `
-              <h2>${createDto.title}</h2>
-              <p>${createDto.content}</p>
-              <br/>
-              <a href="${process.env.FRONTEND_URL}/dashboard/tenant/payments" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-                Xem chi tiết / Thanh toán
-              </a>
-              <p style="font-size: 12px; color: grey; margin-top: 20px;">
-                Bạn nhận được email này vì bạn là thành viên của hệ thống Smart Room.
-              </p>
-            `,
-          );
-          this.logger.log(
-            `📧 Email sent to ${user.email} for ${createDto.notificationType}`,
-          );
-        }
-      } catch (error) {
-        this.logger.error(
-          `Failed to send email notification for user ${createDto.userId}`,
-          error,
-        );
-      }
     }
 
     return result;

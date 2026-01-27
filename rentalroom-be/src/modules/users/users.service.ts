@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
-import { UserRole } from '@prisma/client';
+import { UserRole, ContractStatus } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -47,7 +47,7 @@ export class UsersService {
     if (!/\d/.test(password)) {
       errors.push('Password must contain at least 1 number');
     }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       errors.push(
         'Password must contain at least 1 special character (!@#$%^&*)',
       );
@@ -162,11 +162,11 @@ export class UsersService {
     });
 
     // Create associated profile based on role
-    if (role === UserRole.TENANT) {
+    if ((role as any) === UserRole.TENANT) {
       await this.prisma.tenant.create({
         data: { userId: user.id },
       });
-    } else if (role === UserRole.LANDLORD) {
+    } else if ((role as any) === UserRole.LANDLORD) {
       await this.prisma.landlord.create({
         data: { userId: user.id },
       });
@@ -196,7 +196,7 @@ export class UsersService {
     }
 
     // Handle role change
-    if (role && role !== user.role) {
+    if (role && (role as any) !== user.role) {
       await this.handleRoleChange(id, user.role, role);
       data.role = role;
     }
@@ -408,6 +408,25 @@ export class UsersService {
    */
   async anonymizeUser(userId: string) {
     return await this.prisma.$transaction(async (tx) => {
+      const activeContracts = await tx.contract.count({
+        where: {
+          OR: [{ tenantId: userId }, { landlordId: userId }],
+          status: {
+            notIn: [
+              ContractStatus.TERMINATED,
+              ContractStatus.CANCELLED,
+              ContractStatus.EXPIRED,
+            ],
+          },
+        },
+      });
+
+      if (activeContracts > 0) {
+        throw new BadRequestException(
+          'Cannot anonymize user with active contracts. Terminate contracts first.',
+        );
+      }
+
       // 1. Anonymize user personal data (keep record for audit)
       await tx.user.update({
         where: { id: userId },
@@ -416,6 +435,18 @@ export class UsersService {
           email: `deleted_${userId.substring(0, 8)}@anonymized.local`,
           phoneNumber: null,
           passwordHash: '', // Clear password
+        },
+      });
+
+      await (tx as any).changeLog.create({
+        data: {
+          userId,
+          changeType: 'USER_ANONYMIZED',
+          entityType: 'USER',
+          entityId: userId,
+          metadata: {
+            action: 'ANONYMIZE_USER',
+          },
         },
       });
 

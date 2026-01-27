@@ -15,7 +15,7 @@ import { CommonModule } from 'src/common/common.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow('JWT_SECRET'),
       }),
     }),
@@ -32,6 +32,10 @@ import { CommonModule } from 'src/common/common.module';
       useExisting: NotificationsGateway,
     },
   ],
-  exports: [NotificationsService, NotificationOutboxService, NotificationsGateway],
+  exports: [
+    NotificationsService,
+    NotificationOutboxService,
+    NotificationsGateway,
+  ],
 })
 export class NotificationsModule {}

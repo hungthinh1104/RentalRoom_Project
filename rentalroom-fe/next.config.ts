@@ -93,6 +93,8 @@ const nextConfig: NextConfig = {
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
+  // Disable standalone output to avoid middleware NFT issues
+  // output: 'standalone',
   async headers() {
     return [
       {

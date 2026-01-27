@@ -1,6 +1,7 @@
 "use client";
 
 import { Contract } from "@/types";
+import Image from "next/image";
 import {
     CreditCard,
     DollarSign,
@@ -122,12 +123,14 @@ export function ContractFinancials({ contract }: ContractFinancialsProps) {
                                     {/* SePay QR Code Generator */}
                                     {contract.landlord?.bankName && contract.landlord?.bankAccount && (
                                         <div className="bg-white p-3 rounded-xl border shadow-sm">
-                                            <div className="w-40 h-40 bg-white flex items-center justify-center rounded-lg overflow-hidden">
-                                                <img
+                                            <div className="w-40 h-40 bg-white flex items-center justify-center rounded-lg overflow-hidden relative">
+                                                <Image
                                                     src={`https://qr.sepay.vn/img?bank=${encodeURIComponent(getBankCode(contract.landlord.bankName))}&acc=${encodeURIComponent(contract.landlord.bankAccount)}&amount=${contract.deposit}&des=${encodeURIComponent(`COC ${contract.contractNumber}`)}`}
                                                     alt="Mã QR thanh toán SePay"
-                                                    className="w-full h-full object-contain"
-                                                    referrerPolicy="no-referrer"
+                                                    fill
+                                                    className="object-contain p-2"
+                                                    sizes="(max-width: 768px) 100vw, 160px"
+                                                    unoptimized // QR codes are generated dynamically, bypass optimization to ensure validity
                                                 />
                                             </div>
                                             <p className="text-center text-[10px] text-muted-foreground mt-2">

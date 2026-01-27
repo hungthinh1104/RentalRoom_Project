@@ -62,19 +62,19 @@ const values = [
     title: 'Sứ mệnh',
     icon: Target,
     description: 'Trao quyền cho các chủ sở hữu tài sản và công ty quản lý bất động sản tại Việt Nam với công nghệ AI, giúp tiết kiệm 40% thời gian và tăng 30% doanh thu.',
-    color: 'from-blue-500 to-cyan-500',
+    color: 'from-info to-accent-cyan',
   },
   {
     title: 'Tầm nhìn',
     icon: TrendingUp,
     description: 'Trở thành hệ điều hành (Operating System) số 1 cho quản lý tài sản cho thuê tại Việt Nam, phục vụ 100,000+ properties vào năm 2027.',
-    color: 'from-purple-500 to-pink-500',
+    color: 'from-accent-purple to-primary',
   },
   {
     title: 'Giá trị cốt lõi',
     icon: Heart,
     description: 'Uy tín, minh bạch, khách hàng là trung tâm. Chúng tôi cam kết mang đến dịch vụ tốt nhất.',
-    color: 'from-orange-500 to-red-500',
+    color: 'from-warning to-destructive',
   },
 ];
 

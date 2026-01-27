@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
 import { KeyRound, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,63 +66,46 @@ function ResetPasswordForm() {
   if (success) {
     return (
       <div className="w-full max-w-[760px]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
+        <div
           className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-[32px] p-8 md:p-10 lg:p-12 space-y-8 shadow-2xl relative overflow-hidden"
         >
           {/* Decorative Glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-success/20 rounded-full blur-[80px] -z-10 opacity-40" />
 
           {/* Success Icon */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+          <div
             className="mx-auto w-24 h-24 bg-success/10 rounded-full flex items-center justify-center relative"
           >
             <div className="absolute inset-0 bg-success/20 rounded-full blur-xl animate-pulse" />
             <div className="w-16 h-16 bg-gradient-to-br from-success to-success/80 rounded-full flex items-center justify-center relative z-10 shadow-lg shadow-success/20">
               <CheckCircle2 className="w-8 h-8 text-white" />
             </div>
-          </motion.div>
+          </div>
 
           {/* Header */}
           <div className="text-center space-y-3">
-            <motion.h1
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
+            <h1
               className="text-3xl md:text-4xl font-bold text-foreground tracking-tight"
             >
               Mật khẩu đã được đặt lại!
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+            </h1>
+            <p
               className="text-muted-foreground text-lg"
             >
               Bạn sẽ được chuyển hướng đến trang đăng nhập...
-            </motion.p>
+            </p>
           </div>
 
           {/* Loading indicator */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+          <div
             className="flex items-center justify-center gap-3 py-2"
           >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+            <div
               className="w-5 h-5 border-2 border-success/30 border-t-success rounded-full"
             />
             <span className="text-base font-medium text-success">Đang chuyển hướng...</span>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -131,71 +113,52 @@ function ResetPasswordForm() {
   // Form State
   return (
     <div className="w-full max-w-[760px]">
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+      <div
         className="bg-[var(--glass-bg)] backdrop-blur-xl border border-[var(--glass-border)] rounded-[32px] p-8 md:p-10 lg:p-12 space-y-8 shadow-2xl relative overflow-hidden"
       >
         {/* Decorative Glow */}
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-primary/20 rounded-full blur-[100px] -z-10 opacity-30" />
 
         {/* Icon */}
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+        <div
           className="mx-auto w-24 h-24 bg-secondary/30 rounded-2xl flex items-center justify-center relative border border-input shadow-inner"
         >
           <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
             <KeyRound className="w-8 h-8 text-primary-foreground" />
           </div>
-        </motion.div>
+        </div>
 
         {/* Header */}
         <div className="space-y-3 text-center">
-          <motion.h1
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+          <h1
             className="text-3xl md:text-4xl font-bold text-foreground tracking-tight"
           >
             Đặt lại mật khẩu
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
+          </h1>
+          <p
             className="text-muted-foreground text-lg"
           >
             Nhập mật khẩu mới cho tài khoản của bạn
-          </motion.p>
+          </p>
         </div>
 
         {/* Form */}
-        <motion.form
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+        <form
           onSubmit={handleSubmit}
           className="space-y-6"
         >
           {/* Error Message */}
-          <AnimatePresence mode="wait">
             {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: 'auto' }}
-                exit={{ opacity: 0, y: -10, height: 0 }}
+              <div
+                
                 className="p-4 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 overflow-hidden"
               >
                 <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-destructive flex-1 leading-relaxed font-medium">
                   {error}
                 </p>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
 
           {/* New Password Input */}
           <div className="space-y-2">
@@ -282,9 +245,7 @@ function ResetPasswordForm() {
           >
             {isLoading ? (
               <span className="flex items-center gap-2">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                <div
                   className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full"
                 />
                 Đang đặt lại...
@@ -308,8 +269,8 @@ function ResetPasswordForm() {
               Quay lại đăng nhập
             </Link>
           </div>
-        </motion.form>
-      </motion.div>
+        </form>
+      </div>
     </div>
   );
 

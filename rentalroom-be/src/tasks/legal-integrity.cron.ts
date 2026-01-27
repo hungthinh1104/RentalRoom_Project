@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/database/prisma/prisma.service';
+import { CronClusterGuard } from 'src/shared/guards/cron-cluster.guard';
 import * as crypto from 'crypto';
 
 /**
@@ -28,17 +29,20 @@ import * as crypto from 'crypto';
 export class LegalIntegrityCron {
   private readonly logger = new Logger(LegalIntegrityCron.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cronGuard: CronClusterGuard,
+  ) { }
 
   /**
    * VERIFY EVENT STORE INTEGRITY
-   * 
+   *
    * CHECKS:
    * - Hash chain continuity (no gaps)
    * - Event hash correctness (no tampering)
    * - Version sequencing (no skips)
    * - Causation chain validity
-   * 
+   *
    * RUN: Daily at midnight (UTC)
    */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, {
@@ -46,6 +50,7 @@ export class LegalIntegrityCron {
     timeZone: 'UTC',
   })
   async verifyEventStoreIntegrity(): Promise<void> {
+    if (!this.cronGuard.shouldExecute('event-store-integrity')) return;
     this.logger.log('🔍 Starting event store integrity verification...');
 
     const startTime = Date.now();
@@ -134,7 +139,7 @@ export class LegalIntegrityCron {
           `❌ Event store integrity violations detected:\n${results.issues.join('\n')}`,
         );
         // ALERT: This is a critical security issue
-        await this.sendIntegrityAlert('EVENT_STORE_INTEGRITY_FAILURE', results);
+        this.sendIntegrityAlert('EVENT_STORE_INTEGRITY_FAILURE', results);
       }
 
       // 3. Store verification result
@@ -159,7 +164,7 @@ export class LegalIntegrityCron {
         `❌ Event store integrity check failed: ${error.message}`,
         error.stack,
       );
-      await this.sendIntegrityAlert('EVENT_STORE_CHECK_ERROR', {
+      this.sendIntegrityAlert('EVENT_STORE_CHECK_ERROR', {
         error: error.message,
       });
     }
@@ -167,13 +172,13 @@ export class LegalIntegrityCron {
 
   /**
    * VERIFY ADMIN AUDIT TRAIL INTEGRITY
-   * 
+   *
    * CHECKS:
    * - Admin audit hash chain integrity
    * - No missing audit entries
    * - Suspicious pattern detection
    * - Audit tampering detection
-   * 
+   *
    * RUN: Daily at 1am (UTC)
    */
   @Cron('0 1 * * *', {
@@ -240,9 +245,7 @@ export class LegalIntegrityCron {
       }
 
       // 3. Detect suspicious patterns
-      const suspiciousPatterns = await this.detectSuspiciousAdminPatterns(
-        audits,
-      );
+      const suspiciousPatterns = this.detectSuspiciousAdminPatterns(audits);
       results.suspiciousPatterns = suspiciousPatterns.length;
       results.issues.push(...suspiciousPatterns);
 
@@ -256,7 +259,7 @@ export class LegalIntegrityCron {
         this.logger.error(
           `❌ Admin audit integrity violations detected:\n${results.issues.join('\n')}`,
         );
-        await this.sendIntegrityAlert('ADMIN_AUDIT_INTEGRITY_FAILURE', results);
+        this.sendIntegrityAlert('ADMIN_AUDIT_INTEGRITY_FAILURE', results);
       }
 
       // 4. Store verification result
@@ -280,7 +283,7 @@ export class LegalIntegrityCron {
         `❌ Admin audit integrity check failed: ${error.message}`,
         error.stack,
       );
-      await this.sendIntegrityAlert('ADMIN_AUDIT_CHECK_ERROR', {
+      this.sendIntegrityAlert('ADMIN_AUDIT_CHECK_ERROR', {
         error: error.message,
       });
     }
@@ -288,12 +291,12 @@ export class LegalIntegrityCron {
 
   /**
    * CLEANUP EXPIRED IDEMPOTENCY KEYS
-   * 
+   *
    * POLICY:
    * - Keep idempotency records for 24 hours
    * - Delete records older than 24 hours
    * - Log cleanup results
-   * 
+   *
    * RUN: Daily at 2am (UTC)
    */
   @Cron('0 2 * * *', {
@@ -307,7 +310,7 @@ export class LegalIntegrityCron {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
       // 1. Count expired records
-      const expiredCount = await this.prisma.idempotencyRecord.count({
+      const _expiredCount = await this.prisma.idempotencyRecord.count({
         where: {
           createdAt: {
             lt: twentyFourHoursAgo,
@@ -324,6 +327,20 @@ export class LegalIntegrityCron {
         },
       });
 
+      // 2b. Delete expired raw idempotent operations
+      const expiredOperations = await this.prisma.$queryRaw<
+        Array<{ count: bigint }>
+      >`
+        SELECT COUNT(*)::bigint AS count
+        FROM idempotent_operations
+        WHERE expires_at < ${twentyFourHoursAgo}
+      `;
+
+      const deleteOperations = await this.prisma.$executeRaw`
+        DELETE FROM idempotent_operations
+        WHERE expires_at < ${twentyFourHoursAgo}
+      `;
+
       this.logger.log(
         `✅ Cleaned up ${deleteResult.count} expired idempotency records (older than 24 hours)`,
       );
@@ -337,6 +354,8 @@ export class LegalIntegrityCron {
           entityId: 'IDEMPOTENCY_RECORDS',
           details: {
             deletedCount: deleteResult.count,
+            deletedOperationCount: Number(expiredOperations?.[0]?.count || 0),
+            deletedOperationRows: Number(deleteOperations || 0),
             cutoffDate: twentyFourHoursAgo,
           },
         },
@@ -346,7 +365,7 @@ export class LegalIntegrityCron {
         `❌ Idempotency cleanup failed: ${error.message}`,
         error.stack,
       );
-      await this.sendIntegrityAlert('IDEMPOTENCY_CLEANUP_ERROR', {
+      this.sendIntegrityAlert('IDEMPOTENCY_CLEANUP_ERROR', {
         error: error.message,
       });
     }
@@ -354,9 +373,9 @@ export class LegalIntegrityCron {
 
   /**
    * GENERATE INTEGRITY REPORT
-   * 
+   *
    * RUNS: Daily at 6am (UTC)
-   * 
+   *
    * REPORT INCLUDES:
    * - Summary of all integrity checks
    * - Any failures or suspicious activity
@@ -411,7 +430,9 @@ export class LegalIntegrityCron {
       const suspiciousActions = await this.prisma.adminAuditLog.findMany({
         where: {
           timestamp: { gte: oneDayAgo },
-          action: { in: ['DELETE_INVOICE', 'DELETE_CONTRACT', 'DELETE_PAYMENT'] },
+          action: {
+            in: ['DELETE_INVOICE', 'DELETE_CONTRACT', 'DELETE_PAYMENT'],
+          },
         },
         orderBy: { timestamp: 'desc' },
         take: 50,
@@ -435,7 +456,7 @@ export class LegalIntegrityCron {
 
       // 4. Send alert if any failures
       if (reportSummary.overallStatus === 'ALERT') {
-        await this.sendIntegrityAlert('DAILY_INTEGRITY_REPORT_ALERT', {
+        this.sendIntegrityAlert('DAILY_INTEGRITY_REPORT_ALERT', {
           report: reportSummary,
           suspiciousDeletions: suspiciousActions.map((a) => ({
             id: a.id,
@@ -467,16 +488,14 @@ export class LegalIntegrityCron {
 
   /**
    * DETECT SUSPICIOUS ADMIN PATTERNS
-   * 
+   *
    * DETECTS:
    * - Bulk deletions (>5 in 1 hour)
    * - After-hours access (outside 8am-6pm)
    * - Rapid sequential deletions
    * - Data exports
    */
-  private async detectSuspiciousAdminPatterns(
-    audits: any[],
-  ): Promise<string[]> {
+  private detectSuspiciousAdminPatterns(audits: any[]): string[] {
     const suspiciousPatterns: string[] = [];
 
     // 1. Detect bulk deletions in last hour
@@ -508,15 +527,12 @@ export class LegalIntegrityCron {
 
   /**
    * SEND INTEGRITY ALERT
-   * 
+   *
    * SENDS: Email/Slack/Logger alert when integrity check fails
-   * 
+   *
    * TODO: Integrate with actual alerting system (email, Slack, PagerDuty, etc.)
    */
-  private async sendIntegrityAlert(
-    alertType: string,
-    details: any,
-  ): Promise<void> {
+  private sendIntegrityAlert(alertType: string, details: any): void {
     this.logger.error(`🚨 INTEGRITY ALERT: ${alertType}`, details);
 
     // TODO: Integrate with email service
@@ -536,7 +552,7 @@ export class LegalIntegrityCron {
 
   /**
    * CALCULATE EVENT HASH
-   * 
+   *
    * ALGORITHM: SHA-256 of event payload
    * Ensures any modification is detected
    */
@@ -558,7 +574,7 @@ export class LegalIntegrityCron {
 
   /**
    * CALCULATE AUDIT HASH
-   * 
+   *
    * ALGORITHM: SHA-256 of audit entry
    * Creates hash chain for tamper detection
    */

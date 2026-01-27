@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { taxService } from '../api/tax-api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,12 +28,24 @@ interface FinancialStats {
     netProfit: number;
     incomeGrowth: number;
     expenseGrowth: number;
-    recentTransactions: any[];
+    recentTransactions: TransactionItem[];
+}
+
+interface TransactionItem {
+    type: 'income' | 'expense';
+    date: string;
+    amount: number | string;
+    note?: string;
 }
 
 export function FinancialDashboard() {
     const [year, setYear] = useState<number>(new Date().getFullYear());
     const [monthRange, setMonthRange] = useState<'all' | '3' | '6'>('all');
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Fetch Income Data for current year
     const { data: incomeData, isLoading: isLoadingIncome, error: incomeError } = useQuery({
@@ -154,9 +166,9 @@ export function FinancialDashboard() {
 
     // Show error if queries failed
     if (incomeError || expenseError) {
-        return <div className="p-4 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
-            <h3 className="text-red-800 dark:text-red-200 font-semibold mb-2">Lỗi tải dữ liệu</h3>
-            <p className="text-red-700 dark:text-red-300 text-sm">
+        return <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+            <h3 className="text-destructive font-bold mb-2">Lỗi tải dữ liệu</h3>
+            <p className="text-muted-foreground text-sm">
                 {incomeError?.message || expenseError?.message || 'Không thể tải dữ liệu tài chính'}
             </p>
         </div>;
@@ -197,8 +209,8 @@ export function FinancialDashboard() {
                 <Card className="border-2 hover:border-primary/50 transition-colors">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-                                <Wallet className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                            <div className="p-2 rounded-lg bg-info/10">
+                                <Wallet className="w-4 h-4 text-info" />
                             </div>
                             Tổng Doanh Thu
                         </CardTitle>
@@ -207,9 +219,9 @@ export function FinancialDashboard() {
                         <div className="text-2xl font-bold text-foreground">{formatCurrency(stats.totalIncome)}</div>
                         <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                             {stats.incomeGrowth >= 0 ? (
-                                <><TrendingUp className="w-3 h-3 text-green-600" /> <span className="text-green-600">+{stats.incomeGrowth.toFixed(1)}%</span></>
+                                <><TrendingUp className="w-3 h-3 text-success" /> <span className="text-success">+{stats.incomeGrowth.toFixed(1)}%</span></>
                             ) : (
-                                <><TrendingDown className="w-3 h-3 text-red-600" /> <span className="text-red-600">{stats.incomeGrowth.toFixed(1)}%</span></>
+                                <><TrendingDown className="w-3 h-3 text-destructive" /> <span className="text-destructive">{stats.incomeGrowth.toFixed(1)}%</span></>
                             )} so với năm trước
                         </p>
                     </CardContent>
@@ -219,8 +231,8 @@ export function FinancialDashboard() {
                 <Card className="border-2 hover:border-primary/50 transition-colors">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-900/30">
-                                <Receipt className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                            <div className="p-2 rounded-lg bg-destructive/10">
+                                <Receipt className="w-4 h-4 text-destructive" />
                             </div>
                             Tổng Chi Phí
                         </CardTitle>
@@ -237,8 +249,8 @@ export function FinancialDashboard() {
                 <Card className="border-2 hover:border-primary/50 transition-colors">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                                <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <div className="p-2 rounded-lg bg-success/10">
+                                <DollarSign className="w-4 h-4 text-success" />
                             </div>
                             Lợi Nhuận Ròng
                         </CardTitle>
@@ -261,51 +273,55 @@ export function FinancialDashboard() {
                         <CardDescription>So sánh thu chi theo tháng</CardDescription>
                     </CardHeader>
                     <CardContent className="h-[300px] md:h-[350px] p-4 md:p-6">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={stats.monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.8} />
-                                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                <YAxis
-                                    fontSize={12}
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tickFormatter={(value) => `${value / 1000000}M`}
-                                />
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <Tooltip
-                                    formatter={(value) => formatCurrency(Number(value) || 0)}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                />
-                                <Legend />
-                                <Area
-                                    type="monotone"
-                                    dataKey="income"
-                                    name="Thu nhập"
-                                    stroke="#8b5cf6"
-                                    fillOpacity={1}
-                                    fill="url(#colorIncome)"
-                                    strokeWidth={3}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="expense"
-                                    name="Chi phí"
-                                    stroke="#f43f5e"
-                                    fillOpacity={1}
-                                    fill="url(#colorExpense)"
-                                    strokeWidth={3}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                        {mounted ? (
+                            <ResponsiveContainer width="100%" height="100%" minHeight={300}>
+                                <AreaChart data={stats.monthlyData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorIncome" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="var(--info)" stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor="var(--info)" stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="colorExpense" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="var(--destructive)" stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor="var(--destructive)" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis
+                                        fontSize={12}
+                                        tickLine={false}
+                                        axisLine={false}
+                                        tickFormatter={(value) => `${value / 1000000}M`}
+                                    />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.3} />
+                                    <Tooltip
+                                        formatter={(value) => formatCurrency(Number(value) || 0)}
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                    />
+                                    <Legend />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="income"
+                                        name="Thu nhập"
+                                        stroke="var(--info)"
+                                        fillOpacity={1}
+                                        fill="url(#colorIncome)"
+                                        strokeWidth={3}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="expense"
+                                        name="Chi phí"
+                                        stroke="var(--destructive)"
+                                        fillOpacity={1}
+                                        fill="url(#colorExpense)"
+                                        strokeWidth={3}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <Skeleton className="w-full h-full rounded-lg" />
+                        )}
                     </CardContent>
                 </Card>
 
@@ -318,10 +334,10 @@ export function FinancialDashboard() {
                     <CardContent className="flex-1 overflow-auto pr-2">
                         <div className="space-y-4">
                             {stats.recentTransactions.length > 0 ? (
-                                stats.recentTransactions.map((t, idx: number) => (
+                                stats.recentTransactions.map((t: TransactionItem, idx: number) => (
                                     <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
                                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div className={`p-2 rounded-full flex-shrink-0 ${t.type === 'income' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                            <div className={`p-2 rounded-full flex-shrink-0 ${t.type === 'income' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                                                 {t.type === 'income' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -332,8 +348,8 @@ export function FinancialDashboard() {
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className={`text-sm font-bold flex-shrink-0 ml-2 ${t.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                            {t.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                                        <div className={`text-sm font-bold flex-shrink-0 ml-2 ${t.type === 'income' ? 'text-success' : 'text-destructive'}`}>
+                                            {t.type === 'income' ? '+' : '-'}{formatCurrency(Number(t.amount))}
                                         </div>
                                     </div>
                                 ))

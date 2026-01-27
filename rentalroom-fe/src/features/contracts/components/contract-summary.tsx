@@ -9,7 +9,7 @@ function statusChip(status?: ContractStatus) {
   switch (status) {
     case 'ACTIVE':
       return (
-        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-400 dark:border-green-800">
+        <Badge variant="outline" className="bg-success/10 text-success border-success/20">
           Đang hiệu lực
         </Badge>
       );
@@ -21,7 +21,7 @@ function statusChip(status?: ContractStatus) {
       );
     case 'EXPIRED':
       return (
-        <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-400 dark:border-orange-800">
+        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
           Hết hạn
         </Badge>
       );

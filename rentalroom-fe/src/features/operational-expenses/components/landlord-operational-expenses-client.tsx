@@ -291,7 +291,7 @@ export default function LandlordOperationalExpensesClient() {
                     <SelectValue placeholder="Chọn loại" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXPENSE_CATEGORIES.map((cat) => (
+                    {EXPENSE_CATEGORIES.filter((cat) => cat.value.trim() !== "").map((cat) => (
                       <SelectItem key={cat.value} value={cat.value}>
                         {cat.label}
                       </SelectItem>
@@ -405,15 +405,15 @@ export default function LandlordOperationalExpensesClient() {
               />
             </div>
             <Select
-              value={categoryFilter || ""}
-              onValueChange={(v) => setCategoryFilter(v || undefined)}
+              value={categoryFilter || "ALL"}
+              onValueChange={(v) => setCategoryFilter(v === "ALL" ? undefined : v)}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Lọc theo loại" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tất cả</SelectItem>
-                {EXPENSE_CATEGORIES.map((cat) => (
+                <SelectItem value="ALL">Tất cả</SelectItem>
+                {EXPENSE_CATEGORIES.filter((cat) => cat.value.trim() !== "").map((cat) => (
                   <SelectItem key={cat.value} value={cat.value}>
                     {cat.label}
                   </SelectItem>

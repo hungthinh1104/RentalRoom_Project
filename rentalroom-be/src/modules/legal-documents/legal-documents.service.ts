@@ -13,6 +13,7 @@ import {
   PublishVersionDto,
 } from './dto';
 import { AuditAction, VersionStatus } from './entities/legal-document.entity';
+import { ChangeType } from '@prisma/client';
 import { createHash } from 'crypto';
 
 @Injectable()
@@ -56,9 +57,50 @@ export class LegalDocumentsService {
       },
     });
 
+    await this.prisma.changeLog.create({
+      data: {
+        userId,
+        changeType: this.mapAuditActionToChangeType(action),
+        entityType: 'LEGAL_DOCUMENT',
+        entityId: documentId,
+        beforeValue: changes?.before || null,
+        afterValue: changes?.after || null,
+        reason,
+        ipAddress,
+        userAgent,
+        metadata: {
+          versionId,
+          action,
+        },
+      },
+    });
+
     this.logger.log(
       `[AUDIT] ${action} on document ${documentId} by user ${userId}`,
     );
+  }
+
+  private mapAuditActionToChangeType(action: AuditAction): ChangeType {
+    switch (action) {
+      case AuditAction.CREATED:
+        return ChangeType.DOCUMENT_CREATED;
+      case AuditAction.UPDATED:
+        return ChangeType.DOCUMENT_UPDATED;
+      case AuditAction.PUBLISHED:
+        return ChangeType.DOCUMENT_PUBLISHED;
+      case AuditAction.ARCHIVED:
+        return ChangeType.DOCUMENT_ARCHIVED;
+      case AuditAction.VERSION_CREATED:
+        return ChangeType.DOCUMENT_VERSION_CREATED;
+      case AuditAction.VERSION_PUBLISHED:
+        return ChangeType.DOCUMENT_VERSION_PUBLISHED;
+      case AuditAction.VERSION_APPROVED:
+        return ChangeType.DOCUMENT_VERSION_APPROVED;
+      case AuditAction.VERSION_ARCHIVED:
+        return ChangeType.DOCUMENT_VERSION_ARCHIVED;
+      default:
+        return ChangeType.OTHER;
+    }
   }
 
   /**

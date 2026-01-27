@@ -2,6 +2,9 @@ import React from 'react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { BrandLogo } from '@/components/brand-logo';
 
+// Disable static generation for auth pages (use Framer Motion client-side only)
+export const dynamic = 'force-dynamic';
+
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen w-full flex overflow-hidden font-sans selection:bg-primary/20 relative">

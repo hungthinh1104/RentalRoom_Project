@@ -139,11 +139,28 @@ export class PaymentsController {
 
   @Patch(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updatePaymentDto: UpdatePaymentDto,
     @CurrentUser() user: User,
+    @Req() req: Request,
   ) {
+    // 📝 ADMIN AUDIT: Log payment update if admin
+    if (user.role === UserRole.ADMIN) {
+      const payment = await this.paymentsService.findOne(id);
+
+      await this.adminAudit.logAdminAction({
+        adminId: user.id,
+        action: 'UPDATE_PAYMENT',
+        entityType: 'PAYMENT',
+        entityId: id,
+        beforeValue: payment,
+        reason: `Admin updated payment ${payment.transactionId || id}, status: ${payment.status}, fields: ${Object.keys(updatePaymentDto).join(', ')}`,
+        ipAddress: req.ip,
+        timestamp: new Date(),
+      });
+    }
+
     return this.paymentsService.update(id, updatePaymentDto, user);
   }
 
@@ -168,7 +185,7 @@ export class PaymentsController {
   ) {
     // 📝 ADMIN AUDIT: Log payment deletion before executing
     const payment = await this.paymentsService.findOne(id);
-    
+
     await this.adminAudit.logAdminAction({
       adminId: user.id,
       action: 'DELETE_PAYMENT',

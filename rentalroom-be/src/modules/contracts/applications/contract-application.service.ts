@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, ContractStatus, PrismaClient } from '@prisma/client';
+import { ContractStatus, ApplicationStatus, UserRole } from '@prisma/client';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import {
   CreateRentalApplicationDto,
@@ -15,7 +15,7 @@ import {
 } from '../dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
-import { ApplicationStatus } from '../entities';
+
 import { NotificationsService } from '../../notifications/notifications.service';
 import { EmailService } from 'src/common/services/email.service';
 import { NotificationType } from '../../notifications/entities/notification.entity';
@@ -32,10 +32,7 @@ export class ContractApplicationService {
     private readonly emailService: EmailService,
   ) {}
 
-  private async acquireLock(
-    tx: any,
-    key: string,
-  ) {
+  private async acquireLock(tx: any, key: string) {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
   }
 
@@ -116,7 +113,7 @@ export class ContractApplicationService {
             );
           }
 
-          if (room[0].status !== RoomStatus.AVAILABLE) {
+          if ((room[0].status as any) !== RoomStatus.AVAILABLE) {
             throw new BadRequestException(
               `Room is not available (Status: ${room[0].status})`,
             );
@@ -285,10 +282,26 @@ export class ContractApplicationService {
     );
   }
 
-  async approveApplication(id: string, user: User) {
+  async approveApplication(id: string, user: User, idempotencyKey: string) {
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency-Key header required');
+    }
+
+    const existingOperation = await this.prisma.$queryRaw<any[]>`
+      SELECT * FROM idempotent_operations
+      WHERE idempotency_key = ${idempotencyKey}
+      AND entity_type = 'APPLICATION_APPROVE'
+      AND entity_id = ${id}
+      LIMIT 1
+    `;
+
+    if (existingOperation && existingOperation.length > 0) {
+      return existingOperation[0].result_data;
+    }
+
     const application = await this.findOneApplication(id);
 
-    if (application.status !== ApplicationStatus.PENDING) {
+    if ((application.status as any) !== ApplicationStatus.PENDING) {
       throw new BadRequestException(
         'Only pending applications can be approved',
       );
@@ -296,7 +309,10 @@ export class ContractApplicationService {
 
     // 🔒 SECURITY: Landlord ownership validation
     // Only landlords owning the property can approve applications
-    if (user.role !== 'ADMIN' && user.role !== 'SYSTEM') {
+    if (
+      (user.role as any) !== UserRole.ADMIN &&
+      (user.role as any) !== UserRole.SYSTEM
+    ) {
       const landlord = await this.prisma.landlord.findUnique({
         where: { userId: user.id },
       });
@@ -338,12 +354,25 @@ export class ContractApplicationService {
         );
       }
 
-      const app = await tx.rentalApplication.update({
-        where: { id },
+      const updated = await tx.rentalApplication.updateMany({
+        where: {
+          id,
+          status: ApplicationStatus.PENDING,
+        },
         data: {
           status: ApplicationStatus.APPROVED,
           reviewedAt: new Date(),
         },
+      });
+
+      if (updated.count === 0) {
+        throw new BadRequestException(
+          'Only pending applications can be approved',
+        );
+      }
+
+      const app = await tx.rentalApplication.findUnique({
+        where: { id },
         include: {
           tenant: { include: { user: true } },
           room: {
@@ -355,6 +384,10 @@ export class ContractApplicationService {
           },
         },
       });
+
+      if (!app) {
+        throw new NotFoundException(`Rental application with ID ${id} not found`);
+      }
 
       const contractNumber = await this.generateContractNumberTx(
         tx,
@@ -432,18 +465,42 @@ export class ContractApplicationService {
       this.logger.warn(`Failed to notify tenant: ${error}`);
     }
 
-    return {
+    const response = {
       application: plainToClass(RentalApplicationResponseDto, result.app, {
         excludeExtraneousValues: true,
       }),
       contract: result.contract,
     };
+
+    await this.prisma.$executeRaw`
+      INSERT INTO idempotent_operations (idempotency_key, entity_type, entity_id, result_data, created_at)
+      VALUES (${idempotencyKey}, 'APPLICATION_APPROVE', ${id}, ${JSON.stringify(response)}, NOW())
+      ON CONFLICT (idempotency_key) DO NOTHING
+    `;
+
+    return response;
   }
 
-  async rejectApplication(id: string, user: User) {
+  async rejectApplication(id: string, user: User, idempotencyKey: string) {
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency-Key header required');
+    }
+
+    const existingOperation = await this.prisma.$queryRaw<any[]>`
+      SELECT * FROM idempotent_operations
+      WHERE idempotency_key = ${idempotencyKey}
+      AND entity_type = 'APPLICATION_REJECT'
+      AND entity_id = ${id}
+      LIMIT 1
+    `;
+
+    if (existingOperation && existingOperation.length > 0) {
+      return existingOperation[0].result_data;
+    }
+
     const application = await this.findOneApplication(id);
 
-    if (application.status !== ApplicationStatus.PENDING) {
+    if ((application.status as any) !== ApplicationStatus.PENDING) {
       throw new BadRequestException(
         'Only pending applications can be rejected',
       );
@@ -451,7 +508,10 @@ export class ContractApplicationService {
 
     // 🔒 SECURITY: Landlord ownership validation
     // Only landlords owning the property can reject applications
-    if (user.role !== 'ADMIN' && user.role !== 'SYSTEM') {
+    if (
+      (user.role as any) !== UserRole.ADMIN &&
+      (user.role as any) !== UserRole.SYSTEM
+    ) {
       const landlord = await this.prisma.landlord.findUnique({
         where: { userId: user.id },
       });
@@ -463,12 +523,23 @@ export class ContractApplicationService {
       }
     }
 
-    const updated = await this.prisma.rentalApplication.update({
-      where: { id },
+    const updatedResult = await this.prisma.rentalApplication.updateMany({
+      where: {
+        id,
+        status: ApplicationStatus.PENDING,
+      },
       data: {
         status: ApplicationStatus.REJECTED,
         reviewedAt: new Date(),
       },
+    });
+
+    if (updatedResult.count === 0) {
+      throw new BadRequestException('Only pending applications can be rejected');
+    }
+
+    const updated = await this.prisma.rentalApplication.findUnique({
+      where: { id },
       include: {
         tenant: { include: { user: true } },
         room: {
@@ -478,6 +549,10 @@ export class ContractApplicationService {
         },
       },
     });
+
+    if (!updated) {
+      throw new NotFoundException(`Rental application with ID ${id} not found`);
+    }
 
     const tenantUser = updated.tenant.user;
     const landlordUser = updated.room.property.landlord.user;
@@ -506,9 +581,17 @@ export class ContractApplicationService {
       this.logger.warn(`Failed to notify tenant: ${error}`);
     }
 
-    return plainToClass(RentalApplicationResponseDto, updated, {
+    const response = plainToClass(RentalApplicationResponseDto, updated, {
       excludeExtraneousValues: true,
     });
+
+    await this.prisma.$executeRaw`
+      INSERT INTO idempotent_operations (idempotency_key, entity_type, entity_id, result_data, created_at)
+      VALUES (${idempotencyKey}, 'APPLICATION_REJECT', ${id}, ${JSON.stringify(response)}, NOW())
+      ON CONFLICT (idempotency_key) DO NOTHING
+    `;
+
+    return response;
   }
 
   async withdrawApplication(id: string, tenantUserId: string) {
@@ -527,7 +610,7 @@ export class ContractApplicationService {
       );
     }
 
-    if (application.status !== ApplicationStatus.PENDING) {
+    if ((application.status as any) !== ApplicationStatus.PENDING) {
       throw new BadRequestException(
         'You can only withdraw pending applications',
       );

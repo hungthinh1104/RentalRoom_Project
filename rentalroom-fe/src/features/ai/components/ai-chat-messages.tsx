@@ -104,7 +104,7 @@ export function AIChatMessages({ messages }: AIChatMessagesProps) {
                             Phòng {room.roomNumber}
                           </span>
                           {room.status === 'AVAILABLE' && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success border-success/20 border">
                               Còn trống
                             </span>
                           )}

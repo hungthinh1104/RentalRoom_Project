@@ -13,4 +13,4 @@ import { DocumentsModule } from '../documents/documents.module';
   providers: [PCCCService],
   exports: [PCCCService],
 })
-export class PCCCModule { }
+export class PCCCModule {}

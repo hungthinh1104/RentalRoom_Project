@@ -13,12 +13,19 @@ export enum HandoverStage {
   CHECK_OUT = 'CHECK_OUT',
 }
 
+export enum HandoverItemCondition {
+  GOOD = 'GOOD',
+  DAMAGED = 'DAMAGED',
+  MISSING = 'MISSING',
+  NEW = 'NEW',
+}
+
 export class HandoverItemDto {
   @IsString()
   itemName: string;
 
-  @IsString()
-  condition: string; // GOOD, DAMAGED, MISSING, NEW
+  @IsEnum(HandoverItemCondition)
+  condition: HandoverItemCondition;
 
   @IsNumber()
   quantity: number;

@@ -97,8 +97,8 @@ export default function TenantReviewsPage() {
                                                 <Star
                                                     key={star}
                                                     className={`h-5 w-5 ${star <= review.rating
-                                                        ? "fill-yellow-400 text-yellow-400"
-                                                        : "text-gray-300"
+                                                        ? "fill-warning text-warning"
+                                                        : "text-muted"
                                                         }`}
                                                 />
                                             ))}
@@ -115,8 +115,8 @@ export default function TenantReviewsPage() {
                                                 <Star
                                                     key={star}
                                                     className={`h-3 w-3 ${star <= review.cleanlinessRating
-                                                        ? "fill-yellow-400 text-yellow-400"
-                                                        : "text-gray-300"
+                                                        ? "fill-warning text-warning"
+                                                        : "text-muted"
                                                         }`}
                                                 />
                                             ))}
@@ -129,8 +129,8 @@ export default function TenantReviewsPage() {
                                                 <Star
                                                     key={star}
                                                     className={`h-3 w-3 ${star <= review.locationRating
-                                                        ? "fill-yellow-400 text-yellow-400"
-                                                        : "text-gray-300"
+                                                        ? "fill-warning text-warning"
+                                                        : "text-muted"
                                                         }`}
                                                 />
                                             ))}
@@ -143,8 +143,8 @@ export default function TenantReviewsPage() {
                                                 <Star
                                                     key={star}
                                                     className={`h-3 w-3 ${star <= review.valueRating
-                                                        ? "fill-yellow-400 text-yellow-400"
-                                                        : "text-gray-300"
+                                                        ? "fill-warning text-warning"
+                                                        : "text-muted"
                                                         }`}
                                                 />
                                             ))}

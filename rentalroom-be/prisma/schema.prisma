@@ -4,12 +4,14 @@
 
 generator client {
   provider        = "prisma-client-js"
+  engineType      = "library"
   binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
   provider   = "postgresql"
+  url        = env("DATABASE_URL")
   extensions = [vector]
 }
 
@@ -92,6 +94,12 @@ enum PaymentStatus {
   FAILED
 }
 
+enum RefundStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
 enum ServiceType {
   ELECTRICITY
   WATER
@@ -134,6 +142,14 @@ enum NotificationType {
   SYSTEM
   COMPLAINT_CREATED
   COMPLAINT_RESPONDED
+}
+
+enum EmailDeliveryStatus {
+  PENDING
+  SENT
+  FAILED_TEMPORARY
+  FAILED_PERMANENT
+  BOUNCED
 }
 
 enum FeedbackType {
@@ -324,6 +340,18 @@ enum TaxStatus {
   PAID // Đã nộp
 }
 
+enum HandoverStage {
+  CHECK_IN
+  CHECK_OUT
+}
+
+enum HandoverItemCondition {
+  GOOD
+  DAMAGED
+  MISSING
+  NEW
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   fullName     String   @map("full_name") @db.VarChar(100)
@@ -357,6 +385,8 @@ model User {
   ekycVerifiedAt     DateTime? @map("ekyc_verified_at")
   ekycProvider       String?   @map("ekyc_provider") @db.VarChar(20) // FPT_AI | VNPT
   ekycVerificationId String?   @map("ekyc_verification_id") @db.VarChar(100)
+  ekycStatus         String?   @map("ekyc_status") @db.VarChar(20) // PENDING | VERIFIED | REJECTED
+  ekycData           Json?     @map("ekyc_data") // Full audit data
   ekycRiskLevel      String?   @map("ekyc_risk_level") @db.VarChar(20) // LOW | MEDIUM | HIGH
   ekycDocumentNumber String?   @map("ekyc_document_number") @db.VarChar(50) // Masked CCCD/CMND
 
@@ -641,13 +671,13 @@ model Contract {
 
   // Termination & Handover (New Features)
   terminationDetails Json? @map("termination_details") // { reason, deductions: [], refundAmount }
-  handoverChecklist  Json? @map("handover_checklist") // { checkIn: {}, checkOut: {} }
 
   // Terms and Residents
   paymentDay   Int                @default(5) @map("payment_day")
   terms        String?            @db.Text
   maxOccupants Int?               @map("max_occupants")
   residents    ContractResident[]
+  handoverChecklist HandoverChecklist?
 
   // Relations
   application     RentalApplication   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
@@ -725,6 +755,51 @@ model ContractResident {
 
   @@index([contractId])
   @@map("contract_resident")
+}
+
+model HandoverChecklist {
+  id                 String   @id @default(uuid()) @db.Uuid
+  contractId         String   @unique @map("contract_id") @db.Uuid
+  checkInWitness     String?  @map("check_in_witness") @db.VarChar(100)
+  checkInSignatureUrl String? @map("check_in_signature_url") @db.Text
+  checkInUpdatedAt   DateTime? @map("check_in_updated_at")
+  checkInUpdatedBy   String?  @map("check_in_updated_by") @db.Uuid
+  checkOutWitness    String?  @map("check_out_witness") @db.VarChar(100)
+  checkOutSignatureUrl String? @map("check_out_signature_url") @db.Text
+  checkOutUpdatedAt  DateTime? @map("check_out_updated_at")
+  checkOutUpdatedBy  String?  @map("check_out_updated_by") @db.Uuid
+  notes              String?  @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  items    HandoverItem[]
+
+  @@index([contractId])
+  @@map("handover_checklist")
+}
+
+model HandoverItem {
+  id           String                @id @default(uuid()) @db.Uuid
+  checklistId  String                @map("checklist_id") @db.Uuid
+  stage        HandoverStage         @map("stage")
+  itemName     String                @db.VarChar(100)
+  condition    HandoverItemCondition @map("condition")
+  quantity     Int                   @default(1)
+  note         String?               @db.Text
+  images       String[]              @default([]) @map("images")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  checklist HandoverChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId])
+  @@index([stage])
+  @@map("handover_item")
 }
 
 model Invoice {
@@ -955,7 +1030,7 @@ model FavoriteRoom {
 
 model Notification {
   id               String           @id @default(uuid()) @db.Uuid
-  userId           String           @map("user_id") @db.Uuid
+  userId           String?          @map("user_id") @db.Uuid
   title            String           @db.VarChar(100)
   content          String           @db.Text
   notificationType NotificationType @map("notification_type")
@@ -966,11 +1041,23 @@ model Notification {
   readAt           DateTime?        @map("read_at")
   deletedAt        DateTime?        @map("deleted_at") // 📋 Soft delete field for audit trail
 
+  // Email delivery tracking (merged from NotificationOutbox)
+  emailTo           String?              @map("email_to") @db.VarChar(255)
+  emailSubject      String?              @map("email_subject") @db.VarChar(255)
+  emailBodyHtml     String?              @map("email_body_html") @db.Text
+  emailStatus       EmailDeliveryStatus  @default(PENDING) @map("email_status")
+  emailSentAt       DateTime?            @map("email_sent_at")
+  emailFailureReason String?             @map("email_failure_reason") @db.Text
+  emailRetryCount   Int                  @default(0) @map("email_retry_count")
+  emailNextRetryAt  DateTime?            @map("email_next_retry_at")
+  emailMaxRetries   Int                  @default(5) @map("email_max_retries")
+
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId, isRead, deletedAt]) // Include deletedAt for filtering active notifications
   @@index([notificationType])
+  @@index([emailStatus, emailNextRetryAt])
   @@map("notification")
 }
 
@@ -983,39 +1070,6 @@ model Notification {
 // 3. On success: mark status=SENT
 // 4. On failure: increment retryCount, set nextRetryAt with backoff
 // 5. Max 5 retries, then status=FAILED_PERMANENT
-model NotificationOutbox {
-  id               String           @id @default(uuid()) @db.Uuid
-  notificationId   String?          @map("notification_id") @db.Uuid // Optional FK to notification
-  userId           String           @map("user_id") @db.Uuid
-  email            String           @db.VarChar(255)
-  subject          String           @db.VarChar(255)
-  bodyHtml         String           @db.Text
-  notificationType NotificationType @map("notification_type")
-
-  // Delivery tracking
-  status        OutboxStatus @default(PENDING) // PENDING, SENT, FAILED_PERMANENT
-  sentAt        DateTime?    @map("sent_at")
-  failureReason String?      @map("failure_reason") @db.Text
-
-  // Retry logic
-  retryCount  Int       @default(0) @map("retry_count")
-  nextRetryAt DateTime? @map("next_retry_at")
-  maxRetries  Int       @default(5) @map("max_retries")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@index([status, nextRetryAt]) // For polling pending/failed messages
-  @@index([userId, status])
-  @@index([notificationType]) // Group by type for analytics
-  @@map("notification_outbox")
-}
-
-enum OutboxStatus {
-  PENDING
-  SENT
-  FAILED_PERMANENT
-}
 
 model SystemFeedback {
   id          String         @id @default(uuid()) @db.Uuid
@@ -1264,6 +1318,8 @@ model LegalSnapshot {
   // IMMUTABILITY
   dataHash String @db.VarChar(64)
   // SHA-256 hash of entire snapshot content
+  previousHash String? @map("previous_hash") @db.VarChar(64)
+  chainHash    String? @map("chain_hash") @db.VarChar(64)
 
   // Optional metadata for extensibility
   metadata Json?
@@ -1371,8 +1427,6 @@ model LandlordRevenueSnapshot {
   totalRevenue Decimal @map("total_revenue") @db.Decimal(16, 2) // Upgraded from (15,2)
   invoiceCount Int     @map("invoice_count")
 
-  // Room-level breakdown (optional, for detailed view)
-  breakdown Json? // [{roomId, roomNumber, revenue}]
 
   // Immutability
   snapshotHash String @map("snapshot_hash") @db.VarChar(64)
@@ -1386,6 +1440,24 @@ model LandlordRevenueSnapshot {
   @@index([landlordId, year])
   @@index([year, month])
   @@map("landlord_revenue_snapshot")
+}
+
+model TaxYearBreakdown {
+  id           String   @id @default(uuid()) @db.Uuid
+  landlordId   String   @map("landlord_id") @db.Uuid
+  year         Int
+  month        Int?
+  roomId       String?  @map("room_id") @db.Uuid
+  roomNumber   String?  @map("room_number") @db.VarChar(20)
+  revenue      Decimal  @db.Decimal(16, 2)
+  invoiceCount Int      @default(0) @map("invoice_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([landlordId, year, month, roomId])
+  @@index([landlordId, year])
+  @@index([year, month])
+  @@map("tax_year_breakdown")
 }
 
 // ============================================================================
@@ -1573,6 +1645,24 @@ enum AuditAction {
   VERSION_ARCHIVED
   CONTENT_MODIFIED
   METADATA_MODIFIED
+}
+
+enum ChangeType {
+  DOCUMENT_CREATED
+  DOCUMENT_UPDATED
+  DOCUMENT_PUBLISHED
+  DOCUMENT_ARCHIVED
+  DOCUMENT_VERSION_CREATED
+  DOCUMENT_VERSION_PUBLISHED
+  DOCUMENT_VERSION_APPROVED
+  DOCUMENT_VERSION_ARCHIVED
+  CONTRACT_SIGNED
+  CONTRACT_VERIFIED
+  ADMIN_ACTION
+  USER_ANONYMIZED
+  ALERT_CREATED
+  TEMPLATE_UPDATED
+  OTHER
 }
 
 // Main Legal Document
@@ -1922,7 +2012,8 @@ model Dispute {
   contract Contract          @relation("ContractDisputes", fields: [contractId], references: [id], onDelete: Cascade)
   claimant User              @relation("DisputeClaimant", fields: [claimantId], references: [id])
   resolver User?             @relation("DisputeResolver", fields: [resolvedBy], references: [id])
-  evidence DisputeEvidence[]
+  evidence DisputeEvidence[] @relation("DisputeEvidence")
+  refund   DisputeRefund?    @relation("DisputeRefund")
 
   @@unique([contractId, status], map: "unique_open_dispute")
   @@index([status, deadline])
@@ -1941,11 +2032,28 @@ model DisputeEvidence {
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
-  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  dispute Dispute @relation("DisputeEvidence", fields: [disputeId], references: [id], onDelete: Cascade)
 
   @@index([disputeId])
   @@index([submittedBy])
   @@map("dispute_evidence")
+}
+
+// Dispute refund tracking (financial side-effects)
+model DisputeRefund {
+  id          String       @id @default(uuid()) @db.Uuid
+  disputeId   String       @unique @map("dispute_id") @db.Uuid
+  amount      Decimal      @db.Decimal(16, 2)
+  status      RefundStatus @default(PENDING)
+  reason      String?      @db.Text
+  processedAt DateTime?    @map("processed_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  dispute Dispute @relation("DisputeRefund", fields: [disputeId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("dispute_refund")
 }
 
 // UC_COT_03: Bad Debt Invoice Tracking
@@ -2124,6 +2232,33 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+model ChangeLog {
+  id          String     @id @default(uuid()) @db.Uuid
+  userId      String     @map("user_id") @db.Uuid
+  changeType  ChangeType @map("change_type")
+  entityType  String     @map("entity_type") @db.VarChar(50)
+  entityId    String     @map("entity_id") @db.Uuid
+
+  beforeValue Json?      @map("before_value")
+  afterValue  Json?      @map("after_value")
+  reason      String?    @db.Text
+  ipAddress   String?    @map("ip_address") @db.VarChar(45)
+  userAgent   String?    @map("user_agent") @db.Text
+  metadata    Json?      @map("metadata")
+
+  previousHash String?   @map("previous_hash") @db.VarChar(64)
+  changeHash   String?   @map("change_hash") @db.VarChar(64)
+
+  timestamp DateTime @default(now()) @map("timestamp")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([changeType])
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@map("change_log")
 }
 
 // ============================================================================

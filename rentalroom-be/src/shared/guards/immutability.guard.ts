@@ -1,24 +1,24 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
-import { InvoiceStatus, ContractStatus, PaymentStatus } from '@prisma/client';
+import * as crypto from 'crypto';
 
 /**
  * ☠️ IMMUTABILITY ENFORCER - FREEZE AFTER MILESTONE
- * 
+ *
  * CRITICAL PROBLEM:
  * - Invoice PAID → vẫn có thể UPDATE amount
  * - Contract ACTIVE → vẫn có thể thay đổi điều khoản
  * - Payment COMPLETED → vẫn có thể sửa số tiền
- * 
+ *
  * LEGAL CONSEQUENCE:
  * - Tòa án: "Hệ thống cho phép chỉnh sửa sau sự kiện"
  * - Result: THUA vụ kiện
- * 
+ *
  * SOLUTION:
  * - Define IMMUTABLE MILESTONES for each entity
  * - REJECT any modification after milestone
  * - Store original data in versioned table
- * 
+ *
  * UC_LEGAL_05: Post-Milestone Immutability
  * UC_LEGAL_06: Data Integrity Protection
  */
@@ -32,7 +32,7 @@ export interface FreezeRule {
 
 /**
  * FREEZE RULES - LEGAL-GRADE IMMUTABILITY
- * 
+ *
  * Once an entity reaches a milestone status:
  * - Core fields CANNOT be modified
  * - Only specific fields (like notes, tags) may be updated
@@ -46,35 +46,38 @@ const FREEZE_RULES: FreezeRule[] = [
     allowedFields: ['internalNotes', 'tags'], // Only metadata allowed
     reason: 'Invoice cannot be modified after payment. Legal requirement.',
   },
-  
+
   // CONTRACT RULES
   {
     entityType: 'CONTRACT',
     milestoneStatus: ['ACTIVE', 'TERMINATED', 'EXPIRED'],
     allowedFields: ['internalNotes', 'handoverChecklist'], // Only non-legal fields
-    reason: 'Contract cannot be modified after activation. Use amendment process.',
+    reason:
+      'Contract cannot be modified after activation. Use amendment process.',
   },
-  
+
   // PAYMENT RULES
   {
     entityType: 'PAYMENT',
     milestoneStatus: ['COMPLETED', 'REFUNDED'],
     allowedFields: [], // NO fields allowed
-    reason: 'Completed payments are immutable. Create reversal payment instead.',
+    reason:
+      'Completed payments are immutable. Create reversal payment instead.',
   },
-  
+
   // MAINTENANCE RULES
   {
     entityType: 'MAINTENANCE',
     milestoneStatus: ['COMPLETED'],
     allowedFields: ['feedbackNotes', 'rating'],
-    reason: 'Completed maintenance records are immutable. Create new request for changes.',
+    reason:
+      'Completed maintenance records are immutable. Create new request for changes.',
   },
 ];
 
 /**
  * IMMUTABILITY GUARD SERVICE
- * 
+ *
  * USAGE:
  * ```ts
  * // Before ANY update operation:
@@ -85,7 +88,7 @@ const FREEZE_RULES: FreezeRule[] = [
  *   updateDto, // Fields being updated
  *   userId
  * );
- * 
+ *
  * // If frozen → throws BadRequestException
  * // If allowed → returns true
  * ```
@@ -98,12 +101,12 @@ export class ImmutabilityGuard {
 
   /**
    * ENFORCE IMMUTABILITY - CRITICAL OPERATION
-   * 
+   *
    * GUARANTEES:
    * - Blocks modifications to frozen entities
    * - Logs all freeze violations
    * - Creates audit trail of blocked attempts
-   * 
+   *
    * @param entityType Type of entity
    * @param entityId Entity UUID
    * @param currentStatus Current status
@@ -119,7 +122,9 @@ export class ImmutabilityGuard {
     userId: string,
   ): Promise<boolean> {
     // 1. Get freeze rule for this entity type
-    const freezeRule = FREEZE_RULES.find(rule => rule.entityType === entityType);
+    const freezeRule = FREEZE_RULES.find(
+      (rule) => rule.entityType === entityType,
+    );
     if (!freezeRule) {
       // No freeze rule → allow update (with warning)
       this.logger.warn(
@@ -141,17 +146,17 @@ export class ImmutabilityGuard {
     // 3. Entity is FROZEN → check if update is allowed
     const updatedFieldNames = Object.keys(updateFields);
     const allowedFields = freezeRule.allowedFields || [];
-    
+
     // Filter out fields that are NOT in allowed list
     const forbiddenFields = updatedFieldNames.filter(
-      field => !allowedFields.includes(field),
+      (field) => !allowedFields.includes(field),
     );
 
     if (forbiddenFields.length > 0) {
       // ☠️ FREEZE VIOLATION DETECTED
       this.logger.error(
         `🚨 FREEZE VIOLATION: User ${userId} attempted to modify frozen ${entityType}:${entityId} ` +
-        `(status: ${currentStatus}). Forbidden fields: ${forbiddenFields.join(', ')}`,
+          `(status: ${currentStatus}). Forbidden fields: ${forbiddenFields.join(', ')}`,
       );
 
       // Log security event
@@ -165,19 +170,18 @@ export class ImmutabilityGuard {
 
       throw new BadRequestException(
         `Cannot modify ${entityType} in status ${currentStatus}. ` +
-        `Reason: ${freezeRule.reason} ` +
-        `Attempted to modify frozen fields: ${forbiddenFields.join(', ')}. ` +
-        (allowedFields.length > 0 
-          ? `Only these fields can be updated: ${allowedFields.join(', ')}`
-          : 'No fields can be modified.'
-        ),
+          `Reason: ${freezeRule.reason} ` +
+          `Attempted to modify frozen fields: ${forbiddenFields.join(', ')}. ` +
+          (allowedFields.length > 0
+            ? `Only these fields can be updated: ${allowedFields.join(', ')}`
+            : 'No fields can be modified.'),
       );
     }
 
     // 4. Update is allowed (only allowed fields)
     this.logger.log(
       `✅ Frozen ${entityType}:${entityId} update allowed: ` +
-      `fields ${updatedFieldNames.join(', ')} are in allowed list`,
+        `fields ${updatedFieldNames.join(', ')} are in allowed list`,
     );
 
     return true;
@@ -187,7 +191,9 @@ export class ImmutabilityGuard {
    * CHECK IF ENTITY IS FROZEN (read-only check)
    */
   isFrozen(entityType: string, currentStatus: string): boolean {
-    const freezeRule = FREEZE_RULES.find(rule => rule.entityType === entityType);
+    const freezeRule = FREEZE_RULES.find(
+      (rule) => rule.entityType === entityType,
+    );
     if (!freezeRule) return false;
 
     return freezeRule.milestoneStatus.includes(currentStatus);
@@ -197,7 +203,9 @@ export class ImmutabilityGuard {
    * GET FREEZE REASON - For error messages
    */
   getFreezeReason(entityType: string): string | undefined {
-    const freezeRule = FREEZE_RULES.find(rule => rule.entityType === entityType);
+    const freezeRule = FREEZE_RULES.find(
+      (rule) => rule.entityType === entityType,
+    );
     return freezeRule?.reason;
   }
 
@@ -236,22 +244,22 @@ export class ImmutabilityGuard {
 
 /**
  * ☠️ IDEMPOTENCY ENFORCER - PREVENT DUPLICATION ATTACKS
- * 
+ *
  * CRITICAL PROBLEM:
  * - Regenerate utility invoice → duplicate charge
  * - Retry payment → double payment
  * - Retry snapshot → inconsistent data
- * 
+ *
  * ATTACK SCENARIO:
  * - User clicks "Pay" button 5 times fast
  * - Without idempotency → 5 payments created
  * - Result: User charged 5x
- * 
+ *
  * SOLUTION:
  * - Idempotency key for every critical operation
  * - Store key + result hash
  * - If duplicate request → return cached result
- * 
+ *
  * UC_LEGAL_07: Idempotent Operations
  * UC_LEGAL_08: Duplication Attack Prevention
  */
@@ -274,11 +282,11 @@ export class IdempotencyGuard {
 
   /**
    * ENFORCE IDEMPOTENCY - CRITICAL OPERATION
-   * 
+   *
    * USAGE:
    * ```ts
    * const idempotencyKey = headers['idempotency-key'] || uuidv4();
-   * 
+   *
    * const result = await this.idempotency.executeIdempotent(
    *   idempotencyKey,
    *   'CREATE_PAYMENT',
@@ -289,7 +297,7 @@ export class IdempotencyGuard {
    *   }
    * );
    * ```
-   * 
+   *
    * GUARANTEES:
    * - If key seen before → return cached result (no execution)
    * - If key new → execute operation, cache result
@@ -311,7 +319,7 @@ export class IdempotencyGuard {
       // 2. Key exists → return cached result
       this.logger.log(
         `♻️ Idempotent request detected: key=${idempotencyKey}, ` +
-        `operation=${operation}, user=${userId}. Returning cached result.`,
+          `operation=${operation}, user=${userId}. Returning cached result.`,
       );
 
       // Deserialize cached result
@@ -370,7 +378,9 @@ export class IdempotencyGuard {
       },
     });
 
-    this.logger.log(`🧹 Cleaned up ${result.count} expired idempotency records`);
+    this.logger.log(
+      `🧹 Cleaned up ${result.count} expired idempotency records`,
+    );
     return result.count;
   }
 
@@ -378,7 +388,6 @@ export class IdempotencyGuard {
    * Hash result for integrity verification
    */
   private hashResult<T>(result: T): string {
-    const crypto = require('crypto');
     const resultStr = JSON.stringify(result);
     return crypto.createHash('sha256').update(resultStr).digest('hex');
   }

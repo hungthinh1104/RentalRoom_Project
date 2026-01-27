@@ -1,27 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/database/prisma/prisma.service';
+import { ChangeType } from '@prisma/client';
+import * as crypto from 'crypto';
 
 /**
  * ☠️ ADMIN AUDIT TRAIL - GOD MODE TRACKING
- * 
+ *
  * CRITICAL PROBLEM:
  * - Admin can modify anything
  * - No audit of admin actions
  * - No approval flow
  * - Insider attack = rewrite history
- * 
+ *
  * LEGAL CONSEQUENCE:
  * - Cannot prove data integrity
  * - Admin actions invisible
  * - Tòa án: "How do we know admin didn't fabricate evidence?"
- * 
+ *
  * SOLUTION:
  * - Log EVERY admin action (even reads)
  * - Separate audit table (admin can't delete)
  * - Hash chain for tamper detection
  * - Alert on suspicious patterns
- * 
+ *
  * UC_LEGAL_09: Admin Action Audit Trail
  * UC_LEGAL_10: Insider Attack Detection
  */
@@ -32,16 +34,16 @@ export interface AdminAuditEntry {
   action: string;
   entityType: string;
   entityId: string;
-  
+
   // Before/After values (for data modification tracking)
   beforeValue?: Record<string, any>;
   afterValue?: Record<string, any>;
-  
+
   // Context
   ipAddress?: string;
   userAgent?: string;
   reason?: string; // Admin must provide reason for sensitive operations
-  
+
   // Integrity
   timestamp: Date;
   previousAuditHash?: string;
@@ -50,7 +52,7 @@ export interface AdminAuditEntry {
 
 /**
  * ADMIN AUDIT SERVICE
- * 
+ *
  * USAGE:
  * ```ts
  * // Wrap ANY admin action:
@@ -69,11 +71,11 @@ export interface AdminAuditEntry {
 export class AdminAuditService {
   private readonly logger = new Logger(AdminAuditService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * LOG ADMIN ACTION - CRITICAL OPERATION
-   * 
+   *
    * GUARANTEES:
    * - Immutable log (cannot be deleted even by admin)
    * - Hash chain (detect tampering)
@@ -113,6 +115,23 @@ export class AdminAuditService {
         },
       });
 
+      await tx.changeLog.create({
+        data: {
+          userId: entry.adminId,
+          changeType: ChangeType.ADMIN_ACTION,
+          entityType: entry.entityType,
+          entityId: entry.entityId,
+          beforeValue: entry.beforeValue ?? undefined,
+          afterValue: entry.afterValue ?? undefined,
+          reason: entry.reason,
+          ipAddress: entry.ipAddress,
+          userAgent: entry.userAgent,
+          metadata: {
+            action: entry.action,
+          },
+        },
+      });
+
       this.logger.log(
         `📝 Admin action logged: ${entry.action} on ${entry.entityType}:${entry.entityId} by ${entry.adminId}`,
       );
@@ -124,7 +143,7 @@ export class AdminAuditService {
 
   /**
    * DETECT SUSPICIOUS PATTERNS - Insider attack detection
-   * 
+   *
    * Patterns to detect:
    * - High volume of deletions (>10 in 1 hour)
    * - Bulk data exports
@@ -153,7 +172,7 @@ export class AdminAuditService {
       this.logger.warn(
         `🚨 SUSPICIOUS ACTIVITY: Admin ${adminId} performed ${recentActions} actions in last hour`,
       );
-      
+
       // TODO: Send alert to security team
     }
 
@@ -171,7 +190,7 @@ export class AdminAuditService {
       this.logger.warn(
         `⚠️ SENSITIVE ACTION: Admin ${adminId} performed ${action}`,
       );
-      
+
       // TODO: Send alert to security team
     }
   }
@@ -189,7 +208,7 @@ export class AdminAuditService {
       },
     });
 
-    let errors: string[] = [];
+    const errors: string[] = [];
 
     for (let i = 1; i < auditEntries.length; i++) {
       const entry = auditEntries[i];
@@ -210,8 +229,12 @@ export class AdminAuditService {
         action: entry.action,
         entityType: entry.entityType,
         entityId: entry.entityId,
-        beforeValue: entry.beforeValue ? (entry.beforeValue as Record<string, any>) : undefined,
-        afterValue: entry.afterValue ? (entry.afterValue as Record<string, any>) : undefined,
+        beforeValue: entry.beforeValue
+          ? (entry.beforeValue as Record<string, any>)
+          : undefined,
+        afterValue: entry.afterValue
+          ? (entry.afterValue as Record<string, any>)
+          : undefined,
         reason: entry.reason || undefined,
         ipAddress: entry.ipAddress || undefined,
         userAgent: entry.userAgent || undefined,
@@ -233,8 +256,8 @@ export class AdminAuditService {
       this.logger.error(
         `🚨 ADMIN AUDIT LOG INTEGRITY VIOLATION DETECTED: ${errors.length} errors found`,
       );
-      errors.forEach(err => this.logger.error(err));
-      
+      errors.forEach((err) => this.logger.error(err));
+
       // TODO: Send CRITICAL alert to security team
     } else {
       this.logger.log('✅ Admin audit log integrity verified successfully');
@@ -265,8 +288,6 @@ export class AdminAuditService {
    * Calculate hash of audit entry
    */
   private calculateAuditHash(entry: AdminAuditEntry): string {
-    const crypto = require('crypto');
-    
     const hashInput = [
       entry.adminId,
       entry.action,

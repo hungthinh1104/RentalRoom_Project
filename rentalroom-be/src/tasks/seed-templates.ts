@@ -1,4 +1,4 @@
-import { PrismaClient, ContractType, TemplateStatus } from '@prisma/client';
+import { PrismaClient, ContractType } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 

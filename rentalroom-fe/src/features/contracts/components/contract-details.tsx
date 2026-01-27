@@ -203,7 +203,7 @@ export function ContractDetails({
             <ContractStepper status={contract.status} />
 
             {contract.status === ContractStatus.PENDING_SIGNATURE && (
-                <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-md flex items-start gap-3">
+                <div className="bg-info/10 border border-info/20 text-info px-4 py-3 rounded-md flex items-start gap-3">
                     <FileText className="w-5 h-5 mt-0.5" />
                     <div>
                         <p className="font-semibold">Vui lòng ký hợp đồng</p>
@@ -213,7 +213,7 @@ export function ContractDetails({
             )}
 
             {contract.status === ContractStatus.DEPOSIT_PENDING && (
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-md flex items-start gap-3">
+                <div className="bg-warning/10 border border-warning/20 text-warning px-4 py-3 rounded-md flex items-start gap-3">
                     <FileText className="w-5 h-5 mt-0.5" />
                     <div>
                         <p className="font-semibold">Chờ thanh toán cọc</p>
@@ -262,7 +262,7 @@ export function ContractDetails({
                                     {/* Renewal Button for Active Contracts */}
                                     {(contract.status === ContractStatus.ACTIVE || contract.status === ContractStatus.EXPIRED) && isLandlord && (
                                         <Button
-                                            className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                                            className="bg-success hover:bg-success/90 text-success-foreground gap-2 border-none"
                                             onClick={() => setShowRenewDialog(true)}
                                             disabled={isActionLoading || renewMutation.isPending}
                                         >
@@ -295,7 +295,7 @@ export function ContractDetails({
                                     {/* Tenant Buttons */}
                                     {contract.status === ContractStatus.PENDING_SIGNATURE && !isLandlord && (
                                         <>
-                                            <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 gap-2" onClick={() => setShowRequestChangesDialog(true)} disabled={isActionLoading}>
+                                            <Button variant="outline" className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 border-destructive/20 gap-2" onClick={() => setShowRequestChangesDialog(true)} disabled={isActionLoading}>
                                                 <Pencil className="w-4 h-4" />
                                                 Yêu cầu sửa
                                             </Button>
@@ -316,7 +316,7 @@ export function ContractDetails({
                                                 <Ban className="w-4 h-4" />
                                                 Hủy giao dịch
                                             </Button>
-                                            <Button className="bg-green-600 hover:bg-green-700 text-white gap-2" onClick={handleCheckPayment} disabled={isActionLoading}>
+                                            <Button className="bg-success hover:bg-success/90 text-success-foreground gap-2 border-none" onClick={handleCheckPayment} disabled={isActionLoading}>
                                                 <RefreshCw className={`w-4 h-4 ${isActionLoading ? "animate-spin" : ""}`} />
                                                 Tôi đã chuyển khoản
                                             </Button>

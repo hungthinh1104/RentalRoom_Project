@@ -91,24 +91,24 @@ export class FptAieKycProvider implements IeKycService {
   /**
    * Get verification status for user
    */
-  async getVerificationStatus(userId: string): Promise<eKycResult | null> {
+  getVerificationStatus(_userId: string): Promise<eKycResult | null> {
     try {
       // Stub: would query FPT.AI for verification history
       // In production, cache result in database with ekyc_verified, ekyc_verified_at
-      return null;
-    } catch (error) {
-      console.error('Failed to get verification status:', error);
-      return null;
+      return Promise.resolve(null);
+    } catch (_error) {
+      return Promise.resolve(null);
     }
   }
 
   /**
    * Revoke KYC verification
    */
-  async revokeVerification(userId: string, reason: string): Promise<void> {
+  revokeVerification(_userId: string, reason: string): Promise<void> {
     try {
       // Stub: would call FPT.AI revocation endpoint
-      console.log(`Revoking KYC for user ${userId}: ${reason}`);
+      console.log(`Revoking KYC for user ${_userId}: ${reason}`);
+      return Promise.resolve();
     } catch (error) {
       console.error('Failed to revoke verification:', error);
       throw error;
@@ -118,10 +118,10 @@ export class FptAieKycProvider implements IeKycService {
   /**
    * Check if verification is valid
    */
-  async isVerificationValid(userId: string): Promise<boolean> {
+  isVerificationValid(_userId: string): Promise<boolean> {
     // Stub: would check database ekyc_verified_at
     // Valid if within 12 months
-    return false;
+    return Promise.resolve(false);
   }
 
   /**

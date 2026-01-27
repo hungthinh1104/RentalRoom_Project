@@ -147,7 +147,7 @@ export function NotificationCenter({ externalCount }: NotificationCenterProps) {
           )}
 
           <div
-            className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ${isSocketConnected ? 'bg-green-500' : 'bg-yellow-500'
+            className={`absolute bottom-0 right-0 w-2 h-2 rounded-full ${isSocketConnected ? 'bg-success' : 'bg-warning'
               }`}
             title={isSocketConnected ? 'Connected' : 'Polling'}
           />
@@ -159,7 +159,7 @@ export function NotificationCenter({ externalCount }: NotificationCenterProps) {
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-sm">Thông báo</h3>
             {!isSocketConnected && (
-              <AlertCircle className="h-3 w-3 text-yellow-500" title="Using polling" />
+              <AlertCircle className="h-3 w-3 text-warning" title="Using polling" />
             )}
           </div>
 

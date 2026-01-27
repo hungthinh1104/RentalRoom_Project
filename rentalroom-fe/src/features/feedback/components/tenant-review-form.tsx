@@ -77,7 +77,7 @@ export function TenantReviewForm({
       form.reset();
       onSuccess?.();
     } catch (error: unknown) {
-      const message = error && typeof error === 'object' && 'response' in error ? 
+      const message = error && typeof error === 'object' && 'response' in error ?
         (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
       toast.error(message || "Không thể gửi đánh giá. Vui lòng thử lại.");
     } finally {
@@ -105,11 +105,10 @@ export function TenantReviewForm({
                     className="focus:outline-none transition-transform hover:scale-110"
                   >
                     <Star
-                      className={`w-8 h-8 ${
-                        star <= value
+                      className={`w-8 h-8 ${star <= value
                           ? "fill-yellow-400 text-yellow-400"
-                          : "text-gray-300"
-                      }`}
+                          : "text-muted-foreground/30"
+                        }`}
                     />
                   </button>
                 ))}

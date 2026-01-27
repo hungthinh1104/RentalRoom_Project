@@ -125,7 +125,7 @@ export function useAiSearch(
     if (standardQuery.data) {
       // Normalize PaginatedResponse to UnifiedRoomSearchResult if needed
       if ('data' in standardQuery.data) {
-        const sData = standardQuery.data as any; // Temporary cast to handle PaginatedResponse structure
+        const sData = standardQuery.data as unknown as { meta?: { total: number }, data?: unknown[] };
         return {
           query: '',
           method: 'STANDARD' as const,
@@ -136,7 +136,7 @@ export function useAiSearch(
       return standardQuery.data as unknown as UnifiedRoomSearchResult;
     }
     return null;
-  }, [shouldUseSemanticSearch, semanticQuery.data, standardQuery.data, standardFallbackQuery.data]);
+  }, [shouldUseSemanticSearch, semanticQuery.data, standardQuery.data, standardFallbackQuery.data, debouncedQuery]);
 
   const isLoading = shouldUseSemanticSearch ? semanticQuery.isLoading : standardQuery.isLoading;
   const isFetching = shouldUseSemanticSearch ? (semanticQuery.isFetching || standardFallbackQuery.isFetching) : standardQuery.isFetching;

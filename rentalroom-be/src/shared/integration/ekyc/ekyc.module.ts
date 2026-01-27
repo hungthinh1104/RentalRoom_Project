@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FptAieKycProvider } from './providers/fpt-ai.provider';
 import { VnpteKycProvider } from './providers/vnpt.provider';
-import { eKycProviderType, IeKycService } from './ekyc.types';
+import { IeKycService } from './ekyc.types';
 
 /**
  * eKYC Factory Module
@@ -13,9 +13,7 @@ import { eKycProviderType, IeKycService } from './ekyc.types';
   providers: [
     {
       provide: 'EKYC_SERVICE',
-      useFactory: async (
-        configService: ConfigService,
-      ): Promise<IeKycService> => {
+      useFactory: (configService: ConfigService): IeKycService => {
         const provider = configService.get('EKYC_PROVIDER', 'FPT_AI');
 
         if (provider === 'VNPT') {

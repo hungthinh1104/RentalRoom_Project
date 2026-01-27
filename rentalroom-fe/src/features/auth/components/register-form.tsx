@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
 import { formatAuthError } from "../utils/format-auth-error";
+import { toast } from "sonner";
 import {
   Home,
   Building2,
@@ -19,7 +19,8 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
-  Loader2
+  Loader2,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ import { useRegister } from "../hooks/use-register";
 import { registerSchema, type RegisterInput } from "../schemas";
 import { UserRole } from "@/types";
 import { RoleBackground } from "./role-background";
+import { authRateLimiter } from "@/lib/security/rate-limiter";
 
 type AuthRole = UserRole.TENANT | UserRole.LANDLORD;
 
@@ -37,6 +39,10 @@ export function RegisterForm() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const { mutate: register, isPending, error: registerError } = useRegister();
+
+  // 🛡️ SECURITY: Rate limiting state
+  const [isRateLimited, setIsRateLimited] = React.useState(false);
+  const [backoffSeconds, setBackoffSeconds] = React.useState(0);
 
   const {
     register: registerField,
@@ -51,12 +57,37 @@ export function RegisterForm() {
     },
   });
 
+  // 🛡️ SECURITY: Update backoff timer
+  React.useEffect(() => {
+    if (!isRateLimited) return;
+
+    const interval = setInterval(() => {
+      const remaining = authRateLimiter.getBackoffSeconds('register');
+      setBackoffSeconds(remaining);
+
+      if (remaining === 0) {
+        setIsRateLimited(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isRateLimited]);
+
   const handleRoleChange = (role: AuthRole) => {
     setSelectedRole(role);
     setValue("role", role);
   };
 
   const onSubmit = (data: RegisterInput) => {
+    // 🛡️ SECURITY: Check rate limit
+    if (!authRateLimiter.isAllowed('register')) {
+      const backoff = authRateLimiter.getBackoffSeconds('register');
+      setIsRateLimited(true);
+      setBackoffSeconds(backoff);
+      toast.error(`Quá nhiều lần thử. Vui lòng đợi ${backoff} giây`);
+      return;
+    }
+
     const { phone, ...rest } = data;
     const payload = {
       ...rest,
@@ -66,7 +97,18 @@ export function RegisterForm() {
 
     register(payload, {
       onSuccess: () => {
+        // 🛡️ SECURITY: Reset rate limiter on success
+        authRateLimiter.reset('register');
         router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+      },
+      onError: () => {
+        // 🛡️ SECURITY: Record failed attempt
+        authRateLimiter.recordAttempt('register');
+        const attemptCount = authRateLimiter.getAttemptCount('register');
+
+        if (attemptCount >= 3) {
+          toast.warning(`Lần thử ${attemptCount}/5. Hãy cẩn thận!`);
+        }
       },
     });
   };
@@ -81,25 +123,20 @@ export function RegisterForm() {
       <RoleBackground role={selectedRole} />
 
       {/* Foreground Layer - Glass Card */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
+      <div
         className="w-full max-w-lg"
       >
         <div className="glass-card rounded-[32px] p-8 md:p-10 space-y-8 shadow-2xl relative overflow-hidden ring-1 ring-white/20 backdrop-blur-xl">
 
           {/* Header */}
           <div className="space-y-4 text-center">
-            <motion.div
+            <div
               key={selectedRole}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
               className={`inline-flex items-center justify-center p-3 rounded-2xl mb-2 ${selectedRole === UserRole.TENANT ? 'bg-info/10 text-info' : 'bg-warning/10 text-warning'
                 }`}
             >
               {selectedRole === UserRole.TENANT ? <Home className="w-8 h-8" /> : <Building2 className="w-8 h-8" />}
-            </motion.div>
+            </div>
 
             <div className="space-y-1">
               <h1 className="text-3xl font-bold text-foreground tracking-tight">
@@ -117,12 +154,10 @@ export function RegisterForm() {
           <div className="p-1 bg-muted/50 rounded-2xl border border-white/10 backdrop-blur-md relative z-10">
             <div className="flex relative">
               {/* Sliding Background */}
-              <motion.div
+              <div
                 className={`absolute top-0 bottom-0 rounded-xl shadow-sm ${selectedRole === UserRole.TENANT ? 'bg-background' : 'bg-background translate-x-[100%]'
                   }`}
                 style={{ width: '50%' }}
-                layoutId="roleHighlight"
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
 
               <button
@@ -149,22 +184,34 @@ export function RegisterForm() {
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Global Error */}
-            <AnimatePresence mode="wait">
-              {registerError && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  animate={{ opacity: 1, height: "auto", marginBottom: 16 }}
-                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 backdrop-blur-md overflow-hidden"
-                >
-                  <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-destructive leading-relaxed font-medium">
-                    {formatAuthError(registerError)}
+            {/* Rate Limit Warning */}
+            {isRateLimited && (
+              <div
+                className="p-3 rounded-xl bg-warning/10 border border-warning/20 flex items-start gap-3 backdrop-blur-md overflow-hidden"
+              >
+                <Shield className="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs text-warning leading-relaxed font-medium">
+                    Quá nhiều lần thử đăng ký. Vui lòng đợi {backoffSeconds} giây.
                   </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <p className="text-[10px] text-warning/70 mt-0.5">
+                    Đây là biện pháp bảo mật để ngăn chặn spam.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Global Error */}
+            {(registerError && !isRateLimited) && (
+              <div
+                className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 flex items-start gap-3 backdrop-blur-md overflow-hidden"
+              >
+                <AlertCircle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-destructive leading-relaxed font-medium">
+                  {formatAuthError(registerError)}
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* Full Name */}
@@ -173,7 +220,7 @@ export function RegisterForm() {
                   Họ và tên
                 </Label>
                 <div className="relative group/input">
-                  <div className="absolute inset-0 bg-primary/5 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
+                  <div className="absolute inset-0 bg-primary/10 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within/input:text-primary z-10" />
                   <Input
                     id="fullName"
@@ -200,7 +247,7 @@ export function RegisterForm() {
                   Số điện thoại
                 </Label>
                 <div className="relative group/input">
-                  <div className="absolute inset-0 bg-primary/5 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
+                  <div className="absolute inset-0 bg-primary/10 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within/input:text-primary z-10" />
                   <Input
                     id="phone"
@@ -227,7 +274,7 @@ export function RegisterForm() {
                   Email
                 </Label>
                 <div className="relative group/input">
-                  <div className="absolute inset-0 bg-primary/5 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
+                  <div className="absolute inset-0 bg-primary/10 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within/input:text-primary z-10" />
                   <Input
                     id="email"
@@ -255,7 +302,7 @@ export function RegisterForm() {
                     Mật khẩu
                   </Label>
                   <div className="relative group/input">
-                    <div className="absolute inset-0 bg-primary/5 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
+                    <div className="absolute inset-0 bg-primary/10 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within/input:text-primary z-10" />
                     <Input
                       id="password"
@@ -288,7 +335,7 @@ export function RegisterForm() {
                     Xác nhận lại
                   </Label>
                   <div className="relative group/input">
-                    <div className="absolute inset-0 bg-primary/5 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
+                    <div className="absolute inset-0 bg-primary/10 rounded-xl blur-md transition-opacity opacity-0 group-focus-within/input:opacity-100" />
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within/input:text-primary z-10" />
                     <Input
                       id="confirmPassword"
@@ -338,7 +385,7 @@ export function RegisterForm() {
             <Button
               type="submit"
               size="lg"
-              disabled={isPending || passwordsMismatch}
+              disabled={isPending || passwordsMismatch || isRateLimited}
               className={`w-full h-12 text-sm font-bold text-white rounded-xl shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ring-offset-2 focus-visible:ring-2 disabled:opacity-70 ${selectedRole === UserRole.TENANT
                 ? "bg-gradient-to-r from-info to-info/80 hover:from-info/90 hover:to-info/70 focus-visible:ring-info shadow-info/20"
                 : "bg-gradient-to-r from-warning to-warning/80 hover:from-warning/90 hover:to-warning/70 focus-visible:ring-warning shadow-warning/20"
@@ -367,7 +414,7 @@ export function RegisterForm() {
             </Link>
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

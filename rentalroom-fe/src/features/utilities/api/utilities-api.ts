@@ -1,5 +1,5 @@
 import api from '@/lib/api/client';
-import { PaginationParams, PaginatedResponse } from '@/types';
+
 
 export enum ServiceType {
   ELECTRICITY = 'ELECTRICITY',

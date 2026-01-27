@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
 import { CalendarIcon, Upload, Loader2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -133,7 +134,7 @@ export function DocumentUploadModal({ open, onOpenChange }: DocumentUploadModalP
                             name="title"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Tên tài liệu <span className="text-red-500">*</span></FormLabel>
+                                    <FormLabel>Tên tài liệu <span className="text-destructive">*</span></FormLabel>
                                     <FormControl>
                                         <Input placeholder="Ví dụ: Hợp đồng thuê nhà A" {...field} />
                                     </FormControl>
@@ -236,7 +237,7 @@ export function DocumentUploadModal({ open, onOpenChange }: DocumentUploadModalP
                             name="file"
                             render={() => (
                                 <FormItem>
-                                    <FormLabel>File đính kèm <span className="text-red-500">*</span></FormLabel>
+                                    <FormLabel>File đính kèm <span className="text-destructive">*</span></FormLabel>
                                     <FormControl>
                                         <div className="flex items-center gap-2">
                                             <Input

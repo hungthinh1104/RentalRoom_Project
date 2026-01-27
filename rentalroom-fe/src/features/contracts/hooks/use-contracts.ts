@@ -80,7 +80,7 @@ export function useAddResident() {
 	return useMutation({
 		mutationFn: ({ contractId, data }: { contractId: string; data: { fullName: string; phoneNumber?: string; citizenId?: string; relationship?: string } }) =>
 			contractsApi.addResident(contractId, data),
-		onSuccess: (_data: any, variables: { contractId: string }) => {
+		onSuccess: (_data: unknown, variables: { contractId: string }) => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.detail(variables.contractId) });
 		},
 	});
@@ -92,7 +92,7 @@ export function useUpdateResident() {
 	return useMutation({
 		mutationFn: ({ contractId, residentId, data }: { contractId: string; residentId: string; data: { fullName?: string; phoneNumber?: string; citizenId?: string; relationship?: string } }) =>
 			contractsApi.updateResident(contractId, residentId, data),
-		onSuccess: (_data: any, variables: { contractId: string }) => {
+		onSuccess: (_data: unknown, variables: { contractId: string }) => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.detail(variables.contractId) });
 		},
 	});
@@ -104,7 +104,7 @@ export function useRemoveResident() {
 	return useMutation({
 		mutationFn: ({ contractId, residentId }: { contractId: string; residentId: string }) =>
 			contractsApi.removeResident(contractId, residentId),
-		onSuccess: (_data: any, variables: { contractId: string }) => {
+		onSuccess: (_data: unknown, variables: { contractId: string }) => {
 			queryClient.invalidateQueries({ queryKey: queryKeys.contracts.detail(variables.contractId) });
 		},
 	});

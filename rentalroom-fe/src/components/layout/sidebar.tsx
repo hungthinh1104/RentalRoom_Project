@@ -23,7 +23,8 @@ import {
     Wallet,
     MessageSquareWarning,
     MessageSquare,
-    Menu
+    Menu,
+    Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -59,6 +60,9 @@ export function SidebarContent({ role, isCollapsed = false }: SidebarContentProp
                     { title: 'Tổng quan', href: '/dashboard/admin', icon: LayoutDashboard },
                     { title: 'Người dùng', href: '/dashboard/admin/users', icon: Users },
                     { title: 'Bất động sản', href: '/dashboard/admin/properties', icon: Building },
+                    { title: 'Hợp đồng', href: '/dashboard/admin/contracts', icon: FileText },
+                    { title: 'Thanh toán', href: '/dashboard/admin/payments', icon: CreditCard },
+                    { title: 'Tranh chấp', href: '/dashboard/admin/disputes', icon: Scale },
                     { title: 'Thống kê', href: '/dashboard/admin/analytics', icon: BarChart3 },
                     { title: 'Pháp lý', href: '/dashboard/admin/legal-documents', icon: Scale },
                     { title: 'Nhật ký', href: '/dashboard/admin/audit-logs', icon: ShieldCheck },
@@ -78,6 +82,7 @@ export function SidebarContent({ role, isCollapsed = false }: SidebarContentProp
                             { title: 'Thêm mới', href: '/dashboard/landlord/properties/new' },
                         ],
                     },
+                    { title: 'Đơn thuê', href: '/dashboard/landlord/applications', icon: Users },
                     { title: 'Khách thuê', href: '/dashboard/landlord/tenants', icon: Users },
                     { title: 'Hợp đồng', href: '/dashboard/landlord/contracts', icon: FileText },
                     { title: 'Thanh toán', href: '/dashboard/landlord/payments', icon: CreditCard },
@@ -92,6 +97,7 @@ export function SidebarContent({ role, isCollapsed = false }: SidebarContentProp
                     { title: 'Tổng quan', href: '/dashboard/tenant', icon: LayoutDashboard },
                     { title: 'Hợp đồng', href: '/dashboard/tenant/contracts', icon: FileText },
                     { title: 'Thanh toán', href: '/dashboard/tenant/payments', icon: CreditCard },
+                    { title: 'Điện nước', href: '/dashboard/tenant/utilities', icon: Zap },
                     { title: 'Tài chính', href: '/dashboard/tenant/finance', icon: Wallet },
                     { title: 'Khiếu nại', href: '/dashboard/tenant/complaints', icon: MessageSquareWarning },
                     { title: 'Bảo trì', href: '/dashboard/tenant/maintenance', icon: Wrench },
@@ -147,13 +153,16 @@ export function SidebarContent({ role, isCollapsed = false }: SidebarContentProp
 }
 
 function SidebarItem({ item, pathname, isCollapsed }: { item: NavItem; pathname: string | null; isCollapsed: boolean }) {
-    const [isOpen, setIsOpen] = useState(false);
     const isActive = pathname === item.href;
-    const isChildActive = item.children?.some(child => pathname === child.href);
+    const isChildActive = !!item.children?.some(child => pathname === child.href);
 
-    useEffect(() => {
+    const [isOpen, setIsOpen] = useState(isChildActive);
+    const [prevIsChildActive, setPrevIsChildActive] = useState(isChildActive);
+
+    if (isChildActive !== prevIsChildActive) {
+        setPrevIsChildActive(isChildActive);
         if (isChildActive) setIsOpen(true);
-    }, [isChildActive]);
+    }
 
     if (isCollapsed) {
         return (
@@ -216,7 +225,8 @@ function SidebarItem({ item, pathname, isCollapsed }: { item: NavItem; pathname:
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
+                            transition={{ duration: 0.2, ease: "easeInOut" }}
+                            className="overflow-hidden will-change-[height,opacity]"
                         >
                             <div className="flex flex-col gap-1 pl-4 mt-1 border-l-2 border-border/30 ml-6">
                                 {item.children.map(child => (

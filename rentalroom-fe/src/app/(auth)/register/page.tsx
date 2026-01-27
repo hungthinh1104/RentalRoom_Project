@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { RegisterForm } from "@/features/auth/components/register-form";
+import { RegisterContent } from "./register-content";
 
 export const metadata: Metadata = {
   title: "Register | Rental Room",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function RegisterPage() {
-  return <RegisterForm />;
+  return <RegisterContent />;
 }

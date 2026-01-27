@@ -21,6 +21,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency } from '@/utils/tax-helpers';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useSecureAction } from '@/hooks/use-secure-action';
+import { useLegalConfirmation } from '@/components/security/legal-finality-dialog';
 
 interface ServiceStub {
     id: string;
@@ -140,104 +142,106 @@ export const UnifiedInvoiceTable = () => {
         setIsPreviewOpen(true);
     };
 
+    // 🔒 SECURITY: Legal confirmation for invoice generation
+    const { confirm: confirmGenerate, Dialog: GenerateDialog } = useLegalConfirmation();
+
     const handleConfirmCreate = async () => {
         if (!previewData) return;
 
-        try {
-            const data = previewData as {
-                contract: {
-                    id: string;
-                    room?: {
-                        roomNumber?: string;
-                        property?: {
-                            services?: Array<{ id: string; billingMethod?: string; serviceType?: string; unitPrice?: number; serviceName?: string }>
+        const data = previewData as {
+            contract: {
+                id: string;
+                room?: {
+                    roomNumber?: string;
+                    property?: {
+                        services?: Array<{ id: string; billingMethod?: string; serviceType?: string; unitPrice?: number; serviceName?: string }>
+                    }
+                }
+            };
+            readings: Record<string, { new: string }>;
+            selectedServices: string[]
+        };
+
+        // 🔒 SECURITY: Check if invoice already exists
+        const formattedMonth = `${year}-${month.toString().padStart(2, '0')}`;
+        const existingInvoice = existingInvoices?.find((inv: Invoice) => inv.contractId === data.contract.id);
+
+        if (existingInvoice) {
+            toast.error(`Hóa đơn tháng ${month}/${year} đã tồn tại cho phòng ${data.contract.room?.roomNumber}`);
+            setIsPreviewOpen(false);
+            return;
+        }
+
+        // 🔒 SECURITY: Show legal confirmation
+        confirmGenerate({
+            title: "Tạo hóa đơn tiện ích",
+            description: `Bạn sắp tạo hóa đơn cho phòng ${data.contract.room?.roomNumber} tháng ${month}/${year}. Hành động này sẽ tạo snapshot tài chính và không thể hoàn tác.`,
+            severity: "legal",
+            consentText: "Tôi xác nhận tạo hóa đơn này",
+        }, async () => {
+            try {
+                setProcessing(data.contract.id);
+                const { contract, readings: contractReadings } = data;
+
+                // Prepare metered readings payload
+                const readingsPayload: Array<{ serviceId: string; currentReading: number }> = [];
+                const meteredServices = contract.room?.property?.services?.filter((s: { billingMethod?: string }) => s.billingMethod === 'METERED') || [];
+
+                for (const s of meteredServices) {
+                    const r = contractReadings[s.id];
+                    if (r?.new) {
+                        readingsPayload.push({
+                            serviceId: s.id,
+                            currentReading: Number(r.new)
+                        });
+                    }
+                }
+
+                await utilitiesApi.generateUtilityInvoice(contract.id, formattedMonth, {
+                    readings: readingsPayload,
+                    includeRent: true,
+                    includeFixedServices: true
+                });
+
+                // Invalidate and refetch invoice list
+                queryClient.invalidateQueries({ queryKey: ['utility-invoices', month, year] });
+
+                toast.success(`Đã tạo hóa đơn cho phòng ${contract.room?.roomNumber}`);
+                setIsPreviewOpen(false);
+                setPreviewData(null);
+            } catch (error: unknown) {
+                console.error('[Invoice Creation Error]', error);
+
+                let errorMessage = 'Lỗi tạo hóa đơn';
+
+                if (error && typeof error === 'object') {
+                    let message: string | undefined;
+
+                    if ('message' in error && typeof error.message === 'string') {
+                        message = error.message;
+                    } else if ('response' in error) {
+                        const apiError = error as { response?: { data?: { message?: string } } };
+                        message = apiError.response?.data?.message;
+                    }
+
+                    if (message) {
+                        if (message.includes('Invoice already exists')) {
+                            errorMessage = `Hóa đơn tháng ${month}/${year} đã tồn tại. Vui lòng kiểm tra lại.`;
+                        } else if (message.includes('Contract not found')) {
+                            errorMessage = 'Không tìm thấy hợp đồng';
+                        } else if (message.includes('Invalid readings')) {
+                            errorMessage = 'Số đọc không hợp lệ';
+                        } else {
+                            errorMessage = message;
                         }
                     }
-                };
-                readings: Record<string, { new: string }>;
-                selectedServices: string[]
-            };
-
-            setProcessing(data.contract.id);
-            const { contract, readings: contractReadings } = data;
-
-            // Prepare metered readings payload
-            const readingsPayload: Array<{ serviceId: string; currentReading: number }> = [];
-            const meteredServices = contract.room?.property?.services?.filter((s: { billingMethod?: string }) => s.billingMethod === 'METERED') || [];
-
-            for (const s of meteredServices) {
-                const r = contractReadings[s.id];
-                if (r?.new) {
-                    readingsPayload.push({
-                        serviceId: s.id,
-                        currentReading: Number(r.new)
-                    });
                 }
+
+                toast.error(errorMessage);
+            } finally {
+                setProcessing(null);
             }
-
-            // Format month as YYYY-MM
-            const formattedMonth = `${year}-${month.toString().padStart(2, '0')}`;
-
-            // We currently send includeFixedServices=true to backend, which includes ALL fixed services.
-            // If we want to support partial selection (as UI suggests), backend needs update.
-            // For now, confirm strictly what is selected? 
-            // Actually, backend DOES NOT support partial selection yet (it's boolean includeFixedServices).
-            // BUT, if I assume includeFixedServices=true means ALL, I should warn user?
-            // Wait, I can't change backend right now easily without risking regression.
-            // I will send includeFixedServices=true.
-            // And in preview I showed what IS selected.
-            // If user unselected something in UI, but backend adds it, that's mismatch.
-            // However, typical flow is all fixed services are mandatory.
-            // I'll stick to includeFixedServices=true for now.
-
-            await utilitiesApi.generateUtilityInvoice(contract.id, formattedMonth, {
-                readings: readingsPayload,
-                includeRent: true,
-                includeFixedServices: true
-            });
-
-            // Invalidate and refetch invoice list
-            queryClient.invalidateQueries({ queryKey: ['utility-invoices', month, year] });
-
-            toast.success(`Đã tạo hóa đơn cho phòng ${contract.room?.roomNumber}`);
-            setIsPreviewOpen(false);
-            setPreviewData(null);
-        } catch (error: unknown) {
-            console.error('[Invoice Creation Error]', error);
-
-            // Extract error message from API response
-            let errorMessage = 'Lỗi tạo hóa đơn';
-
-            if (error && typeof error === 'object') {
-                // First check if it's ApiError with message property
-                let message: string | undefined;
-
-                if ('message' in error && typeof error.message === 'string') {
-                    message = error.message;
-                } else if ('response' in error) {
-                    // Fallback to response.data.message
-                    const apiError = error as { response?: { data?: { message?: string } } };
-                    message = apiError.response?.data?.message;
-                }
-
-                if (message) {
-                    // Handle specific error cases
-                    if (message.includes('Invoice already exists')) {
-                        errorMessage = `Hóa đơn tháng ${month}/${year} đã tồn tại. Vui lòng kiểm tra lại.`;
-                    } else if (message.includes('Contract not found')) {
-                        errorMessage = 'Không tìm thấy hợp đồng';
-                    } else if (message.includes('Invalid readings')) {
-                        errorMessage = 'Số đọc không hợp lệ';
-                    } else {
-                        errorMessage = message;
-                    }
-                }
-            }
-
-            toast.error(errorMessage);
-        } finally {
-            setProcessing(null);
-        }
+        });
     };
 
     // Extract unique properties
@@ -525,6 +529,9 @@ export const UnifiedInvoiceTable = () => {
                 open={isDetailOpen}
                 onOpenChange={setIsDetailOpen}
             />
+
+            {/* 🔒 SECURITY: Legal confirmation dialog */}
+            <GenerateDialog />
         </div>
     );
 };

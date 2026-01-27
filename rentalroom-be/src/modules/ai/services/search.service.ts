@@ -4,11 +4,6 @@ import { AnalysisService } from './analysis.service';
 import { EmbeddingService } from './embedding.service';
 import { CacheService } from 'src/common/services/cache.service';
 
-interface RoomWithSimilarity {
-  room: any;
-  similarity: number;
-}
-
 @Injectable()
 export class SearchService {
   private readonly logger = new Logger(SearchService.name);

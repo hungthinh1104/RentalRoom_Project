@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   Logger,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +17,8 @@ import { PrismaService } from 'src/database/prisma/prisma.service';
 import { RegisterDto, AuthResponseDto } from './dto/auth.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { EmailService } from 'src/common/services/email.service';
+import type { IeKycService } from 'src/shared/integration/ekyc/ekyc.service.interface';
+import { eKycResult } from 'src/shared/integration/ekyc/ekyc.types';
 
 @Injectable()
 export class AuthService {
@@ -26,7 +29,70 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
+    @Inject('EKYC_SERVICE') private readonly eKycService: IeKycService,
   ) {}
+
+  // ... (keep existing methods)
+
+  /**
+   * UC_AUTH_01: Verify user identity via eKYC
+   */
+  async verifyIdentity(
+    userId: string,
+    frontImage: string,
+    backImage: string,
+    selfie: string,
+  ): Promise<eKycResult> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new BadRequestException('User not found');
+
+    if (user.ekycVerified) {
+      throw new ConflictException('User already verified');
+    }
+
+    try {
+      // Call eKYC provider
+      const result = await this.eKycService.verifyIdentity(
+        frontImage,
+        backImage,
+        selfie,
+      );
+
+      // Verify that the eKYC data matches the stored user name (if strictly enforced)
+      // For now, we update the user with eKYC details
+
+      if (result.verified) {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            ekycVerified: true,
+            ekycStatus: 'VERIFIED',
+            ekycData: result as any, // Store full result for audit
+            ekycDocumentNumber: result.documentNumber,
+            // Optionally update full name if we trust eKYC more
+            // fullName: result.fullName
+          },
+        });
+      } else {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            ekycStatus: 'REJECTED',
+            ekycData: result as any,
+          },
+        });
+        throw new BadRequestException(
+          'eKYC Verification Failed: ' + (result as any).message ||
+            'Liveness check failed',
+        );
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`eKYC failed for user ${userId}`, error);
+      throw new InternalServerErrorException('eKYC Service Error');
+    }
+  }
 
   /**
    * Generate a cryptographically strong random token for password reset (128 chars)
@@ -68,7 +134,7 @@ export class AuthService {
     if (!/\d/.test(password)) {
       errors.push('Password must contain at least 1 number');
     }
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       errors.push(
         'Password must contain at least 1 special character (!@#$%^&*)',
       );

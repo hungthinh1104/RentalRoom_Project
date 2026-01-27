@@ -148,7 +148,7 @@ export function AddRoomDialog({ open, onOpenChange, propertyId }: AddRoomDialogP
                 <div className="flex items-center gap-2 mb-4 bg-muted/30 p-3 rounded-lg border border-border/30">
                     <Switch checked={isRangeMode} onCheckedChange={setIsRangeMode} id="range-mode" />
                     <Label htmlFor="range-mode" className="flex items-center gap-2 cursor-pointer font-medium">
-                        <Sparkles className="w-4 h-4 text-amber-500" />
+                        <Sparkles className="w-4 h-4 text-warning" />
                         Chế độ Tạo Hàng Loạt (Range Mode)
                     </Label>
                 </div>
@@ -271,7 +271,7 @@ export function AddRoomDialog({ open, onOpenChange, propertyId }: AddRoomDialogP
 
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Hủy</Button>
-                            <Button type="submit" disabled={isCreating} className="bg-amber-500 hover:bg-amber-600">
+                            <Button type="submit" disabled={isCreating} className="bg-warning hover:bg-warning/90">
                                 {isCreating ? <Loader2 className="animate-spin w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
                                 {isRangeMode ? "Tạo hàng loạt" : "Tạo phòng"}
                             </Button>

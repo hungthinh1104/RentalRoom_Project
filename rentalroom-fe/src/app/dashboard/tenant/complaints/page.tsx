@@ -206,12 +206,18 @@ export default function TenantComplaintsPage() {
                     <SelectValue placeholder="Chọn hợp đồng" />
                   </SelectTrigger>
                   <SelectContent>
-                    {contractOptions?.length === 0 && <SelectItem value="" disabled>Chưa có hợp đồng</SelectItem>}
-                    {contractOptions?.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.code || c.id.substring(0, 8)} - {c.room?.name || "Phòng"}
+                    {(!contractOptions || contractOptions.length === 0) && (
+                      <SelectItem value="NONE" disabled>
+                        Chưa có hợp đồng
                       </SelectItem>
-                    ))}
+                    )}
+                    {contractOptions
+                      ?.filter((c: { id: string }) => typeof c?.id === "string" && c.id.trim() !== "")
+                      .map((c: { id: string; code?: string; room?: { name?: string } }) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.code || c.id.substring(0, 8)} - {c.room?.name || "Phòng"}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

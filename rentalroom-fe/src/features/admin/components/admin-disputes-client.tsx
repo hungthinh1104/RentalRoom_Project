@@ -59,6 +59,9 @@ import { vi } from "date-fns/locale";
 import { toast } from "sonner";
 import { useDisputes, useResolveDispute } from "@/features/disputes/hooks/use-disputes";
 import type { DisputeItem } from "@/features/disputes/api/disputes-api";
+import { useLegalConfirmation } from "@/components/security/legal-finality-dialog";
+import { isActionAllowed } from "@/lib/security/action-matrix";
+import { sanitizeText } from "@/lib/security/sanitize";
 
 const DISPUTE_CATEGORIES = [
   { value: "MAINTENANCE", label: "Bảo trì / Sửa chữa" },
@@ -86,6 +89,7 @@ export default function AdminDisputesClient() {
     approvedAmount: 0,
     reason: "",
   });
+  const { confirm, Dialog: LegalDialog } = useLegalConfirmation();
 
   const { data: disputesData, isLoading } = useDisputes();
   const disputes: DisputeItem[] = useMemo(() => {
@@ -173,26 +177,41 @@ export default function AdminDisputesClient() {
       return;
     }
 
-    resolveDispute.mutate(
+    // Use LegalFinalityDialog for confirmation
+    confirm(
       {
-        disputeId: selectedDispute.id,
-        resolution: resolutionData.resolution as "APPROVED" | "PARTIAL" | "REJECTED",
-        approvedAmount:
-          resolutionData.resolution === "REJECTED" ? 0 : resolutionData.approvedAmount,
-        resolutionReason: resolutionData.reason,
+        title: "Giải quyết tranh chấp",
+        description: `Bạn đang giải quyết tranh chấp ${selectedDispute.id.substring(0, 8)}... với kết luận: ${resolutionData.resolution}. Hành động này sẽ tạo snapshot pháp lý và không thể hoàn tác.`,
+        severity: "legal",
+        consentText: "Tôi xác nhận giải quyết tranh chấp này",
       },
-      {
-        onSuccess: () => {
-          toast.success("Đã giải quyết tranh chấp");
-          setResolutionModalOpen(false);
-          setSelectedDispute(null);
-          setResolutionData({
-            resolution: "APPROVED",
-            approvedAmount: 0,
-            reason: "",
-          });
-        },
-        onError: () => toast.error("Không thể giải quyết tranh chấp"),
+      async () => {
+        resolveDispute.mutate(
+          {
+            disputeId: selectedDispute.id,
+            resolution: resolutionData.resolution as "APPROVED" | "PARTIAL" | "REJECTED",
+            approvedAmount:
+              resolutionData.resolution === "REJECTED" ? 0 : resolutionData.approvedAmount,
+            resolutionReason: resolutionData.reason,
+          },
+          {
+            onSuccess: (result: { snapshotId?: string }) => {
+              toast.success(
+                result?.snapshotId
+                  ? `Đã giải quyết - Snapshot: ${result.snapshotId.substring(0, 8)}...`
+                  : "Đã giải quyết tranh chấp"
+              );
+              setResolutionModalOpen(false);
+              setSelectedDispute(null);
+              setResolutionData({
+                resolution: "APPROVED",
+                approvedAmount: 0,
+                reason: "",
+              });
+            },
+            onError: () => toast.error("Không thể giải quyết tranh chấp"),
+          }
+        );
       }
     );
   };
@@ -301,12 +320,12 @@ export default function AdminDisputesClient() {
                 className="pl-9"
               />
             </div>
-            <Select value={statusFilter || ""} onValueChange={(v) => setStatusFilter(v || undefined)}>
+            <Select value={statusFilter || "ALL"} onValueChange={(v) => setStatusFilter(v === "ALL" ? undefined : v)}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Lọc theo trạng thái" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Tất cả</SelectItem>
+                <SelectItem value="ALL">Tất cả</SelectItem>
                 <SelectItem value="OPEN">Đang mở</SelectItem>
                 <SelectItem value="APPROVED">Chấp nhận</SelectItem>
                 <SelectItem value="PARTIAL">Một phần</SelectItem>
@@ -370,6 +389,14 @@ export default function AdminDisputesClient() {
                               (c) => c.value === dispute.category
                             )?.label || dispute.category}
                           </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {/* 🛡️ SECURITY: Sanitize user input to prevent XSS */}
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {sanitizeText(dispute.description)}
+                          </p>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -473,7 +500,7 @@ export default function AdminDisputesClient() {
                   <SelectValue placeholder="Chọn kết luận" />
                 </SelectTrigger>
                 <SelectContent>
-                  {RESOLUTION_OPTIONS.map((opt) => (
+                  {RESOLUTION_OPTIONS.filter((opt) => opt.value.trim() !== "").map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -539,6 +566,7 @@ export default function AdminDisputesClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <LegalDialog />
     </div>
   );
 }

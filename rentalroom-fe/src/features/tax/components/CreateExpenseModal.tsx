@@ -70,7 +70,7 @@ export function CreateExpenseModal({ isOpen, onClose, rentalUnits }: CreateExpen
             });
         },
         onError: (error: unknown) => {
-            const message = error && typeof error === 'object' && 'response' in error ? 
+            const message = error && typeof error === 'object' && 'response' in error ?
                 (error as { response?: { data?: { message?: string } } }).response?.data?.message : undefined;
             toast({
                 title: 'Lỗi',
@@ -117,7 +117,7 @@ export function CreateExpenseModal({ isOpen, onClose, rentalUnits }: CreateExpen
 
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="rental-unit">Bất động sản <span className="text-red-500">*</span></Label>
+                        <Label htmlFor="rental-unit">Bất động sản <span className="text-destructive">*</span></Label>
                         <Select
                             value={formData.rentalUnitId}
                             onValueChange={(value) => setFormData({ ...formData, rentalUnitId: value })}
@@ -137,7 +137,7 @@ export function CreateExpenseModal({ isOpen, onClose, rentalUnits }: CreateExpen
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="amount">Số tiền (VND) <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="amount">Số tiền (VND) <span className="text-destructive">*</span></Label>
                             <Input
                                 id="amount"
                                 type="number"
@@ -147,7 +147,7 @@ export function CreateExpenseModal({ isOpen, onClose, rentalUnits }: CreateExpen
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="date">Ngày chi <span className="text-red-500">*</span></Label>
+                            <Label htmlFor="date">Ngày chi <span className="text-destructive">*</span></Label>
                             <Input
                                 id="date"
                                 type="date"

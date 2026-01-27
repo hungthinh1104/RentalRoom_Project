@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Home, Building2, Search, ShieldCheck, Zap, FileCheck, CheckCircle2 } from "lucide-react";
 import { UserRole } from "@/types";
+import { cn } from "@/lib/utils";
 
 interface RoleBackgroundProps {
     role: UserRole.TENANT | UserRole.LANDLORD;
@@ -12,7 +13,7 @@ const roleConfig = {
     TENANT: {
         color: "text-info",
         bgColor: "bg-info/10",
-        gradient: "from-blue-500/20 to-cyan-400/20",
+        gradient: "from-info/20 to-primary/20",
         icon: Home,
         title: "Người thuê",
         description: "Tìm kiếm không gian sống lý tưởng",
@@ -23,9 +24,9 @@ const roleConfig = {
         ],
     },
     LANDLORD: {
-        color: "text-chart-2",
-        bgColor: "bg-chart-2/10",
-        gradient: "from-orange-500/20 to-amber-400/20",
+        color: "text-warning",
+        bgColor: "bg-warning/10",
+        gradient: "from-warning/20 to-primary/10",
         icon: Building2,
         title: "Chủ nhà",
         description: "Quản lý toà nhà & cư dân hiệu quả",
@@ -56,8 +57,14 @@ export function RoleBackground({ role }: RoleBackgroundProps) {
                     <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br ${config.gradient} opacity-20 mix-blend-screen transition-all duration-1000`} />
 
                     {/* Ambient Orbs */}
-                    <div className={`absolute top-[-20%] left-[-10%] w-[800px] h-[800px] rounded-full blur-[150px] ${role === 'TENANT' ? 'bg-info/20' : 'bg-chart-2/20'} opacity-30 animate-pulse-slow`} />
-                    <div className={`absolute bottom-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full blur-[150px] ${role === 'TENANT' ? 'bg-chart-5/10' : 'bg-warning/10'} opacity-30`} />
+                    <div className={cn(
+                        "absolute top-[-20%] left-[-10%] w-[800px] h-[800px] rounded-full blur-[150px] opacity-30 animate-pulse-slow",
+                        role === 'TENANT' ? 'bg-info/20' : 'bg-warning/20'
+                    )} />
+                    <div className={cn(
+                        "absolute bottom-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full blur-[150px] opacity-30",
+                        role === 'TENANT' ? 'bg-primary/10' : 'bg-warning/10'
+                    )} />
 
                     {/* 2. Large Symbolic Watermark */}
                     <Icon className={`absolute bottom-[-5%] -left-[5%] w-[800px] h-[800px] ${config.color} opacity-[0.03] stroke-[0.5px] -rotate-12 transition-all duration-1000`} />

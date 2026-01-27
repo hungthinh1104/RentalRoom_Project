@@ -80,7 +80,7 @@ export class NotificationsGateway
 
       // Join user's personal notification room
       const userRoom = `user:${userId}`;
-      client.join(userRoom);
+      await client.join(userRoom);
 
       // Track user connections
       if (!this.userConnections.has(userId)) {

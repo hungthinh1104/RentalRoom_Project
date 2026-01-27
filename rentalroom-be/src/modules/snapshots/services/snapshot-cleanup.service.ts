@@ -62,7 +62,7 @@ export class SnapshotCleanupService {
           if (isOrphaned) {
             orphaned.push(snapshot);
           }
-        } catch (err) {
+        } catch (_err) {
           // Entity might not exist, mark as orphaned
           orphaned.push(snapshot);
         }

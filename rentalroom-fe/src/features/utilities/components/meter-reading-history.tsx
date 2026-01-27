@@ -33,7 +33,7 @@ export function MeterReadingHistory({
         </CardHeader>
         <CardContent>
           <div className="flex justify-center py-8">
-            <div className="text-gray-500">Đang tải...</div>
+            <div className="text-muted-foreground font-medium">Đang tải...</div>
           </div>
         </CardContent>
       </Card>
@@ -48,7 +48,7 @@ export function MeterReadingHistory({
         </CardHeader>
         <CardContent>
           <div className="flex justify-center py-8">
-            <div className="text-gray-500">Chưa có dữ liệu</div>
+            <div className="text-muted-foreground font-medium">Chưa có dữ liệu</div>
           </div>
         </CardContent>
       </Card>
@@ -105,7 +105,7 @@ export function MeterReadingHistory({
                         currency: 'VND',
                       })}
                     </TableCell>
-                    <TableCell className="text-sm text-gray-500">
+                    <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(reading.createdAt), 'dd/MM/yyyy', {
                         locale: vi,
                       })}

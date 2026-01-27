@@ -130,13 +130,13 @@ export function PaymentStatusPoller({
 
     if (data?.status === "ACTIVE") {
         return (
-            <Card className="border-green-200 bg-green-50 dark:bg-green-900/10">
+            <Card className="border-success/20 bg-success/5">
                 <CardContent className="pt-6 flex flex-col items-center text-center space-y-4">
-                    <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-600 dark:text-green-400">
+                    <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center text-success">
                         <CheckCircle2 className="w-6 h-6" />
                     </div>
                     <div>
-                        <h3 className="text-xl font-bold text-green-700 dark:text-green-400">Thanh toán thành công</h3>
+                        <h3 className="text-xl font-bold text-success">Thanh toán thành công</h3>
                         <p className="text-muted-foreground">Hợp đồng đã được kích hoạt.</p>
                     </div>
                 </CardContent>
@@ -155,10 +155,10 @@ export function PaymentStatusPoller({
             <CardContent className="space-y-8 p-6">
 
                 {/* Timer Alert */}
-                <Alert variant="default" className="bg-amber-50 dark:bg-amber-950/30 border-amber-200">
-                    <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
-                    <AlertTitle className="text-amber-800 dark:text-amber-500">Đang chờ thanh toán</AlertTitle>
-                    <AlertDescription className="text-amber-700 dark:text-amber-400">
+                <Alert variant="default" className="bg-warning/5 border-warning/20">
+                    <Loader2 className="h-4 w-4 animate-spin text-warning" />
+                    <AlertTitle className="text-warning">Đang chờ thanh toán</AlertTitle>
+                    <AlertDescription className="text-warning/80">
                         Hợp đồng sẽ bị hủy sau: <span className="font-bold font-mono text-lg">{timeLeft}</span>
                     </AlertDescription>
                 </Alert>
@@ -209,16 +209,16 @@ export function PaymentStatusPoller({
                             </div>
                         </div>
 
-                        <div className="space-y-1 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                            <label className="text-xs font-semibold uppercase text-blue-600 dark:text-blue-400">Nội dung chuyển khoản (Bắt buộc)</label>
+                        <div className="space-y-1 p-3 bg-info/5 rounded-lg border border-info/10">
+                            <label className="text-xs font-semibold uppercase text-info">Nội dung chuyển khoản (Bắt buộc)</label>
                             <div className="flex items-center justify-between gap-2 mt-1">
-                                <span className="text-lg font-mono font-bold text-blue-700 dark:text-blue-300">{paymentRef}</span>
+                                <span className="text-lg font-mono font-bold text-info">{paymentRef}</span>
                                 <Button variant="secondary" size="sm" onClick={() => copyToClipboard(paymentRef, "nội dung")}>
                                     <Copy className="h-3.5 w-3.5 mr-1.5" />
                                     Sao chép
                                 </Button>
                             </div>
-                            <p className="text-[10px] text-blue-500 mt-1">
+                            <p className="text-[10px] text-info/70 mt-1">
                                 * Hệ thống tự động xác nhận dựa trên nội dung này. Vui lòng điền chính xác.
                             </p>
                         </div>

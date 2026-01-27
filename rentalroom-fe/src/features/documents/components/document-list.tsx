@@ -52,7 +52,7 @@ const formatType = (type: UserDocumentType) => {
     }
 };
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string): "default" | "destructive" | "secondary" | "outline" => {
     switch (status) {
         case 'VALID': return 'default'; // primary
         case 'EXPIRED': return 'destructive';
@@ -127,7 +127,7 @@ export function DocumentList({ documents, isLoading }: DocumentListProps) {
                                 </TableCell>
                                 <TableCell>{formatType(doc.type)}</TableCell>
                                 <TableCell>
-                                    <Badge variant={getStatusColor(doc.status) as any}>
+                                    <Badge variant={getStatusColor(doc.status)}>
                                         {getStatusLabel(doc.status)}
                                     </Badge>
                                 </TableCell>
@@ -158,7 +158,7 @@ export function DocumentList({ documents, isLoading }: DocumentListProps) {
                                                 <Download className="mr-2 h-4 w-4" /> Tải xuống
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
-                                                className="text-red-600 focus:text-red-600"
+                                                className="text-destructive focus:text-destructive"
                                                 onClick={() => setDeleteId(doc.id)}
                                             >
                                                 <Trash className="mr-2 h-4 w-4" /> Xóa
@@ -189,7 +189,7 @@ export function DocumentList({ documents, isLoading }: DocumentListProps) {
                                     setDeleteId(null);
                                 }
                             }}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-destructive hover:bg-destructive/90"
                         >
                             Xóa
                         </AlertDialogAction>

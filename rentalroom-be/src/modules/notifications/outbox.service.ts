@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../database/prisma/prisma.service';
 import { EmailService } from '../../common/services/email.service';
-import { OutboxStatus, NotificationType } from '@prisma/client';
+import { EmailDeliveryStatus, NotificationType } from '@prisma/client';
 
 /**
  * Outbox Pattern Implementation
@@ -50,15 +50,17 @@ export class NotificationOutboxService {
     notificationType: NotificationType,
     userId: string,
   ): Promise<void> {
-    await this.prisma.notificationOutbox.create({
+    await this.prisma.notification.create({
       data: {
-        email,
-        subject,
-        bodyHtml,
-        notificationType,
         userId,
-        status: 'PENDING',
-        retryCount: 0,
+        title: subject,
+        content: bodyHtml,
+        notificationType,
+        emailTo: email,
+        emailSubject: subject,
+        emailBodyHtml: bodyHtml,
+        emailStatus: EmailDeliveryStatus.PENDING,
+        emailRetryCount: 0,
       },
     });
 
@@ -75,24 +77,22 @@ export class NotificationOutboxService {
       // Find messages that are:
       // 1. PENDING (never attempted) OR
       // 2. Past retry deadline
-      const pendingMessages = await this.prisma.notificationOutbox.findMany({
+      const pendingMessages = await this.prisma.notification.findMany({
         where: {
           OR: [
-            { status: 'PENDING' },
-            {
-              status: 'FAILED_PERMANENT',
-              nextRetryAt: null, // Only retry if nextRetryAt set
-            },
+            { emailStatus: EmailDeliveryStatus.PENDING },
+            { emailStatus: EmailDeliveryStatus.FAILED_TEMPORARY },
           ],
           // Ensure we don't process message before its retry time
           AND: [
             {
               OR: [
-                { nextRetryAt: null }, // Never tried
-                { nextRetryAt: { lte: new Date() } }, // Retry window passed
+                { emailNextRetryAt: null }, // Never tried
+                { emailNextRetryAt: { lte: new Date() } }, // Retry window passed
               ],
             },
           ],
+          emailTo: { not: null },
         },
         orderBy: { createdAt: 'asc' },
         take: 10, // Process max 10 at a time to avoid overwhelming
@@ -117,59 +117,71 @@ export class NotificationOutboxService {
    * Process a single outbox message
    */
   private async processMessage(message: any): Promise<void> {
-    const { id, email, subject, bodyHtml, retryCount, maxRetries } = message;
+    const {
+      id,
+      emailTo,
+      emailSubject,
+      emailBodyHtml,
+      emailRetryCount,
+      emailMaxRetries,
+    } = message;
 
     try {
       // Attempt email delivery
-      await this.emailService.sendEmail(email, subject, bodyHtml);
+      await this.emailService.sendEmail(
+        emailTo,
+        emailSubject || 'Notification',
+        emailBodyHtml || '',
+      );
 
       // ✅ SUCCESS: Mark as sent
-      await this.prisma.notificationOutbox.update({
+      await this.prisma.notification.update({
         where: { id },
         data: {
-          status: 'SENT',
-          sentAt: new Date(),
+          emailStatus: EmailDeliveryStatus.SENT,
+          emailSentAt: new Date(),
         },
       });
 
       this.logger.log(
-        `✅ Email sent successfully to ${email} (ID: ${id.substring(0, 8)}...)`,
+        `✅ Email sent successfully to ${emailTo} (ID: ${id.substring(0, 8)}...)`,
       );
     } catch (error) {
       // ❌ FAILURE: Determine if retriable
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `❌ Failed to send email to ${email} (attempt ${retryCount + 1}/${maxRetries}): ${errorMsg}`,
+        `❌ Failed to send email to ${emailTo} (attempt ${emailRetryCount + 1}/${emailMaxRetries}): ${errorMsg}`,
       );
 
-      if (retryCount >= maxRetries - 1) {
+      if (emailRetryCount >= emailMaxRetries - 1) {
         // MAX RETRIES EXCEEDED: Mark permanent failure
-        await this.prisma.notificationOutbox.update({
+        await this.prisma.notification.update({
           where: { id },
           data: {
-            status: 'FAILED_PERMANENT',
-            failureReason: errorMsg,
-            retryCount: retryCount + 1,
+            emailStatus: EmailDeliveryStatus.FAILED_PERMANENT,
+            emailFailureReason: errorMsg,
+            emailRetryCount: emailRetryCount + 1,
           },
         });
 
         this.logger.error(
-          `🚨 Email delivery FAILED after ${maxRetries} attempts for ${email}. Manual intervention required.`,
+          `🚨 Email delivery FAILED after ${emailMaxRetries} attempts for ${emailTo}. Manual intervention required.`,
         );
 
         // TODO: Alert admin via Slack/PagerDuty
         // await this.alertingService.alertFailedEmailDelivery(message);
       } else {
         // RETRIABLE: Schedule next attempt with backoff
-        const nextRetryDelay = this.RETRY_DELAYS[retryCount] || 960; // 16 min as fallback
+        const nextRetryDelay = this.RETRY_DELAYS[emailRetryCount] || 960; // 16 min as fallback
         const nextRetryAt = new Date(Date.now() + nextRetryDelay * 1000);
 
-        await this.prisma.notificationOutbox.update({
+        await this.prisma.notification.update({
           where: { id },
           data: {
-            retryCount: retryCount + 1,
-            nextRetryAt,
-            failureReason: errorMsg,
+            emailRetryCount: emailRetryCount + 1,
+            emailNextRetryAt: nextRetryAt,
+            emailFailureReason: errorMsg,
+            emailStatus: EmailDeliveryStatus.FAILED_TEMPORARY,
           },
         });
 
@@ -185,12 +197,12 @@ export class NotificationOutboxService {
    * Useful for checking if email was successfully sent
    */
   async getDeliveryStatus(notificationId: string): Promise<{
-    status: OutboxStatus;
+    status: EmailDeliveryStatus;
     sentAt?: Date;
     failureReason?: string;
     retryCount: number;
   }> {
-    const message = await this.prisma.notificationOutbox.findUnique({
+    const message = await this.prisma.notification.findUnique({
       where: { id: notificationId },
     });
 
@@ -199,10 +211,10 @@ export class NotificationOutboxService {
     }
 
     return {
-      status: message.status,
-      sentAt: message.sentAt ?? undefined,
-      failureReason: message.failureReason ?? undefined,
-      retryCount: message.retryCount,
+      status: message.emailStatus,
+      sentAt: message.emailSentAt ?? undefined,
+      failureReason: message.emailFailureReason ?? undefined,
+      retryCount: message.emailRetryCount,
     };
   }
 
@@ -214,15 +226,24 @@ export class NotificationOutboxService {
   async cleanupOldMessages(): Promise<void> {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const deleted = await this.prisma.notificationOutbox.deleteMany({
+    const cleaned = await this.prisma.notification.updateMany({
       where: {
-        status: 'SENT',
-        sentAt: { lt: thirtyDaysAgo },
+        emailStatus: EmailDeliveryStatus.SENT,
+        emailSentAt: { lt: thirtyDaysAgo },
+      },
+      data: {
+        emailBodyHtml: null,
+        emailSubject: null,
+        emailFailureReason: null,
+        emailNextRetryAt: null,
+        emailRetryCount: 0,
       },
     });
 
-    if (deleted.count > 0) {
-      this.logger.log(`🗑️  Cleaned up ${deleted.count} old notification records`);
+    if (cleaned.count > 0) {
+      this.logger.log(
+        `🧹 Cleaned email payloads for ${cleaned.count} old notifications`,
+      );
     }
   }
 }

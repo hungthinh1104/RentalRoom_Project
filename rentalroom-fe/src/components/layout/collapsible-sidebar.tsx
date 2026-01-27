@@ -25,14 +25,20 @@ export function CollapsibleSidebar({ role, className }: CollapsibleSidebarProps)
     const [isPinned, setIsPinned] = useState(true);
 
     // Sync with localStorage on mount (client-side only behavior)
+    // Sync with localStorage on mount (client-side only behavior)
     useEffect(() => {
         const pinned = localStorage.getItem('sidebar-pinned');
         if (pinned !== null) {
             setIsPinned(pinned === 'true');
         }
+        // Delay hydration signal to ensure the initial state snap (duration: 0) takes effect
+        // BEFORE we enable the spring animation. This prevents the "flash/bounce" on load.
+        const timer = setTimeout(() => setIsHydrated(true), 200);
+        return () => clearTimeout(timer);
     }, []);
 
     const [isHovered, setIsHovered] = useState(false);
+    const [isHydrated, setIsHydrated] = useState(false);
 
     const handlePinToggle = () => {
         const newPinned = !isPinned;
@@ -49,12 +55,12 @@ export function CollapsibleSidebar({ role, className }: CollapsibleSidebarProps)
             animate={{
                 width: isExpanded ? 280 : 88,
             }}
-            transition={{
+            transition={isHydrated ? {
                 type: "spring",
                 stiffness: 300,
-                damping: 30, // Slightly less damping for subtle bounce, effectively smooth
+                damping: 30,
                 mass: 0.8
-            }}
+            } : { duration: 0 }} // Prepare instant snap for hydration sync
             className={cn(
                 'hidden lg:flex flex-col',
                 'fixed left-4 top-24 bottom-4 z-40', // Floating Position

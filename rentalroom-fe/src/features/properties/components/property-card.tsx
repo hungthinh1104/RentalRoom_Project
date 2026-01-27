@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Building2, MapPin, Home, Zap, AlertCircle, CheckCircle2, DoorOpen, Edit2, Trash2, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -162,9 +164,9 @@ export function PropertyCard({ property, isLandlordView = false, viewMode = 'gri
         <div className="grid grid-cols-2 gap-4">
           {[
             { label: "Tổng phòng", value: totalRooms, icon: DoorOpen, color: "text-muted-foreground" },
-            { label: "Phòng trống", value: availableRooms, icon: Zap, color: "text-emerald-600 dark:text-emerald-400" },
-            { label: "Đã thuê", value: occupiedRooms, icon: CheckCircle2, color: "text-blue-600 dark:text-blue-400" },
-            { label: "Bảo trì", value: maintenanceRooms, icon: AlertCircle, color: "text-orange-600 dark:text-orange-400" }
+            { label: "Phòng trống", value: availableRooms, icon: Zap, color: "text-success" },
+            { label: "Đã thuê", value: occupiedRooms, icon: CheckCircle2, color: "text-info" },
+            { label: "Bảo trì", value: maintenanceRooms, icon: AlertCircle, color: "text-warning" }
           ].map((stat, i) => (
             <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border hover:border-border transition-colors">
               <stat.icon className={cn("size-4 flex-shrink-0", stat.color)} />

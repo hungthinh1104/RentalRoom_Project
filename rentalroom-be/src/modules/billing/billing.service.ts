@@ -2,17 +2,14 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger,
   InternalServerErrorException,
-  BadRequestException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationOutboxService } from '../notifications/outbox.service';
 import { NotificationType } from '../notifications/entities';
 import { IncomeService } from '../income/income.service';
-import { IncomeType } from '../income/entities/income.entity';
 import { SnapshotService } from '../snapshots/snapshot.service';
 import { StateTransitionLogger } from '../../shared/state-machines/transition-logger.service';
 import {
@@ -24,16 +21,17 @@ import {
 } from './dto';
 import { PaginatedResponse } from 'src/shared/dtos';
 import { plainToClass } from 'class-transformer';
-import { InvoiceStatus } from './entities';
-import { UserRole } from '../users/entities';
+import { InvoiceStatus, UserRole, Prisma } from '@prisma/client';
 import {
   PaymentMethod,
   PaymentStatus,
 } from '../payments/entities/payment.entity';
-import { v4 as uuidv4 } from 'uuid';
 import { EventStoreService } from 'src/shared/event-sourcing/event-store.service';
 import { StateMachineGuard } from 'src/shared/state-machine/state-machine.guard';
-import { ImmutabilityGuard, IdempotencyGuard } from 'src/shared/guards/immutability.guard';
+import {
+  ImmutabilityGuard,
+  IdempotencyGuard,
+} from 'src/shared/guards/immutability.guard';
 
 @Injectable()
 export class BillingService {
@@ -42,7 +40,6 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
-    private readonly notificationOutbox: NotificationOutboxService,
     private readonly incomeService: IncomeService,
     private readonly snapshotService: SnapshotService,
     private readonly stateLogger: StateTransitionLogger,
@@ -172,29 +169,6 @@ export class BillingService {
           data: { snapshotId },
         });
 
-        // 📧 ENQUEUE EMAIL: Add to outbox for at-least-once delivery
-        // CRITICAL: This happens INSIDE transaction for atomicity
-        const tenantUser = invoice.contract.tenant.user;
-
-        if (tenantUser && tenantUser.email) {
-          await this.notificationOutbox.enqueueNotification(
-            tenantUser.email,
-            `[Smart Room] Hóa đơn mới - ${invoice.invoiceNumber}`,
-            `
-              <h2>Hóa đơn mới đã được tạo</h2>
-              <p>Hóa đơn <strong>${invoice.invoiceNumber}</strong> cho phòng <strong>${invoice.contract.room.roomNumber}</strong></p>
-              <h3>Số tiền: ${Number(invoice.totalAmount).toLocaleString('vi-VN')} VNĐ</h3>
-              <p><strong>Hạn thanh toán:</strong> ${new Date(invoice.dueDate).toLocaleDateString('vi-VN')}</p>
-              <a href="${process.env.FRONTEND_URL}/dashboard/tenant/invoices/${invoice.id}" 
-                 style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Xem & Thanh toán
-              </a>
-            `,
-            NotificationType.PAYMENT,
-            invoice.contract.tenantId,
-          );
-        }
-
         return invoice;
       })
       .then((invoice) => {
@@ -208,8 +182,8 @@ export class BillingService {
               notificationType: NotificationType.PAYMENT,
               relatedEntityId: invoice.id,
             })
-            .catch((err) =>
-              this.logger.error('Failed to send real-time notification', err),
+            .catch((_err) =>
+              this.logger.error('Failed to send real-time notification', _err),
             );
         } catch (error) {
           this.logger.error('Notification gateway error', error);
@@ -429,9 +403,21 @@ export class BillingService {
   async markAsPaid(
     id: string,
     user: { id: string; role: UserRole },
-    idempotencyKey?: string,
+    idempotencyKey: string,
   ) {
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency-Key header required');
+    }
+
+    this.logger.log(
+      `[IDEMPOTENT] markAsPaid: invoiceId=${id}, userId=${user.id}, key=${idempotencyKey}`,
+    );
+
     return await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM invoice WHERE id = ${id} FOR UPDATE`,
+      );
+
       // 🔐 ROW LOCK: Prevent concurrent modifications
       const invoice = await tx.invoice.findUnique({
         where: { id },
@@ -455,9 +441,7 @@ export class BillingService {
 
       // ✅ IDEMPOTENCY: Early return if already paid
       if (invoice.status === InvoiceStatus.PAID) {
-        this.logger.warn(
-          `Invoice ${id} already paid (idempotency protected)`,
-        );
+        this.logger.warn(`Invoice ${id} already paid (idempotency protected)`);
         return {
           ...invoice,
           totalAmount: Number(invoice.totalAmount),
@@ -471,22 +455,19 @@ export class BillingService {
         );
       }
 
-      // Optional: Store idempotency key to detect retries
-      if (idempotencyKey) {
-        const existingOperation = await tx.$queryRaw<any[]>`
-          SELECT * FROM idempotent_operations 
-          WHERE idempotency_key = ${idempotencyKey} 
-          AND entity_type = 'INVOICE_PAYMENT' 
-          AND entity_id = ${id}
-          LIMIT 1
-        `;
-        if (existingOperation && existingOperation.length > 0) {
-          this.logger.warn(
-            `Duplicate operation detected for key ${idempotencyKey}`,
-          );
-          // Return existing result from idempotent_operations.result_data
-          return existingOperation[0].result_data;
-        }
+      const existingOperation = await tx.$queryRaw<any[]>`
+        SELECT * FROM idempotent_operations 
+        WHERE idempotency_key = ${idempotencyKey} 
+        AND entity_type = 'INVOICE_PAYMENT' 
+        AND entity_id = ${id}
+        LIMIT 1
+      `;
+      if (existingOperation && existingOperation.length > 0) {
+        this.logger.warn(
+          `Duplicate operation detected for key ${idempotencyKey}`,
+        );
+        // Return existing result from idempotent_operations.result_data
+        return existingOperation[0].result_data;
       }
 
       const paid = await tx.invoice.update({
@@ -506,7 +487,7 @@ export class BillingService {
       });
 
       // � LOG STATE TRANSITION: Invoice PENDING → PAID
-      await this.stateLogger.logTransitionSafe({
+      this.stateLogger.logTransitionSafe({
         entityType: 'invoice',
         entityId: id,
         oldStatus: InvoiceStatus.PENDING,
@@ -539,14 +520,11 @@ export class BillingService {
         data: { snapshotId: paymentSnapshotId },
       });
 
-      // Store idempotency result if key provided
-      if (idempotencyKey) {
-        await tx.$executeRaw`
-          INSERT INTO idempotent_operations (idempotency_key, entity_type, entity_id, result_data, created_at)
-          VALUES (${idempotencyKey}, 'INVOICE_PAYMENT', ${id}, ${JSON.stringify({ totalAmount: Number(paid.totalAmount) })}, NOW())
-          ON CONFLICT (idempotency_key) DO NOTHING
-        `;
-      }
+      await tx.$executeRaw`
+        INSERT INTO idempotent_operations (idempotency_key, entity_type, entity_id, result_data, created_at)
+        VALUES (${idempotencyKey}, 'INVOICE_PAYMENT', ${id}, ${JSON.stringify({ totalAmount: Number(paid.totalAmount) })}, NOW())
+        ON CONFLICT (idempotency_key) DO NOTHING
+      `;
 
       return {
         ...paid,
@@ -721,9 +699,29 @@ export class BillingService {
       readings: Array<{ serviceId: string; currentReading: number }>;
     },
     actor?: { id: string; role: UserRole }, // Optional: enforce landlord role
+    idempotencyKey?: string,
   ) {
+    if (!idempotencyKey) {
+      throw new BadRequestException('Idempotency-Key header required');
+    }
+
+    const existingOperation = await this.prisma.$queryRaw<any[]>`
+      SELECT * FROM idempotent_operations
+      WHERE idempotency_key = ${idempotencyKey}
+      AND entity_type = 'METER_READING_SUBMIT'
+      AND entity_id = ${dto.contractId}
+      LIMIT 1
+    `;
+    if (existingOperation && existingOperation.length > 0) {
+      return existingOperation[0].result_data;
+    }
+
     // 🔒 AUTHORIZATION: If actor provided, verify landlord role
-    if (actor && actor.role !== UserRole.LANDLORD && actor.role !== UserRole.ADMIN) {
+    if (
+      actor &&
+      actor.role !== UserRole.LANDLORD &&
+      actor.role !== UserRole.ADMIN
+    ) {
       throw new ForbiddenException(
         'Only landlords can submit meter readings. Tenants may provide readings but landlord must confirm.',
       );
@@ -747,6 +745,19 @@ export class BillingService {
 
     if (!contract) {
       throw new NotFoundException(`Contract ${dto.contractId} not found`);
+    }
+
+    const existingMonthReadings = await this.prisma.meterReading.findFirst({
+      where: {
+        contractId: dto.contractId,
+        month: dto.month,
+      },
+    });
+
+    if (existingMonthReadings) {
+      throw new BadRequestException(
+        `Meter readings already submitted for contract ${dto.contractId} in month ${dto.month}`,
+      );
     }
 
     const createdReadings: any[] = [];
@@ -832,7 +843,7 @@ export class BillingService {
       }
     }
 
-    return {
+    const result = {
       contractId: dto.contractId,
       month: dto.month,
       readings: createdReadings,
@@ -841,6 +852,14 @@ export class BillingService {
         0,
       ),
     };
+
+    await this.prisma.$executeRaw`
+      INSERT INTO idempotent_operations (idempotency_key, entity_type, entity_id, result_data, created_at)
+      VALUES (${idempotencyKey}, 'METER_READING_SUBMIT', ${dto.contractId}, ${JSON.stringify(result)}, NOW())
+      ON CONFLICT (idempotency_key) DO NOTHING
+    `;
+
+    return result;
   }
 
   /**
@@ -901,11 +920,12 @@ export class BillingService {
   ) {
     // 1. Optional: Submit readings if provided
     if (options?.readings && options.readings.length > 0) {
+      const generatedIdempotencyKey = `UTIL-READINGS-${contractId}-${month}`;
       await this.submitMeterReadingsForLandlord({
         contractId,
         month,
         readings: options.readings,
-      });
+      }, user, generatedIdempotencyKey);
     }
 
     // Verify contract exists
@@ -942,10 +962,11 @@ export class BillingService {
     // Check if invoice already exists for this month
     // Updated check to be more specific or allow regeneration?
     // For now, strict check to prevent duplicates
+    const expectedInvoiceNumber = `UTL-${month}-${contractId.substring(0, 8)}`;
     const existingInvoice = await this.prisma.invoice.findFirst({
       where: {
         contractId,
-        invoiceNumber: { contains: `UTL-${month}` },
+        invoiceNumber: expectedInvoiceNumber,
       },
     });
 
@@ -1225,7 +1246,7 @@ export class BillingService {
       const invoiceTotal = Number(invoice.totalAmount);
 
       // Update invoice status
-      let newStatus = InvoiceStatus.PENDING;
+      let newStatus: InvoiceStatus = InvoiceStatus.PENDING;
       if (totalPaid >= invoiceTotal) {
         newStatus = InvoiceStatus.PAID;
       } else if (totalPaid > 0) {

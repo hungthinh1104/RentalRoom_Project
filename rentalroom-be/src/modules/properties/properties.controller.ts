@@ -7,17 +7,14 @@ import {
   Param,
   Delete,
   Query,
-  UseInterceptors,
   UseGuards,
 } from '@nestjs/common';
-import { CacheInterceptor } from '@nestjs/cache-manager';
 import { PropertiesService } from './properties.service';
 import {
   CreatePropertyDto,
   UpdatePropertyDto,
   FilterPropertiesDto,
 } from './dto';
-import { CacheTTL } from '../../common/decorators/cache.decorator';
 import { UserRole } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { Auth } from 'src/common/decorators/auth.decorator';

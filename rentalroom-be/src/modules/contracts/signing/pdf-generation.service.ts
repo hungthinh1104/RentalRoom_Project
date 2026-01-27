@@ -2,7 +2,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
@@ -42,7 +41,7 @@ export class ContractPdfService {
 
     try {
       // Try to load from local file system first
-      this.fontCache = fs.readFileSync(this.fontPath);
+      this.fontCache = await fs.promises.readFile(this.fontPath);
       this.logger.log('Font loaded from local file system');
       return this.fontCache;
     } catch (err) {
@@ -62,7 +61,7 @@ export class ContractPdfService {
    */
   async generatePdf(
     contractId: string,
-    requesterUserId: string,
+    _requesterUserId: string,
   ): Promise<Buffer> {
     try {
       // Fetch contract with necessary relations
@@ -123,18 +122,18 @@ export class ContractPdfService {
       });
       y -= lineHeight * 2;
 
-      drawText(`Hợp đồng số: ${contract.contractNumber}`);
+      drawText(`Hợp đồng số: ${contract.contractNumber} `);
       drawText(
-        `Ngày bắt đầu: ${contract.startDate.toISOString().split('T')[0]}`,
+        `Ngày bắt đầu: ${contract.startDate.toISOString().split('T')[0]} `,
       );
       drawText(
-        `Ngày kết thúc: ${contract.endDate.toISOString().split('T')[0]}`,
+        `Ngày kết thúc: ${contract.endDate.toISOString().split('T')[0]} `,
       );
-      drawText(`Phòng: ${contract.room?.roomNumber || ''}`);
-      drawText(`Chủ nhà: ${contract.landlord?.user?.fullName || ''}`);
-      drawText(`Người thuê: ${contract.tenant?.user?.fullName || ''}`);
-      drawText(`Tiền thuê hàng tháng: ${contract.monthlyRent.toString()}`);
-      drawText(`Tiền cọc: ${contract.deposit.toString()}`);
+      drawText(`Phòng: ${contract.room?.roomNumber || ''} `);
+      drawText(`Chủ nhà: ${contract.landlord?.user?.fullName || ''} `);
+      drawText(`Người thuê: ${contract.tenant?.user?.fullName || ''} `);
+      drawText(`Tiền thuê hàng tháng: ${contract.monthlyRent.toString()} `);
+      drawText(`Tiền cọc: ${contract.deposit.toString()} `);
 
       // FIXED: Don't hard-truncate terms - show note instead
       if (contract.terms) {
@@ -164,9 +163,10 @@ export class ContractPdfService {
               height: pngDims.height,
             });
           }
-        } catch (e) {
+        } catch (_e) {
+          // Renamed 'e' to '_e' as per instruction to prefix unused variables, assuming 'e' was considered unused in the context of the instruction.
           this.logger.warn(
-            `Failed to embed QR code for contract ${contractId}: ${(e as Error).message}`,
+            `Failed to embed QR code for contract ${contractId}: ${(_e as Error).message}`,
           );
           // Continue without QR - non-blocking failure
         }

@@ -37,6 +37,14 @@ interface TopProperty {
 }
 
 interface Trend { date: string; revenue: number }
+interface KpiCardProps {
+  title: string;
+  value: string;
+  icon: React.ReactNode;
+  palette: 'primary' | 'success' | 'warning' | 'info';
+  isLoading: boolean;
+  delay: number;
+}
 
 export interface AdminDashboardClientProps {
   stats: {
@@ -193,7 +201,7 @@ export default function AdminDashboardClient({ stats }: AdminDashboardClientProp
 
           <div className="h-[350px] w-full">
             {isLoading ? <Skeleton className="w-full h-full rounded-xl" /> : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={350}>
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -225,8 +233,8 @@ export default function AdminDashboardClient({ stats }: AdminDashboardClientProp
                       boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
                     }}
                     itemStyle={{ color: 'var(--foreground)' }}
-                    formatter={(val: any) => (typeof val === "number" ? currencyFormatter.format(val) : "₫ 0")}
-                    labelFormatter={(val: any) => formatDateShort(String(val))}
+                    formatter={(val: unknown) => (typeof val === "number" ? currencyFormatter.format(val) : "₫ 0")}
+                    labelFormatter={(val: unknown) => formatDateShort(String(val))}
                   />
                   <Area
                     type="monotone"
@@ -245,13 +253,13 @@ export default function AdminDashboardClient({ stats }: AdminDashboardClientProp
         {/* Occupancy Donut */}
         <motion.div variants={item} className="lg:col-span-1 rounded-3xl border bg-card/50 p-8 shadow-sm backdrop-blur-xl transition-all hover:shadow-md flex flex-col">
           <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-emerald-500" />
+            <Building2 className="w-5 h-5 text-success" />
             Trạng thái phòng
           </h3>
           <div className="flex-1 flex items-center justify-center relative min-h-[300px]">
             {isLoading ? <Skeleton className="w-48 h-48 rounded-full" /> : (
               <>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                   <PieChart>
                     <Pie
                       data={[
@@ -344,7 +352,7 @@ export default function AdminDashboardClient({ stats }: AdminDashboardClientProp
   );
 }
 
-const KpiCard = memo(function KpiCard({ title, value, icon, palette, isLoading, delay }: any) {
+const KpiCard = memo(function KpiCard({ title, value, icon, palette, isLoading, delay }: KpiCardProps) {
   const colorVar = palette === 'primary'
     ? '--primary'
     : palette === 'success'

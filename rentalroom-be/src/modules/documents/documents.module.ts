@@ -4,8 +4,8 @@ import { DocumentsController } from './documents.controller';
 import { PrismaService } from '../../database/prisma/prisma.service';
 
 @Module({
-    controllers: [DocumentsController],
-    providers: [DocumentsService, PrismaService],
-    exports: [DocumentsService],
+  controllers: [DocumentsController],
+  providers: [DocumentsService, PrismaService],
+  exports: [DocumentsService],
 })
-export class DocumentsModule { }
+export class DocumentsModule {}

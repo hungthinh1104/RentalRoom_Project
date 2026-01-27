@@ -130,7 +130,6 @@ export class SepayService {
   ): Promise<{ success: boolean; qrUrl?: string; error?: string }> {
     try {
       // Get landlord's payment config for bank details
-      // @ts-ignore
       const config = await this.prisma.paymentConfig.findUnique({
         where: { landlordId },
       });

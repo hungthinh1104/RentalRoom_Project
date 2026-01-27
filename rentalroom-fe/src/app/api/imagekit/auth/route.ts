@@ -10,14 +10,31 @@ interface ImageKitInstance {
     };
 }
 
-const imagekit = new ImageKit({
-    publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
-    privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-    urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
-} as unknown as { publicKey: string; privateKey: string; urlEndpoint: string }) as unknown as ImageKitInstance;
+// Initialize ImageKit only if credentials are available
+let imagekit: ImageKitInstance | null = null;
+
+try {
+    const publicKey = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY;
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    const urlEndpoint = process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT;
+
+    if (publicKey && privateKey && urlEndpoint) {
+        imagekit = new ImageKit({
+            publicKey,
+            privateKey,
+            urlEndpoint,
+        } as unknown as { publicKey: string; privateKey: string; urlEndpoint: string }) as unknown as ImageKitInstance;
+    }
+} catch (error) {
+    console.warn("ImageKit initialization skipped:", error);
+}
 
 export async function GET(req: NextRequest) {
     try {
+        if (!imagekit) {
+            return NextResponse.json({ error: "ImageKit not configured" }, { status: 503 });
+        }
+
         const session = await auth();
 
         if (!session) {

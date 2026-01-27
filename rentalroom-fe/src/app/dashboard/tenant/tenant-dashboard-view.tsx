@@ -48,8 +48,8 @@ interface TenantDashboardViewProps {
         payments: { items: Payment[]; total: number };
         recommendations: { items: RoomSummary[]; total: number };
         favorites: { items: FavoriteRoom[]; total: number };
-        maintenance: { items: any[]; total: number };
-        bookings: { items: any[]; total: number };
+        maintenance: { items: unknown[]; total: number };
+        bookings: { items: unknown[]; total: number };
     };
 }
 
@@ -92,14 +92,14 @@ export function TenantDashboardView({ user, data }: TenantDashboardViewProps) {
             {/* Hero Section */}
             <motion.div variants={item} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 glass-card p-10 rounded-[2.5rem] relative overflow-hidden group border-none shadow-2xl shadow-primary/5">
                 <div className="absolute top-0 right-0 -mt-20 -mr-20 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-soft"></div>
-                <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-blue-500/5 rounded-full blur-[80px]"></div>
+                <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-80 h-80 bg-info/5 rounded-full blur-[80px]"></div>
 
                 <div className="space-y-3 relative z-10 w-full max-w-2xl">
                     <div className="flex items-center gap-2">
-                        <Badge className="bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-none px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                        <Badge className="bg-success/20 text-success border-none px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest">
                             Verified Tenant
                         </Badge>
-                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                        <ShieldCheck className="w-4 h-4 text-success" />
                     </div>
                     <h1 className="text-4xl md:text-5xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground via-foreground to-foreground/50">
                         Xin chào, {user.name.split(' ').pop()}!
@@ -133,7 +133,7 @@ export function TenantDashboardView({ user, data }: TenantDashboardViewProps) {
 
                     <div className="h-[300px] w-full">
                         {paymentHistoryData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minHeight={300}>
                                 <BarChart data={paymentHistoryData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.3} />
                                     <XAxis
@@ -160,7 +160,7 @@ export function TenantDashboardView({ user, data }: TenantDashboardViewProps) {
                                         formatter={(val: number | undefined) => val !== undefined ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(val) : '₫ 0'}
                                     />
                                     <Bar dataKey="amount" radius={[4, 4, 0, 0]} maxBarSize={50}>
-                                        {paymentHistoryData.map((entry: any, index: number) => (
+                                        {paymentHistoryData.map((_entry: unknown, index: number) => (
                                             <Cell key={`cell-${index}`} fill="var(--primary)" fillOpacity={0.8} />
                                         ))}
                                     </Bar>
@@ -179,15 +179,15 @@ export function TenantDashboardView({ user, data }: TenantDashboardViewProps) {
                 {/* Item 2: Quick Stats */}
                 <motion.div variants={item} className="md:col-span-1 rounded-[2rem] border bg-card/50 p-8 shadow-sm backdrop-blur-xl">
                     <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-blue-500" />
+                        <Activity className="w-5 h-5 text-info" />
                         Hoạt động
                     </h3>
                     <div className="grid grid-cols-2 gap-4 h-full content-start">
                         {[
-                            { label: "Hợp đồng", val: stats.contracts, icon: FileText, color: "bg-orange-500/10 text-orange-500" },
-                            { label: "Yêu cầu", val: stats.maintenance, icon: AlertCircle, color: "bg-blue-500/10 text-blue-500" },
-                            { label: "Đã lưu", val: favorites.total, icon: Heart, color: "bg-pink-500/10 text-pink-500" },
-                            { label: "Xem phòng", val: stats.bookings, icon: Calendar, color: "bg-purple-500/10 text-purple-500" },
+                            { label: "Hợp đồng", val: stats.contracts, icon: FileText, color: "bg-warning/10 text-warning" },
+                            { label: "Yêu cầu", val: stats.maintenance, icon: AlertCircle, color: "bg-info/10 text-info" },
+                            { label: "Đã lưu", val: favorites.total, icon: Heart, color: "bg-primary/10 text-primary" },
+                            { label: "Xem phòng", val: stats.bookings, icon: Calendar, color: "bg-accent-purple/10 text-accent-purple" },
                         ].map((s, idx) => (
                             <div key={idx} className={cn("flex flex-col items-center justify-center p-4 rounded-3xl bg-background/50 border hover:bg-background transition-all cursor-default group")}>
                                 <div className={cn("p-3 rounded-2xl mb-2 transition-transform group-hover:scale-110", s.color)}>
@@ -225,8 +225,8 @@ export function TenantDashboardView({ user, data }: TenantDashboardViewProps) {
                                 ))}
                                 {payments.items.length === 0 && (
                                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-40">
-                                        <div className="p-4 bg-emerald-500/10 rounded-full mb-4">
-                                            <ShieldCheck className="w-8 h-8 text-emerald-500" />
+                                        <div className="p-4 bg-success/10 rounded-full mb-4">
+                                            <ShieldCheck className="w-8 h-8 text-success" />
                                         </div>
                                         <p className="text-sm font-bold uppercase tracking-widest">Đã thanh toán hết</p>
                                     </div>
@@ -246,7 +246,7 @@ export function TenantDashboardView({ user, data }: TenantDashboardViewProps) {
                         header={
                             <RecommendationList />
                         }
-                        icon={<Sparkles className="h-5 w-5 text-purple-500" />}
+                        icon={<Sparkles className="h-5 w-5 text-accent-purple" />}
                         className="glass-card border-none hover:shadow-2xl transition-all duration-500"
                     />
                 </motion.div>

@@ -22,25 +22,15 @@ services:
       context: ./rentalroom-be
       dockerfile: Dockerfile
     volumes:
-      - ./rentalroom-be:/app3000"
+      - ./rentalroom-be:/app
+      - /app/node_modules
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: development
       PORT: 3000
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/rental_room_db?sslmode=disable
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: password
-      REDIS_TTL: 3600
-      JWT_SECRET: super-secret-key-change-this-123
-      JWT_REFRESH_SECRET: super-secret-refresh-key
-      MAIL_HOST: smtp.gmail.com
-      MAIL_PORT: 587
-      MAIL_USER: smartroom.mail@gmail.com
-      MAIL_PASSWORD: dzen ethf wjjt vzot
-      GEMINI_API_KEY: AIzaSyC4dQqF8rpuXqt04BkXldzcTzWSsH4sZrk
-      ENCRYPTION_KEY: f809f4aab42f73980dd3f0c0811c88558aed799aa6b9d0fb535dc0e01a7ee00c
+    env_file:
+      - ./rentalroom-be/.env.development
     depends_on:
       - postgres
       - redis

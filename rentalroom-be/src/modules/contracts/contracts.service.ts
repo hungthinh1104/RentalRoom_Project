@@ -38,12 +38,12 @@ export class ContractsService {
     return this.applicationService.findOneApplication(id);
   }
 
-  async approveApplication(id: string, user: User) {
-    return this.applicationService.approveApplication(id, user);
+  async approveApplication(id: string, user: User, idempotencyKey: string) {
+    return this.applicationService.approveApplication(id, user, idempotencyKey);
   }
 
-  async rejectApplication(id: string, user: User) {
-    return this.applicationService.rejectApplication(id, user);
+  async rejectApplication(id: string, user: User, idempotencyKey: string) {
+    return this.applicationService.rejectApplication(id, user, idempotencyKey);
   }
 
   async withdrawApplication(id: string, userId: string) {
@@ -52,20 +52,20 @@ export class ContractsService {
 
   // --- Contracts ---
 
-  async create(createContractDto: CreateContractDto) {
-    return this.lifecycleService.create(createContractDto);
+  async create(createContractDto: CreateContractDto, user: User) {
+    return this.lifecycleService.create(createContractDto, user);
   }
 
   async findAll(filterDto: FilterContractsDto, user: User) {
     return this.lifecycleService.findAllContracts(filterDto, user);
   }
 
-  async findOne(id: string) {
-    return this.lifecycleService.findOne(id);
+  async findOne(id: string, user?: User) {
+    return this.lifecycleService.findOne(id, user);
   }
 
-  async getContractDetails(id: string) {
-    return this.lifecycleService.getContractDetails(id);
+  async getContractDetails(id: string, user?: User) {
+    return this.lifecycleService.getContractDetails(id, user);
   }
 
   async update(id: string, updateContractDto: UpdateContractDto, user: User) {

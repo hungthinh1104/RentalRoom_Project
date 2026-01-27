@@ -30,6 +30,7 @@ import {
   UploadModule,
   FavoritesModule,
   DocumentsModule,
+  AuditModule,
 } from './modules';
 import { ReportsModule } from './modules/reports/reports.module';
 import { AIModule } from './modules/ai/ai.module';
@@ -42,12 +43,13 @@ import { LegalDocumentsModule } from './modules/legal-documents/legal-documents.
 import { HealthModule } from './modules/health/health.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PCCCModule } from './modules/pccc/pccc.module';
-import { DisputeModule } from './modules/dispute/dispute.module';
+import { DisputeModule } from './modules/disputes/dispute.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { eKycModule } from './shared/integration/ekyc/ekyc.module';
 import { LegalInfrastructureModule } from './shared/legal-infrastructure.module';
 import { UtilitiesModule } from './shared/utilities/utilities.module';
 import { OperationalExpensesModule } from './modules/operational-expenses/operational-expenses.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -101,6 +103,8 @@ import { OperationalExpensesModule } from './modules/operational-expenses/operat
     UtilitiesModule, // Global utilities (ContractHashService, etc.)
     OperationalExpensesModule,
     DocumentsModule,
+    AuditModule,
+    MetricsModule, // Prometheus metrics endpoint
   ],
   providers: [
     PrismaService,

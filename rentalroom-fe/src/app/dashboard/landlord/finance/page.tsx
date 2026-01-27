@@ -207,8 +207,8 @@ export default function ThuChiPage() {
 
                     <div className="bg-card p-4 rounded-xl border shadow-sm flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                                <Receipt className="h-5 w-5 text-red-600 dark:text-red-400" />
+                            <div className="p-2 bg-destructive/10 rounded-lg">
+                                <Receipt className="h-5 w-5 text-destructive" />
                             </div>
                             <div>
                                 <h3 className="font-semibold">Chi tiết khoản chi</h3>

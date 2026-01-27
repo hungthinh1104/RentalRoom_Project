@@ -16,17 +16,17 @@ const statusConfig: Record<PaymentStatus, {
 }> = {
   [PaymentStatus.COMPLETED]: {
     label: "Đã thanh toán",
-    className: "bg-green-100 text-green-700 border-green-200 hover:bg-green-100",
+    className: "bg-success/10 text-success border-success/20 hover:bg-success/15",
     icon: CheckCircle,
   },
   [PaymentStatus.PENDING]: {
     label: "Chờ thanh toán",
-    className: "bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100",
+    className: "bg-warning/10 text-warning border-warning/20 hover:bg-warning/15",
     icon: Clock,
   },
   [PaymentStatus.FAILED]: {
     label: "Thất bại",
-    className: "bg-red-100 text-red-700 border-red-200 hover:bg-red-100",
+    className: "bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/15",
     icon: XCircle,
   },
 };
@@ -38,7 +38,7 @@ export function PaymentStatusBadge({
 }: PaymentStatusBadgeProps) {
   const config = statusConfig[status] || {
     label: status,
-    className: "bg-gray-100 text-gray-700 border-gray-200",
+    className: "bg-muted text-muted-foreground border-border",
     icon: Clock,
   };
 

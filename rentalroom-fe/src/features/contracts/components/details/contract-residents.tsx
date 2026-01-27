@@ -35,9 +35,11 @@ interface ContractResidentsProps {
     isOwner: boolean; // Landlord or Tenant of this contract
 }
 
+type Resident = NonNullable<Contract['residents']>[number];
+
 export function ContractResidents({ contract, isOwner }: ContractResidentsProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingResident, setEditingResident] = useState<any>(null);
+    const [editingResident, setEditingResident] = useState<Resident | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
     const addMutation = useAddResident();
@@ -49,7 +51,7 @@ export function ContractResidents({ contract, isOwner }: ContractResidentsProps)
         setIsModalOpen(true);
     };
 
-    const handleEdit = (resident: any) => {
+    const handleEdit = (resident: Resident) => {
         setEditingResident(resident);
         setIsModalOpen(true);
     };
@@ -66,7 +68,7 @@ export function ContractResidents({ contract, isOwner }: ContractResidentsProps)
         }
     };
 
-    const handleSubmit = async (data: any) => {
+    const handleSubmit = async (data: { fullName: string; phoneNumber?: string; citizenId?: string; relationship?: string }) => {
         try {
             if (editingResident) {
                 await updateMutation.mutateAsync({
@@ -83,9 +85,10 @@ export function ContractResidents({ contract, isOwner }: ContractResidentsProps)
                 toast.success("Thêm người ở thành công");
             }
             setIsModalOpen(false);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Extract error message from backend if available
-            const msg = error?.response?.data?.message || error.message || "Có lỗi xảy ra";
+            const err = error as { response?: { data?: { message?: string } }, message?: string };
+            const msg = err?.response?.data?.message || err.message || "Có lỗi xảy ra";
             toast.error(msg);
         }
     };
@@ -135,10 +138,10 @@ export function ContractResidents({ contract, isOwner }: ContractResidentsProps)
                         </TableHeader>
                         <TableBody>
                             {contract.residents && contract.residents.length > 0 ? (
-                                contract.residents.map((resident: any) => (
+                                contract.residents.map((resident: Resident) => (
                                     <TableRow key={resident.id}>
                                         <TableCell className="font-medium flex items-center gap-2">
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                                                 <User className="w-4 h-4" />
                                             </div>
                                             {resident.fullName}
@@ -160,8 +163,8 @@ export function ContractResidents({ contract, isOwner }: ContractResidentsProps)
                                                             Chỉnh sửa
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
-                                                            className="text-red-600"
-                                                            onClick={() => setDeletingId(resident.id)}
+                                                            className="text-destructive"
+                                                            onClick={() => setDeletingId(resident.id || null)}
                                                         >
                                                             <Trash className="mr-2 h-4 w-4" />
                                                             Xóa
@@ -205,7 +208,7 @@ export function ContractResidents({ contract, isOwner }: ContractResidentsProps)
                         <AlertDialogCancel>Hủy</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDelete}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="bg-destructive hover:bg-destructive/90"
                             disabled={removeMutation.isPending}
                         >
                             {removeMutation.isPending ? "Đang xóa..." : "Xóa"}

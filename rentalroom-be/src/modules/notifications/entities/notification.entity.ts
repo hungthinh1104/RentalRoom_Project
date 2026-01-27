@@ -10,11 +10,14 @@ export enum NotificationType {
 
 export class Notification {
   id: string;
-  userId: string;
+  userId?: string;
   title: string;
-  message: string;
-  type: NotificationType;
+  content: string;
+  notificationType: NotificationType;
   relatedEntityId?: string;
   isRead: boolean;
   createdAt: Date;
+  sentAt?: Date;
+  readAt?: Date;
+  deletedAt?: Date;
 }

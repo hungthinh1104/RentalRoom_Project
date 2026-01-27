@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/database/prisma/prisma.service';
-import { InvoiceStatus } from '../billing/entities';
-import { ContractStatus } from '@prisma/client';
+import { InvoiceStatus, ContractStatus } from '@prisma/client';
 
 export interface CashFlowAlert {
   type: 'overdue' | 'upcoming' | 'forecast' | 'success';

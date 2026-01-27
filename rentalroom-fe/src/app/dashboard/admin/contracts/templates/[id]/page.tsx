@@ -218,11 +218,13 @@ export default function ContractTemplateEditorPage() {
                                                                 </SelectTrigger>
                                                             </FormControl>
                                                             <SelectContent>
-                                                                {Object.values(ContractType).map((type) => (
-                                                                    <SelectItem key={type} value={type}>
-                                                                        {type}
-                                                                    </SelectItem>
-                                                                ))}
+                                                                {Object.values(ContractType)
+                                                                    .filter((type) => typeof type === 'string' && type.trim() !== '')
+                                                                    .map((type) => (
+                                                                        <SelectItem key={type} value={type}>
+                                                                            {type}
+                                                                        </SelectItem>
+                                                                    ))}
                                                             </SelectContent>
                                                         </Select>
                                                         <FormMessage />

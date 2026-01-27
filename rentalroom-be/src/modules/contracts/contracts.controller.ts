@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   BadRequestException,
+  Headers,
   Res,
   NotFoundException,
   HttpCode,
@@ -38,6 +39,7 @@ import { Auth } from 'src/common/decorators/auth.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { ContractPartyGuard } from '../../common/guards/contract-party.guard';
 import { AdminAuditService } from 'src/shared/audit/admin-audit.service';
+import { PrismaService } from 'src/database/prisma/prisma.service';
 
 @Controller('contracts')
 export class ContractsController {
@@ -47,6 +49,7 @@ export class ContractsController {
     private readonly pdfQueueService: PdfQueueService,
     private readonly contractPdfService: ContractPdfService,
     private readonly adminAudit: AdminAuditService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Patch(':id/handover')
@@ -85,14 +88,22 @@ export class ContractsController {
 
   @Patch('applications/:id/approve')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  approveApplication(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.contractsService.approveApplication(id, user);
+  approveApplication(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Headers('idempotency-key') idempotencyKey: string,
+  ) {
+    return this.contractsService.approveApplication(id, user, idempotencyKey);
   }
 
   @Patch('applications/:id/reject')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  rejectApplication(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.contractsService.rejectApplication(id, user);
+  rejectApplication(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+    @Headers('idempotency-key') idempotencyKey: string,
+  ) {
+    return this.contractsService.rejectApplication(id, user, idempotencyKey);
   }
 
   @Patch('applications/:id/withdraw')
@@ -128,8 +139,11 @@ export class ContractsController {
 
   @Post()
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
-  create(@Body() createContractDto: CreateContractDto) {
-    return this.contractsService.create(createContractDto);
+  create(
+    @Body() createContractDto: CreateContractDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.contractsService.create(createContractDto, user);
   }
 
   @Get()
@@ -141,18 +155,35 @@ export class ContractsController {
   @Get(':id')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   @UseGuards(ContractPartyGuard) // ✅ Only contract parties
-  findOne(@Param('id') id: string) {
-    return this.contractsService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contractsService.findOne(id, user);
   }
 
   @Patch(':id')
   @Auth(UserRole.ADMIN, UserRole.LANDLORD)
   @UseGuards(ContractPartyGuard) // ✅ Only landlord of this contract
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateContractDto: UpdateContractDto,
     @CurrentUser() user: User,
+    @Req() req: Request,
   ) {
+    // 📝 ADMIN AUDIT: Log contract update if admin
+    if (user.role === UserRole.ADMIN) {
+      const contract = await this.contractsService.findOne(id, user);
+
+      await this.adminAudit.logAdminAction({
+        adminId: user.id,
+        action: 'UPDATE_CONTRACT',
+        entityType: 'CONTRACT',
+        entityId: id,
+        beforeValue: contract,
+        reason: `Admin updated contract ${contract.contractNumber}, fields: ${Object.keys(updateContractDto).join(', ')}`,
+        ipAddress: req.ip,
+        timestamp: new Date(),
+      });
+    }
+
     return this.contractsService.update(id, updateContractDto, user);
   }
 
@@ -205,6 +236,18 @@ export class ContractsController {
     return this.contractsService.renew(id, user.id, renewDto);
   }
 
+  @Post(':id/renew')
+  @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
+  @UseGuards(ContractPartyGuard)
+  renewViaPost(
+    @Param('id') id: string,
+    @Body() renewDto: RenewContractDto,
+    @CurrentUser() user: User,
+  ) {
+    // ✅ Backward compatibility: FE can use POST or PATCH for renew
+    return this.contractsService.renew(id, user.id, renewDto);
+  }
+
   @Delete(':id')
   @Auth(UserRole.ADMIN)
   async remove(
@@ -214,7 +257,7 @@ export class ContractsController {
   ) {
     // 📝 ADMIN AUDIT: Log contract deletion before executing
     const contract = await this.contractsService.findOne(id);
-    
+
     await this.adminAudit.logAdminAction({
       adminId: user.id,
       action: 'DELETE_CONTRACT',
@@ -244,11 +287,32 @@ export class ContractsController {
   @Delete(':id/residents/:residentId')
   @Auth(UserRole.TENANT, UserRole.LANDLORD, UserRole.ADMIN)
   @UseGuards(ContractPartyGuard)
-  removeResident(
+  async removeResident(
     @Param('id') id: string,
     @Param('residentId') residentId: string,
     @CurrentUser() user: User,
+    @Req() req: Request,
   ) {
+    // 📝 ADMIN AUDIT: Log resident deletion before executing (if admin)
+    if (user.role === UserRole.ADMIN) {
+      const resident = await this.prisma.contractResident.findUnique({
+        where: { id: residentId },
+      });
+
+      if (resident) {
+        await this.adminAudit.logAdminAction({
+          adminId: user.id,
+          action: 'DELETE_RESIDENT',
+          entityType: 'CONTRACT_RESIDENT',
+          entityId: residentId,
+          beforeValue: resident,
+          reason: `Admin deleted resident ${resident.fullName} from contract`,
+          ipAddress: req.ip,
+          timestamp: new Date(),
+        });
+      }
+    }
+
     return this.contractsService.removeResident(id, residentId, user.id);
   }
 
@@ -344,15 +408,16 @@ export class ContractsController {
   async signContract(
     @Param('id') id: string,
     @CurrentUser() user: User,
+    @Req() req: any,
     @Body() body: { reason: string },
   ) {
     if (!user) {
       throw new BadRequestException('User information is required');
     }
 
-    // TODO: Parse real IP and UserAgent from request headers
-    // ipAddress: req.ip || req.headers['x-forwarded-for']
-    // userAgent: req.headers['user-agent']
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'N/A';
+    const userAgent = req.headers['user-agent'] || 'N/A';
+
     return this.contractSigningService.signContract(
       id,
       {
@@ -362,8 +427,8 @@ export class ContractsController {
         reason: body.reason || 'Contract signature',
       },
       {
-        ipAddress: 'N/A', // TODO: Parse from request.ip
-        userAgent: 'N/A', // TODO: Parse from request.headers['user-agent']
+        ipAddress: typeof ipAddress === 'string' ? ipAddress : ipAddress[0],
+        userAgent: userAgent,
         deviceInfo: 'Web Browser',
       },
     );

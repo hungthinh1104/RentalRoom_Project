@@ -90,7 +90,7 @@ export function AIChatWidget() {
                 <Sparkles className="h-8 w-8 text-primary" />
               </div>
               <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-1 shadow-sm">
-                <div className="h-2.5 w-2.5 bg-green-500 rounded-full border-2 border-background"></div>
+                <div className="h-2.5 w-2.5 bg-success rounded-full border-2 border-background"></div>
               </div>
             </div>
 

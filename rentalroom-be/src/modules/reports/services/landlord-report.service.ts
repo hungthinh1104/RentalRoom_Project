@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import {
   LandlordRevenueQueryDto,
   LandlordRevenueResponseDto,
@@ -111,6 +112,55 @@ export class LandlordReportService {
       return b.month - a.month;
     });
 
+    const roomBreakdownConditions: Prisma.Sql[] = [
+      Prisma.sql`b.landlord_id = ${landlordId}`,
+    ];
+
+    if (startDate) {
+      roomBreakdownConditions.push(
+        Prisma.sql`make_date(b.year, b.month, 1) >= ${new Date(startDate)}`,
+      );
+    }
+
+    if (endDate) {
+      roomBreakdownConditions.push(
+        Prisma.sql`make_date(b.year, b.month, 1) <= ${new Date(endDate)}`,
+      );
+    }
+
+    const joinProperty = propertyId
+      ? Prisma.sql`JOIN room r ON r.id = b.room_id`
+      : Prisma.sql``;
+
+    if (propertyId) {
+      roomBreakdownConditions.push(Prisma.sql`r.property_id = ${propertyId}`);
+    }
+
+    const roomBreakdown = await this.prisma.$queryRaw<
+      Array<{
+        roomId: string;
+        roomNumber: string;
+        year: number;
+        month: number;
+        totalRevenue: number;
+        invoiceCount: number;
+      }>
+    >(
+      Prisma.sql`
+        SELECT
+          b.room_id as "roomId",
+          b.room_number as "roomNumber",
+          b.year as "year",
+          b.month as "month",
+          b.total_revenue as "totalRevenue",
+          b.invoice_count as "invoiceCount"
+        FROM landlord_room_breakdown b
+        ${joinProperty}
+        WHERE ${Prisma.join(roomBreakdownConditions, ' AND ')}
+        ORDER BY b.year DESC, b.month DESC
+      `,
+    );
+
     // Calculate summary
     const summary = {
       totalRevenue: monthlyData.reduce(
@@ -136,6 +186,7 @@ export class LandlordReportService {
     return {
       summary,
       monthlyBreakdown: monthlyData,
+      roomBreakdown,
     };
   }
 

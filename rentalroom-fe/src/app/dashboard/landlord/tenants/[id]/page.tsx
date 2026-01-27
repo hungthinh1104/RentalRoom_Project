@@ -28,6 +28,7 @@ import { Contract, ContractStatus } from "@/types";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import api from "@/lib/api/client";
+import { cn } from "@/lib/utils";
 
 export default function TenantDetailPage() {
 	const params = useParams();
@@ -60,19 +61,19 @@ export default function TenantDetailPage() {
 
 	const getStatusBadge = (status: ContractStatus) => {
 		const variants = {
-			ACTIVE: { variant: "default" as const, icon: CheckCircle2, label: "Đang hoạt động", className: "bg-green-500" },
-			TERMINATED: { variant: "destructive" as const, icon: XCircle, label: "Đã kết thúc", className: "bg-red-500" },
-			EXPIRED: { variant: "secondary" as const, icon: Clock, label: "Hết hạn", className: "bg-yellow-500" },
-			DRAFT: { variant: "outline" as const, icon: FileText, label: "Nháp", className: "bg-gray-500" },
-			PENDING_SIGNATURE: { variant: "secondary" as const, icon: AlertCircle, label: "Chờ ký", className: "bg-blue-500" },
-			DEPOSIT_PENDING: { variant: "secondary" as const, icon: AlertCircle, label: "Chờ đặt cọc", className: "bg-orange-500" },
+			ACTIVE: { variant: "default" as const, icon: CheckCircle2, label: "Đang hoạt động", className: "bg-success text-success-foreground" },
+			TERMINATED: { variant: "destructive" as const, icon: XCircle, label: "Đã kết thúc", className: "bg-destructive text-destructive-foreground" },
+			EXPIRED: { variant: "secondary" as const, icon: Clock, label: "Hết hạn", className: "bg-warning text-warning-foreground" },
+			DRAFT: { variant: "outline" as const, icon: FileText, label: "Nháp", className: "bg-muted text-muted-foreground" },
+			PENDING_SIGNATURE: { variant: "secondary" as const, icon: AlertCircle, label: "Chờ ký", className: "bg-info text-info-foreground" },
+			DEPOSIT_PENDING: { variant: "secondary" as const, icon: AlertCircle, label: "Chờ đặt cọc", className: "bg-accent-purple text-accent-purple-foreground" },
 		};
 
 		const config = variants[status as keyof typeof variants] || variants.DRAFT;
 		const Icon = config.icon;
 
 		return (
-			<Badge variant={config.variant} className="gap-1">
+			<Badge variant={config.variant} className={cn("gap-1", config.className)}>
 				<Icon className="w-3 h-3" />
 				{config.label}
 			</Badge>
@@ -131,7 +132,7 @@ export default function TenantDetailPage() {
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle className="text-sm font-medium">Hợp đồng hoạt động</CardTitle>
-						<CheckCircle2 className="h-4 w-4 text-green-500" />
+						<CheckCircle2 className="h-4 w-4 text-success" />
 					</CardHeader>
 					<CardContent>
 						<div className="text-2xl font-bold">{activeContracts.length}</div>
@@ -152,9 +153,9 @@ export default function TenantDetailPage() {
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle className="text-sm font-medium">Trạng thái</CardTitle>
 						{activeContracts.length > 0 ? (
-							<CheckCircle2 className="h-4 w-4 text-green-500" />
+							<CheckCircle2 className="h-4 w-4 text-success" />
 						) : (
-							<XCircle className="h-4 w-4 text-red-500" />
+							<XCircle className="h-4 w-4 text-destructive" />
 						)}
 					</CardHeader>
 					<CardContent>

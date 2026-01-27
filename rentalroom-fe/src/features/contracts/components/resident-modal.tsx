@@ -96,7 +96,7 @@ export function ResidentModal({
                             name="fullName"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Họ và tên <span className="text-red-500">*</span></FormLabel>
+                                    <FormLabel>Họ và tên <span className="text-destructive">*</span></FormLabel>
                                     <FormControl>
                                         <Input placeholder="Nguyễn Văn A" {...field} />
                                     </FormControl>

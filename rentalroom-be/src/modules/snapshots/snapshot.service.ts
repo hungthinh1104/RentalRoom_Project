@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma/prisma.service';
-import { UserRole, Prisma, PrismaClient } from '@prisma/client';
+import { UserRole, Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
 export interface CreateSnapshotDto {
@@ -30,7 +30,7 @@ export interface DocumentRef {
 
 @Injectable()
 export class SnapshotService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Create immutable legal snapshot
@@ -54,7 +54,7 @@ export class SnapshotService {
     const regulations = await this.getActiveRegulations(timestamp, prisma);
 
     // 2. Get active document versions (MVP: hardcoded, can be DB later)
-    const documentVersions = await this.getActiveDocumentVersions();
+    const documentVersions = await this.getActiveDocumentVersions(prisma);
 
     // 3. Generate immutable hash
     const snapshotData = {
@@ -74,6 +74,15 @@ export class SnapshotService {
 
     const dataHash = this.generateHash(snapshotData);
 
+    const previousSnapshot = await prisma.legalSnapshot.findFirst({
+      orderBy: { timestamp: 'desc' },
+    });
+
+    const previousHash =
+      previousSnapshot?.chainHash || previousSnapshot?.dataHash || null;
+
+    const chainHash = this.generateChainHash(dataHash, previousHash);
+
     // 4. Create snapshot (immutable) - use transaction if provided
     const snapshot = await prisma.legalSnapshot.create({
       data: {
@@ -89,6 +98,8 @@ export class SnapshotService {
         regulations: regulations as any,
         documentVersions: documentVersions as any,
         dataHash,
+        previousHash,
+        chainHash,
         metadata: dto.metadata,
       },
     });
@@ -105,8 +116,7 @@ export class SnapshotService {
     timestamp: Date,
     tx?: Prisma.TransactionClient | PrismaService,
   ): Promise<RegulationRef[]> {
-    const prisma =
-      (tx as Prisma.TransactionClient) || this.prisma;
+    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
     const regulations = await prisma.regulationVersion.findMany({
       where: {
         effectiveFrom: { lte: timestamp },
@@ -126,20 +136,27 @@ export class SnapshotService {
    * Get active document versions (Privacy Policy, Terms, etc.)
    * MVP: Hardcoded v1.0, can move to DB in Phase 2
    */
-  private async getActiveDocumentVersions(): Promise<DocumentRef[]> {
-    // TODO Phase 2: Query from DocumentVersion table
-    return [
-      {
-        type: 'privacy_policy',
-        version: '1.0',
-        hash: this.hashString('Initial Privacy Policy'),
+  private async getActiveDocumentVersions(
+    tx?: Prisma.TransactionClient | PrismaService,
+  ): Promise<DocumentRef[]> {
+    const prisma = (tx as Prisma.TransactionClient) || this.prisma;
+    const docs = await prisma.legalDocument.findMany({
+      where: {
+        isPublished: true,
+        deletedAt: null,
       },
-      {
-        type: 'terms_of_service',
-        version: '1.0',
-        hash: this.hashString('Initial Terms of Service'),
+      include: {
+        currentVersion: true,
       },
-    ];
+    });
+
+    return docs
+      .filter((doc) => doc.currentVersion)
+      .map((doc) => ({
+        type: doc.type,
+        version: doc.currentVersion?.version || 'unknown',
+        hash: doc.currentVersion?.contentHash || '',
+      }));
   }
 
   /**
@@ -149,6 +166,11 @@ export class SnapshotService {
   private generateHash(data: any): string {
     const canonical = JSON.stringify(data, Object.keys(data).sort());
     return crypto.createHash('sha256').update(canonical).digest('hex');
+  }
+
+  private generateChainHash(dataHash: string, previousHash: string | null) {
+    const input = `${previousHash || 'GENESIS'}:${dataHash}`;
+    return crypto.createHash('sha256').update(input).digest('hex');
   }
 
   /**
@@ -188,8 +210,17 @@ export class SnapshotService {
     };
 
     const expectedHash = this.generateHash(reconstructed);
+    const expectedChainHash = this.generateChainHash(
+      expectedHash,
+      snapshot.previousHash ?? null,
+    );
 
-    return expectedHash === snapshot.dataHash;
+    const dataHashOk = expectedHash === snapshot.dataHash;
+    const chainHashOk = snapshot.chainHash
+      ? expectedChainHash === snapshot.chainHash
+      : true;
+
+    return dataHashOk && chainHashOk;
   }
 
   /**
@@ -230,11 +261,11 @@ export class SnapshotService {
       ...(actorId && { actorId }),
       ...(startDate || endDate
         ? {
-          timestamp: {
-            ...(startDate && { gte: startDate }),
-            ...(endDate && { lte: endDate }),
-          },
-        }
+            timestamp: {
+              ...(startDate && { gte: startDate }),
+              ...(endDate && { lte: endDate }),
+            },
+          }
         : {}),
     };
 

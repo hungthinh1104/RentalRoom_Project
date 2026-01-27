@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useState } from 'react';
 import { addMonths, format } from 'date-fns';
 import { CalendarIcon, TrendingUp } from 'lucide-react';
+import { useLegalConfirmation } from '@/components/security/legal-finality-dialog';
 
 interface RenewalDialogProps {
     open: boolean;
@@ -28,17 +29,30 @@ export function RenewalDialog({
     const [durationMonths, setDurationMonths] = useState(6);
     const [increasePercentage, setIncreasePercentage] = useState(0);
     const [customPrice, setCustomPrice] = useState<number | undefined>(undefined);
+    const { confirm, Dialog: LegalDialog } = useLegalConfirmation();
 
     // Derived values
     const newEndDate = currentEndDate ? addMonths(new Date(currentEndDate), durationMonths) : addMonths(new Date(), durationMonths);
     const calculatedPrice = customPrice !== undefined ? customPrice : currentRent * (1 + increasePercentage / 100);
 
     const handleConfirm = () => {
-        onConfirm({
+        const renewalData = {
             newEndDate: newEndDate.toISOString(),
             newRentPrice: calculatedPrice,
             increasePercentage,
-        });
+        };
+
+        confirm(
+            {
+                title: "Tái ký hợp đồng",
+                description: `Bạn đang gia hạn hợp đồng đến ${format(newEndDate, 'dd/MM/yyyy')} với giá thuê mới ${calculatedPrice.toLocaleString('vi-VN')} đ/tháng. Hành động này sẽ tạo hợp đồng mới và không thể hoàn tác.`,
+                severity: "legal",
+                consentText: "Tôi xác nhận gia hạn hợp đồng với điều khoản mới",
+            },
+            () => {
+                onConfirm(renewalData);
+            }
+        );
     };
 
     return (
@@ -115,7 +129,7 @@ export function RenewalDialog({
 
                         <div className="text-sm text-muted-foreground">
                             Giá cũ: {currentRent.toLocaleString('vi-VN')} đ <br />
-                            Chênh lệch: <span className={calculatedPrice > currentRent ? "text-green-600" : ""}>
+                            Chênh lệch: <span className={calculatedPrice > currentRent ? "text-success" : ""}>
                                 {calculatedPrice > currentRent ? "+" : ""}
                                 {(calculatedPrice - currentRent).toLocaleString('vi-VN')} đ
                             </span>
@@ -132,6 +146,7 @@ export function RenewalDialog({
                     </Button>
                 </DialogFooter>
             </DialogContent>
+            <LegalDialog />
         </Dialog>
     );
 }

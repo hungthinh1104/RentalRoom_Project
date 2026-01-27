@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Mail, 
-  Phone, 
-  MapPin, 
+import {
+  Mail,
+  Phone,
+  MapPin,
   Clock,
   Send,
   MessageSquare,
@@ -32,7 +32,7 @@ const contactInfo = [
     value: 'smartroom.mail@gmail.com',
     description: 'Gửi email cho chúng tôi',
     href: 'mailto:smartroom.mail@gmail.com',
-    color: 'from-blue-500 to-cyan-500',
+    color: 'from-info to-info-light',
   },
   {
     icon: Phone,
@@ -40,7 +40,7 @@ const contactInfo = [
     value: '1900 xxxx',
     description: 'Gọi cho chúng tôi',
     href: 'tel:1900xxxx',
-    color: 'from-green-500 to-emerald-500',
+    color: 'from-success to-success-light',
   },
   {
     icon: MapPin,
@@ -48,7 +48,7 @@ const contactInfo = [
     value: '123 Đường ABC, Quận 1',
     description: 'TP. Hồ Chí Minh, Việt Nam',
     href: '#',
-    color: 'from-orange-500 to-red-500',
+    color: 'from-warning to-destructive-light',
   },
   {
     icon: Clock,
@@ -56,15 +56,15 @@ const contactInfo = [
     value: 'T2 - T7: 8:00 - 18:00',
     description: 'CN: 9:00 - 17:00',
     href: '#',
-    color: 'from-purple-500 to-pink-500',
+    color: 'from-accent-purple to-primary-light',
   },
 ];
 
 const socialLinks = [
-  { icon: Facebook, href: 'https://facebook.com', label: 'Facebook', color: 'hover:text-blue-600' },
-  { icon: Twitter, href: 'https://twitter.com', label: 'Twitter', color: 'hover:text-sky-500' },
-  { icon: Instagram, href: 'https://instagram.com', label: 'Instagram', color: 'hover:text-pink-600' },
-  { icon: Linkedin, href: 'https://linkedin.com', label: 'LinkedIn', color: 'hover:text-blue-700' },
+  { icon: Facebook, href: 'https://facebook.com', label: 'Facebook', color: 'hover:text-info' },
+  { icon: Twitter, href: 'https://twitter.com', label: 'Twitter', color: 'hover:text-info-light' },
+  { icon: Instagram, href: 'https://instagram.com', label: 'Instagram', color: 'hover:text-primary-hover' },
+  { icon: Linkedin, href: 'https://linkedin.com', label: 'LinkedIn', color: 'hover:text-info' },
 ];
 
 const fadeInUp = {
@@ -86,13 +86,13 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     setIsSubmitting(false);
     setIsSubmitted(true);
-    
+
     // Reset form after 3 seconds
     setTimeout(() => {
       setIsSubmitted(false);
@@ -109,7 +109,7 @@ export default function ContactPage() {
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-background pt-6 pb-12 overflow-hidden">
         <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
-        
+
         <div className="container mx-auto px-4">
           <motion.div
             initial="hidden"
